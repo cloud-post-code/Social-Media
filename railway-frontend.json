@@ -4,7 +4,7 @@
     "builder": "RAILPACK"
   },
   "deploy": {
-    "buildCommand": "rm -rf .vite node_modules/.vite dist || true && npm ci && npm run build",
+    "buildCommand": "bash scripts/build.sh",
     "startCommand": "npx serve dist -s -l 3000",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
