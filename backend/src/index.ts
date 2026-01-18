@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import brandRoutes from './routes/brandRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { migrate } from './migrations/migrate.js';
 
 dotenv.config();
 
@@ -28,7 +29,25 @@ app.use('/api/assets', assetRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Run migrations and start server
+async function startServer() {
+  try {
+    console.log('Running database migrations...');
+    await migrate();
+    console.log('Migrations completed, starting server...');
+  } catch (error: any) {
+    // Check if error is because tables already exist (migrations already ran)
+    if (error?.code === '42P07' || error?.message?.includes('already exists')) {
+      console.log('Tables already exist, starting server...');
+    } else {
+      console.error('Migration error:', error);
+      console.log('Starting server anyway (migrations may have already run)...');
+    }
+  }
+  
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
+startServer();
