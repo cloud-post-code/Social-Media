@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "rm -rf .vite dist node_modules/.vite || true",
     "build": "vite build",
     "preview": "vite preview",
     "backend:dev": "cd backend && npm run dev",

@@ -20,28 +20,18 @@ async function migrate() {
     await client.query('COMMIT');
     
     console.log('Migrations completed successfully!');
-  } catch (error: any) {
-    await client.query('ROLLBACK').catch(() => {}); // Ignore rollback errors
-    // Check if error is because tables already exist (migrations already ran)
-    if (error?.code === '42P07' || error?.message?.includes('already exists')) {
-      console.log('Tables already exist, skipping migrations');
-      return; // Success - migrations already applied
-    }
+  } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Migration failed:', error);
     throw error;
   } finally {
     client.release();
-    // Don't close the pool - server needs it!
+    await pool.end();
   }
 }
 
-// Only run migrations if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  migrate().catch((error) => {
-    console.error('Migration error:', error);
-    process.exit(1);
-  });
-}
-
-export { migrate };
+migrate().catch((error) => {
+  console.error('Migration error:', error);
+  process.exit(1);
+});
 

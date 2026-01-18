@@ -16,5 +16,5 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
   },
-  cacheDir: '.vite',
+  cacheDir: '.vite-cache', // Use a directory outside node_modules
 });
