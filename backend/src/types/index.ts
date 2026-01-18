@@ -25,7 +25,6 @@ export interface BrandDNA {
     core_value_prop: string;
     product_category: string;
   };
-  image_generation_prompt_prefix: string;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -51,7 +50,6 @@ export interface BrandRow {
   visual_identity: any;
   brand_voice: any;
   strategic_profile: any;
-  image_generation_prompt_prefix: string;
   created_at: Date;
   updated_at: Date;
 }

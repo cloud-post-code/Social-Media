@@ -33,7 +33,7 @@ export const createBrand = async (brand: BrandDNA): Promise<BrandDNA> => {
       JSON.stringify(brand.visual_identity),
       JSON.stringify(brand.brand_voice),
       JSON.stringify(brand.strategic_profile),
-      brand.image_generation_prompt_prefix || ''
+      '' // image_generation_prompt_prefix deprecated, always empty
     ]
   );
   return rowToBrandDNA(result.rows[0]);
@@ -62,7 +62,7 @@ export const updateBrand = async (id: string, brand: Partial<BrandDNA>): Promise
       JSON.stringify(updated.visual_identity),
       JSON.stringify(updated.brand_voice),
       JSON.stringify(updated.strategic_profile),
-      updated.image_generation_prompt_prefix || '',
+      '', // image_generation_prompt_prefix deprecated, always empty
       id
     ]
   );
@@ -86,7 +86,6 @@ function rowToBrandDNA(row: BrandRow): BrandDNA {
     visual_identity: row.visual_identity,
     brand_voice: row.brand_voice,
     strategic_profile: row.strategic_profile,
-    image_generation_prompt_prefix: row.image_generation_prompt_prefix,
     created_at: row.created_at,
     updated_at: row.updated_at
   };

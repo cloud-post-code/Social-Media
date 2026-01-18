@@ -25,7 +25,6 @@ export interface BrandDNA {
     core_value_prop: string;
     product_category: string;
   };
-  image_generation_prompt_prefix: string;
   created_at?: Date;
   updated_at?: Date;
 }

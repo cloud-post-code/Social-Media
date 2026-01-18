@@ -25,64 +25,243 @@ const safeJsonParse = (str: string) => {
 export const extractBrandDNA = async (input: { url?: string; imageBase64?: string }): Promise<BrandDNA> => {
   const ai = getAIClient();
   const model = 'gemini-3-flash-preview';
+  
+  const source = input.url ? `website URL: ${input.url}` : 'attached website screenshot';
+  const urlContext = input.url ? `\n\nIMPORTANT: Visit and analyze the website at ${input.url}. Extract information directly from the website content, design, and messaging.` : '';
 
-  const prompt = `
-    You are an expert Chief Marketing Officer and Creative Director. 
-    Analyze the provided ${input.url ? `URL: ${input.url}` : 'attached website screenshot'} to reverse-engineer the company's "Brand DNA."
-
-    Output a strictly formatted JSON object with this structure:
+  // Step 1: Extract Basic Brand Information
+  const basicInfoPrompt = `
+    You are an expert Chief Marketing Officer and Creative Director.
+    Analyze the ${source} to extract the core brand identity information.
+    ${urlContext}
+    
+    Focus specifically on extracting:
+    - The company/brand name (exact name as it appears)
+    - The brand tagline or main slogan (if present)
+    - A comprehensive overview paragraph describing what the brand is about, its mission, and core values
+    
+    Return ONLY a JSON object with this exact structure:
     {
-      "name": "Company Name",
-      "tagline": "Brand tagline",
-      "overview": "Short brand overview paragraph",
-      "visual_identity": {
-        "primary_color_hex": "Extract dominant brand color",
-        "accent_color_hex": "Extract secondary/button color",
-        "background_style": "Describe background (e.g. 'Clean white', 'Dark mode gradients')",
-        "imagery_style": "Describe photography style for an image generator",
-        "font_vibe": "Describe typography personality",
-        "logo_style": "Describe the logo's visual characteristics"
-      },
-      "brand_voice": {
-        "tone_adjectives": ["Adj1", "Adj2", "Adj3"],
-        "writing_style": "Describe sentence structure",
-        "keywords_to_use": ["K1", "K2", "K3"],
-        "taboo_words": ["Word1", "Word2", "Word3"]
-      },
-      "strategic_profile": {
-        "target_audience": "Specific audience description",
-        "core_value_prop": "Main benefit promised",
-        "product_category": "Industry niche"
-      },
-      "image_generation_prompt_prefix": "Create a detailed prefix for Imagen 3. Example: 'A high-quality professional photo in the style of [Brand]...'"
+      "name": "Exact brand name",
+      "tagline": "Brand tagline or slogan",
+      "overview": "Detailed paragraph describing the brand's mission, values, and essence"
     }
     
-    Return ONLY JSON. No markdown.
+    Return ONLY JSON. No markdown, no explanations.
   `;
 
-  let contents: any;
+  let basicContents: any;
   if (input.imageBase64) {
     const base64Data = input.imageBase64.includes(',') 
       ? input.imageBase64.split(',')[1] 
       : input.imageBase64;
-    contents = {
+    basicContents = {
       parts: [
-        { text: prompt },
+        { text: basicInfoPrompt },
         { inlineData: { mimeType: "image/png", data: base64Data } }
       ]
     };
   } else {
-    contents = { parts: [{ text: prompt }] };
+    basicContents = { parts: [{ text: basicInfoPrompt }] };
   }
 
-  const response = await ai.models.generateContent({
-    model,
-    contents,
-    config: { responseMimeType: "application/json" }
-  });
+  let basicInfo: any = {};
+  try {
+    const basicResponse = await ai.models.generateContent({
+      model,
+      contents: basicContents,
+      config: { responseMimeType: "application/json" }
+    });
+    basicInfo = safeJsonParse(basicResponse.text || '{}') || {};
+  } catch (error) {
+    console.error('Error extracting basic info:', error);
+    basicInfo = {};
+  }
+  const brandName = basicInfo.name || 'Unknown Brand';
 
-  const dna = safeJsonParse(response.text || '{}');
-  return { ...dna, id: Date.now().toString() };
+  // Step 2: Extract Visual Identity
+  const visualPrompt = `
+    You are an expert Brand Designer and Visual Identity Specialist.
+    Analyze the ${source} to extract detailed visual identity information.
+    ${urlContext}
+    
+    Focus specifically on:
+    - Primary brand color (dominant color used throughout - return as hex code like #FF5733)
+    - Accent color (secondary color used for buttons, highlights - return as hex code)
+    - Background style (describe the typical background aesthetic)
+    - Imagery style (describe the photography/image style used)
+    - Typography vibe (describe the font personality and style)
+    - Logo style (describe the logo's visual characteristics)
+    
+    Return ONLY a JSON object with this exact structure:
+    {
+      "primary_color_hex": "#HEXCODE",
+      "accent_color_hex": "#HEXCODE",
+      "background_style": "Description of background style",
+      "imagery_style": "Description of imagery/photography style",
+      "font_vibe": "Description of typography personality",
+      "logo_style": "Description of logo characteristics"
+    }
+    
+    Return ONLY JSON. No markdown, no explanations.
+  `;
+
+  let visualContents: any;
+  if (input.imageBase64) {
+    const base64Data = input.imageBase64.includes(',') 
+      ? input.imageBase64.split(',')[1] 
+      : input.imageBase64;
+    visualContents = {
+      parts: [
+        { text: visualPrompt },
+        { inlineData: { mimeType: "image/png", data: base64Data } }
+      ]
+    };
+  } else {
+    visualContents = { parts: [{ text: visualPrompt }] };
+  }
+
+  let visualInfo: any = {};
+  try {
+    const visualResponse = await ai.models.generateContent({
+      model,
+      contents: visualContents,
+      config: { responseMimeType: "application/json" }
+    });
+    visualInfo = safeJsonParse(visualResponse.text || '{}') || {};
+  } catch (error) {
+    console.error('Error extracting visual identity:', error);
+    visualInfo = {};
+  }
+
+  // Step 3: Extract Brand Voice
+  const voicePrompt = `
+    You are an expert Copywriter and Brand Voice Strategist.
+    Analyze the ${source} to extract the brand's voice and messaging style.
+    ${urlContext}
+    
+    Focus specifically on:
+    - Tone adjectives (3-5 words that describe the brand's tone)
+    - Writing style (describe sentence structure, formality, length)
+    - Keywords to use (3-5 key terms/phrases the brand uses)
+    - Taboo words (words the brand avoids or would never use)
+    
+    Return ONLY a JSON object with this exact structure:
+    {
+      "tone_adjectives": ["adjective1", "adjective2", "adjective3"],
+      "writing_style": "Description of writing style",
+      "keywords_to_use": ["keyword1", "keyword2", "keyword3"],
+      "taboo_words": ["word1", "word2", "word3"]
+    }
+    
+    Return ONLY JSON. No markdown, no explanations.
+  `;
+
+  let voiceContents: any;
+  if (input.imageBase64) {
+    const base64Data = input.imageBase64.includes(',') 
+      ? input.imageBase64.split(',')[1] 
+      : input.imageBase64;
+    voiceContents = {
+      parts: [
+        { text: voicePrompt },
+        { inlineData: { mimeType: "image/png", data: base64Data } }
+      ]
+    };
+  } else {
+    voiceContents = { parts: [{ text: voicePrompt }] };
+  }
+
+  let voiceInfo: any = {};
+  try {
+    const voiceResponse = await ai.models.generateContent({
+      model,
+      contents: voiceContents,
+      config: { responseMimeType: "application/json" }
+    });
+    voiceInfo = safeJsonParse(voiceResponse.text || '{}') || {};
+  } catch (error) {
+    console.error('Error extracting brand voice:', error);
+    voiceInfo = {};
+  }
+
+  // Step 4: Extract Strategic Profile
+  const strategicPrompt = `
+    You are an expert Marketing Strategist and Brand Analyst.
+    Analyze the ${source} to extract strategic positioning information.
+    ${urlContext}
+    
+    Focus specifically on:
+    - Target audience (specific demographic and psychographic description)
+    - Core value proposition (main benefit or promise the brand makes)
+    - Product category (industry niche or category)
+    
+    Return ONLY a JSON object with this exact structure:
+    {
+      "target_audience": "Specific audience description",
+      "core_value_prop": "Main benefit promised",
+      "product_category": "Industry niche"
+    }
+    
+    Return ONLY JSON. No markdown, no explanations.
+  `;
+
+  let strategicContents: any;
+  if (input.imageBase64) {
+    const base64Data = input.imageBase64.includes(',') 
+      ? input.imageBase64.split(',')[1] 
+      : input.imageBase64;
+    strategicContents = {
+      parts: [
+        { text: strategicPrompt },
+        { inlineData: { mimeType: "image/png", data: base64Data } }
+      ]
+    };
+  } else {
+    strategicContents = { parts: [{ text: strategicPrompt }] };
+  }
+
+  let strategicInfo: any = {};
+  try {
+    const strategicResponse = await ai.models.generateContent({
+      model,
+      contents: strategicContents,
+      config: { responseMimeType: "application/json" }
+    });
+    strategicInfo = safeJsonParse(strategicResponse.text || '{}') || {};
+  } catch (error) {
+    console.error('Error extracting strategic profile:', error);
+    strategicInfo = {};
+  }
+
+  // Combine all extracted data
+  const dna: BrandDNA = {
+    id: Date.now().toString(),
+    name: basicInfo.name || 'Unknown Brand',
+    tagline: basicInfo.tagline || '',
+    overview: basicInfo.overview || '',
+    visual_identity: {
+      primary_color_hex: visualInfo.primary_color_hex || '#4F46E5',
+      accent_color_hex: visualInfo.accent_color_hex || '#F59E0B',
+      background_style: visualInfo.background_style || '',
+      imagery_style: visualInfo.imagery_style || '',
+      font_vibe: visualInfo.font_vibe || '',
+      logo_style: visualInfo.logo_style || ''
+    },
+    brand_voice: {
+      tone_adjectives: voiceInfo.tone_adjectives || [],
+      writing_style: voiceInfo.writing_style || '',
+      keywords_to_use: voiceInfo.keywords_to_use || [],
+      taboo_words: voiceInfo.taboo_words || []
+    },
+    strategic_profile: {
+      target_audience: strategicInfo.target_audience || '',
+      core_value_prop: strategicInfo.core_value_prop || '',
+      product_category: strategicInfo.product_category || ''
+    }
+  };
+
+  return dna;
 };
 
 export const generateProductStrategy = async (brandDNA: BrandDNA, productFocus: string, referenceImageBase64?: string) => {

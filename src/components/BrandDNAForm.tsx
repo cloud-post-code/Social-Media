@@ -20,12 +20,22 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
 
   const handleExtract = async () => {
     if (!urlInput) return;
+    
+    // Validate and format URL
+    let url = urlInput.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    
     setIsExtracting(true);
     try {
-      const extracted = await brandApi.extractDNA({ url: urlInput });
+      const extracted = await brandApi.extractDNA({ url });
       setFormData(extracted);
-    } catch (err) {
-      alert('Extraction failed. Please ensure the URL is valid.');
+      setUrlInput(''); // Clear input after successful extraction
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Extraction failed. Please ensure the URL is valid and accessible.';
+      alert(`Extraction failed: ${errorMessage}`);
+      console.error('DNA extraction error:', err);
     } finally {
       setIsExtracting(false);
     }
@@ -90,8 +100,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
         target_audience: formData.strategic_profile?.target_audience || 'General',
         core_value_prop: formData.strategic_profile?.core_value_prop || 'Quality products',
         product_category: formData.strategic_profile?.product_category || 'General'
-      },
-      image_generation_prompt_prefix: formData.image_generation_prompt_prefix || ''
+      }
     };
     onSave(finalData);
   };
@@ -203,18 +212,68 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                       <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Primary Color</label>
                       <div className="flex gap-3">
                         <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-                          <input type="color" className="absolute inset-0 w-[200%] h-[200%] cursor-pointer -translate-x-1/4 -translate-y-1/4" value={formData.visual_identity?.primary_color_hex || '#4F46E5'} onChange={e => updateNested('visual_identity.primary_color_hex', e.target.value)} />
+                          <input 
+                            type="color" 
+                            className="absolute inset-0 w-[200%] h-[200%] cursor-pointer -translate-x-1/4 -translate-y-1/4" 
+                            value={formData.visual_identity?.primary_color_hex || '#4F46E5'} 
+                            onChange={e => {
+                              const hex = e.target.value.toUpperCase();
+                              updateNested('visual_identity.primary_color_hex', hex);
+                            }} 
+                          />
                         </div>
-                        <input value={formData.visual_identity?.primary_color_hex || ''} onChange={e => updateNested('visual_identity.primary_color_hex', e.target.value)} className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono" />
+                        <input 
+                          type="text"
+                          value={formData.visual_identity?.primary_color_hex || ''} 
+                          onChange={e => {
+                            let value = e.target.value.toUpperCase().replace(/[^0-9A-F]/g, '');
+                            if (value.length > 0 && value[0] !== '#') value = '#' + value;
+                            if (value.length > 7) value = value.slice(0, 7);
+                            updateNested('visual_identity.primary_color_hex', value || '#4F46E5');
+                          }}
+                          onBlur={e => {
+                            const value = e.target.value;
+                            if (!value.match(/^#[0-9A-F]{6}$/i)) {
+                              updateNested('visual_identity.primary_color_hex', '#4F46E5');
+                            }
+                          }}
+                          className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono" 
+                          placeholder="#4F46E5"
+                        />
                       </div>
                    </div>
                    <div>
                       <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Accent Color</label>
                       <div className="flex gap-3">
                         <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-                          <input type="color" className="absolute inset-0 w-[200%] h-[200%] cursor-pointer -translate-x-1/4 -translate-y-1/4" value={formData.visual_identity?.accent_color_hex || '#F59E0B'} onChange={e => updateNested('visual_identity.accent_color_hex', e.target.value)} />
+                          <input 
+                            type="color" 
+                            className="absolute inset-0 w-[200%] h-[200%] cursor-pointer -translate-x-1/4 -translate-y-1/4" 
+                            value={formData.visual_identity?.accent_color_hex || '#F59E0B'} 
+                            onChange={e => {
+                              const hex = e.target.value.toUpperCase();
+                              updateNested('visual_identity.accent_color_hex', hex);
+                            }} 
+                          />
                         </div>
-                        <input value={formData.visual_identity?.accent_color_hex || ''} onChange={e => updateNested('visual_identity.accent_color_hex', e.target.value)} className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono" />
+                        <input 
+                          type="text"
+                          value={formData.visual_identity?.accent_color_hex || ''} 
+                          onChange={e => {
+                            let value = e.target.value.toUpperCase().replace(/[^0-9A-F]/g, '');
+                            if (value.length > 0 && value[0] !== '#') value = '#' + value;
+                            if (value.length > 7) value = value.slice(0, 7);
+                            updateNested('visual_identity.accent_color_hex', value || '#F59E0B');
+                          }}
+                          onBlur={e => {
+                            const value = e.target.value;
+                            if (!value.match(/^#[0-9A-F]{6}$/i)) {
+                              updateNested('visual_identity.accent_color_hex', '#F59E0B');
+                            }
+                          }}
+                          className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono" 
+                          placeholder="#F59E0B"
+                        />
                       </div>
                    </div>
                 </div>
@@ -230,14 +289,6 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Typography Vibe</label>
                   <input value={formData.visual_identity?.font_vibe || ''} onChange={e => updateNested('visual_identity.font_vibe', e.target.value)} className="w-full p-4 bg-white border border-slate-200 rounded-xl" />
                 </div>
-              </div>
-            </section>
-
-            <section>
-              <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Creative Engine</h3>
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Imagen Prompt Prefix</label>
-                <textarea rows={5} value={formData.image_generation_prompt_prefix || ''} onChange={e => setFormData({...formData, image_generation_prompt_prefix: e.target.value})} className="w-full p-4 bg-slate-900 text-indigo-300 border border-slate-800 rounded-2xl text-xs font-mono leading-relaxed" placeholder="A high-quality professional photo in the style of [Brand]..." />
               </div>
             </section>
           </div>
