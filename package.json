@@ -10,7 +10,9 @@
     "backend:dev": "cd backend && npm run dev",
     "backend:build": "cd backend && npm run build",
     "backend:start": "cd backend && npm start",
-    "backend:migrate": "cd backend && npm run migrate"
+    "backend:migrate": "cd backend && npm run migrate",
+    "deploy:railway": "node deploy/railway-setup.js",
+    "deploy:railway:bash": "./deploy/railway-setup.sh"
   },
   "dependencies": {
     "react-dom": "^19.2.3",

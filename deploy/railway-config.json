@@ -1,0 +1,44 @@
+{
+  "services": {
+    "backend": {
+      "rootDirectory": "backend",
+      "buildCommand": "npm ci && npm run build",
+      "startCommand": "npm start",
+      "environmentVariables": {
+        "DATABASE_URL": {
+          "source": "postgresql",
+          "variable": "DATABASE_URL"
+        },
+        "GEMINI_API_KEY": {
+          "required": true,
+          "description": "Your Google Gemini API key"
+        },
+        "NODE_ENV": "production",
+        "PORT": {
+          "auto": true
+        }
+      }
+    },
+    "frontend": {
+      "rootDirectory": "/",
+      "buildCommand": "npm ci && npm run build",
+      "startCommand": "npx serve dist -s -l 3000",
+      "environmentVariables": {
+        "VITE_API_URL": {
+          "required": true,
+          "description": "Backend API URL (set after backend deploys)",
+          "format": "https://your-backend.railway.app/api"
+        }
+      }
+    },
+    "postgresql": {
+      "type": "database",
+      "provider": "postgresql"
+    }
+  },
+  "migrations": {
+    "runAfterDeploy": true,
+    "command": "cd backend && npm run migrate"
+  }
+}
+
