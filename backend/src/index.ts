@@ -36,13 +36,8 @@ async function startServer() {
     await migrate();
     console.log('Migrations completed, starting server...');
   } catch (error: any) {
-    // Check if error is because tables already exist (migrations already ran)
-    if (error?.code === '42P07' || error?.message?.includes('already exists')) {
-      console.log('Tables already exist, starting server...');
-    } else {
-      console.error('Migration error:', error);
-      console.log('Starting server anyway (migrations may have already run)...');
-    }
+    console.error('Migration error:', error);
+    console.log('Starting server anyway (migrations may have already run)...');
   }
   
   app.listen(PORT, () => {
