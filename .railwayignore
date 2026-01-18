@@ -9,4 +9,7 @@ dist
 .DS_Store
 coverage
 .nyc_output
+.vite
+.vite-cache
+node_modules/.vite
 
