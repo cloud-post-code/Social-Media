@@ -1,0 +1,13 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK"
+  },
+  "deploy": {
+    "buildCommand": "npm ci && npm run build",
+    "startCommand": "npx serve dist -s -l 3000",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+
