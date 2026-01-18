@@ -30,8 +30,13 @@ async function migrate() {
   }
 }
 
-migrate().catch((error) => {
-  console.error('Migration error:', error);
-  process.exit(1);
-});
+// Only run migrations if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  migrate().catch((error) => {
+    console.error('Migration error:', error);
+    process.exit(1);
+  });
+}
+
+export { migrate };
 
