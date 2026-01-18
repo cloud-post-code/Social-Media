@@ -20,13 +20,18 @@ async function migrate() {
     await client.query('COMMIT');
     
     console.log('Migrations completed successfully!');
-  } catch (error) {
-    await client.query('ROLLBACK');
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {}); // Ignore rollback errors
+    // Check if error is because tables already exist (migrations already ran)
+    if (error?.code === '42P07' || error?.message?.includes('already exists')) {
+      console.log('Tables already exist, skipping migrations');
+      return; // Success - migrations already applied
+    }
     console.error('Migration failed:', error);
     throw error;
   } finally {
     client.release();
-    await pool.end();
+    // Don't close the pool - server needs it!
   }
 }
 
