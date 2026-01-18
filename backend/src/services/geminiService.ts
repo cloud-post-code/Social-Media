@@ -72,9 +72,13 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
       contents: basicContents,
       config: { responseMimeType: "application/json" }
     });
+    if (!basicResponse.text) {
+      throw new Error('No response text from Gemini API');
+    }
     basicInfo = safeJsonParse(basicResponse.text || '{}') || {};
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error extracting basic info:', error);
+    // Continue with defaults to allow partial extraction
     basicInfo = {};
   }
   const brandName = basicInfo.name || 'Unknown Brand';
@@ -128,9 +132,13 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
       contents: visualContents,
       config: { responseMimeType: "application/json" }
     });
+    if (!visualResponse.text) {
+      throw new Error('No response text from Gemini API');
+    }
     visualInfo = safeJsonParse(visualResponse.text || '{}') || {};
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error extracting visual identity:', error);
+    // Continue with defaults instead of throwing to allow partial extraction
     visualInfo = {};
   }
 
@@ -179,9 +187,13 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
       contents: voiceContents,
       config: { responseMimeType: "application/json" }
     });
+    if (!voiceResponse.text) {
+      throw new Error('No response text from Gemini API');
+    }
     voiceInfo = safeJsonParse(voiceResponse.text || '{}') || {};
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error extracting brand voice:', error);
+    // Continue with defaults instead of throwing to allow partial extraction
     voiceInfo = {};
   }
 
@@ -228,9 +240,13 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
       contents: strategicContents,
       config: { responseMimeType: "application/json" }
     });
+    if (!strategicResponse.text) {
+      throw new Error('No response text from Gemini API');
+    }
     strategicInfo = safeJsonParse(strategicResponse.text || '{}') || {};
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error extracting strategic profile:', error);
+    // Continue with defaults instead of throwing to allow partial extraction
     strategicInfo = {};
   }
 

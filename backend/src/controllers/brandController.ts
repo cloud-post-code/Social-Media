@@ -66,8 +66,13 @@ export const extractBrandDNA = async (req: Request, res: Response, next: NextFun
 
     const extractedDNA = await geminiService.extractBrandDNA({ url, imageBase64 });
     res.json(extractedDNA);
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    console.error('Error in extractBrandDNA controller:', error);
+    const errorMessage = error?.message || 'Failed to extract brand DNA';
+    const statusCode = error?.statusCode || 500;
+    res.status(statusCode).json({
+      error: { message: errorMessage }
+    });
   }
 };
 

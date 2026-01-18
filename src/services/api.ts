@@ -18,9 +18,39 @@ async function request<T>(
 
   const response = await fetch(url, config);
 
+  // Check content type before parsing
+  const contentType = response.headers.get('content-type');
+  const isJson = contentType && contentType.includes('application/json');
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: { message: response.statusText } }));
-    throw new Error(error.error?.message || `HTTP error! status: ${response.status}`);
+    let errorMessage = response.statusText;
+    if (isJson) {
+      try {
+        const error = await response.json();
+        errorMessage = error.error?.message || error.message || response.statusText;
+      } catch (e) {
+        // If JSON parsing fails, use status text
+        errorMessage = response.statusText;
+      }
+    } else {
+      // If response is HTML (like a 404 page), try to get text
+      try {
+        const text = await response.text();
+        if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+          errorMessage = `Server returned HTML instead of JSON. This usually means the endpoint doesn't exist or the server isn't running. Status: ${response.status}`;
+        } else {
+          errorMessage = text.substring(0, 200) || response.statusText;
+        }
+      } catch (e) {
+        errorMessage = `HTTP error! status: ${response.status}`;
+      }
+    }
+    throw new Error(errorMessage);
+  }
+
+  if (!isJson) {
+    const text = await response.text();
+    throw new Error(`Expected JSON but received: ${contentType || 'unknown content type'}. Response: ${text.substring(0, 200)}`);
   }
 
   return response.json();
