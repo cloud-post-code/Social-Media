@@ -5,27 +5,49 @@ import { BrandAsset, BrandAssetRow } from '../types/index.js';
  * Fetch an external image URL and convert it to base64 data URL
  */
 async function fetchImageAsBase64(imageUrl: string): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  
   try {
+    console.log(`[Image Fetch] Starting fetch for: ${imageUrl.substring(0, 100)}...`);
+    
     const response = await fetch(imageUrl, {
+      signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'image/*'
+        'Accept': 'image/*',
+        'Referer': imageUrl.split('/').slice(0, 3).join('/') // Add referer to help with some sites
       }
     });
     
+    clearTimeout(timeoutId);
+    
     if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.startsWith('image/')) {
+      console.warn(`[Image Fetch] Unexpected content-type: ${contentType} for ${imageUrl}`);
+      // Continue anyway - might still be an image
     }
     
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const base64 = buffer.toString('base64');
-    const contentType = response.headers.get('content-type') || 'image/png';
+    const finalContentType = contentType || 'image/png';
     
-    return `data:${contentType};base64,${base64}`;
+    const dataUrl = `data:${finalContentType};base64,${base64}`;
+    console.log(`[Image Fetch] Successfully converted ${imageUrl.substring(0, 50)}... to base64 (${Math.round(buffer.length / 1024)}KB)`);
+    
+    return dataUrl;
   } catch (error: any) {
-    console.error(`Error fetching image ${imageUrl}:`, error.message);
-    throw new Error(`Failed to fetch image from ${imageUrl}: ${error.message}`);
+    clearTimeout(timeoutId);
+    const errorMsg = error.name === 'AbortError' 
+      ? 'Request timeout after 30 seconds'
+      : error.message || 'Unknown error';
+    console.error(`[Image Fetch] Failed to fetch ${imageUrl}:`, errorMsg);
+    throw new Error(`Failed to fetch image from ${imageUrl}: ${errorMsg}`);
   }
 }
 
@@ -79,14 +101,18 @@ export const createBrandAsset = async (
   let finalImageUrl = imageUrl;
   if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
     try {
-      console.log(`Fetching external image: ${imageUrl}`);
       finalImageUrl = await fetchImageAsBase64(imageUrl);
-      console.log(`Successfully converted external image to base64`);
     } catch (error: any) {
-      console.error(`Failed to fetch image ${imageUrl}, using URL as-is:`, error.message);
-      // Fallback: use URL as-is (might fail due to CORS, but at least we tried)
-      // In production, you might want to throw here instead
+      // Don't silently fall back - external URLs will fail due to CORS
+      // Log the error and rethrow so the caller knows it failed
+      console.error(`[Brand Asset] CRITICAL: Failed to convert external image to base64: ${imageUrl}`, error.message);
+      throw new Error(`Unable to fetch and convert image from ${imageUrl}. The image may be inaccessible or the URL may be invalid: ${error.message}`);
     }
+  }
+  
+  // Validate that we have a valid image URL (either base64 data URL or relative path)
+  if (!finalImageUrl || finalImageUrl.trim().length === 0) {
+    throw new Error('Invalid image URL: empty or whitespace');
   }
   
   const id = `${assetType}_${brandId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -128,6 +154,43 @@ export const migrateBrandAssets = async (
       }
     }
   }
+};
+
+/**
+ * Convert existing external URLs in database to base64 (for migration/fix)
+ */
+export const convertExternalUrlsToBase64 = async (brandId?: string): Promise<{ converted: number; failed: number }> => {
+  let query = 'SELECT * FROM brand_assets WHERE image_url LIKE $1';
+  const params: any[] = ['http%'];
+  
+  if (brandId) {
+    query += ' AND brand_id = $2';
+    params.push(brandId);
+  }
+  
+  const result = await pool.query<BrandAssetRow>(query, params);
+  let converted = 0;
+  let failed = 0;
+  
+  for (const row of result.rows) {
+    if (row.image_url.startsWith('http://') || row.image_url.startsWith('https://')) {
+      try {
+        console.log(`[Migration] Converting ${row.id}: ${row.image_url.substring(0, 100)}...`);
+        const base64 = await fetchImageAsBase64(row.image_url);
+        await pool.query(
+          'UPDATE brand_assets SET image_url = $1 WHERE id = $2',
+          [base64, row.id]
+        );
+        converted++;
+        console.log(`[Migration] Successfully converted asset ${row.id}`);
+      } catch (error: any) {
+        failed++;
+        console.error(`[Migration] Failed to convert asset ${row.id}:`, error.message);
+      }
+    }
+  }
+  
+  return { converted, failed };
 };
 
 function rowToBrandAsset(row: BrandAssetRow): BrandAsset {

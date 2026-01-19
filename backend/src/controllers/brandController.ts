@@ -82,27 +82,37 @@ export const extractBrandDNA = async (req: Request, res: Response, next: NextFun
         try {
           if (extractedAssets.logoUrl) {
             try {
+              console.log(`[Extract] Saving logo: ${extractedAssets.logoUrl.substring(0, 100)}...`);
               await brandAssetService.createBrandAsset(createdBrand.id, extractedAssets.logoUrl, 'logo');
+              console.log(`[Extract] Logo saved successfully`);
             } catch (err: any) {
-              // Logo might already exist or other error - log but continue
-              console.error('Failed to save extracted logo:', err.message);
+              // Logo might already exist or conversion failed - log but continue
+              console.error(`[Extract] Failed to save extracted logo:`, err.message);
+              // Don't throw - brand is already created, just log the issue
             }
           }
           
           if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
+            let savedCount = 0;
             for (const imageUrl of extractedAssets.imageUrls.slice(0, 10)) {
               try {
+                console.log(`[Extract] Saving image ${savedCount + 1}/${Math.min(extractedAssets.imageUrls.length, 10)}: ${imageUrl.substring(0, 100)}...`);
                 await brandAssetService.createBrandAsset(createdBrand.id, imageUrl, 'brand_image');
+                savedCount++;
+                console.log(`[Extract] Image ${savedCount} saved successfully`);
               } catch (err: any) {
                 if (err.message?.includes('Maximum')) {
+                  console.log(`[Extract] Reached maximum image limit`);
                   break; // Reached max limit
                 }
-                console.error('Failed to save extracted image:', err.message);
+                console.error(`[Extract] Failed to save extracted image:`, err.message);
+                // Continue with next image
               }
             }
+            console.log(`[Extract] Successfully saved ${savedCount} brand images`);
           }
         } catch (err) {
-          console.error('Error saving extracted assets:', err);
+          console.error('[Extract] Error saving extracted assets:', err);
           // Continue even if asset saving fails - brand is already created
         }
       }

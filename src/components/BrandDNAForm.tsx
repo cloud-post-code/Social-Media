@@ -428,19 +428,26 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                       className="max-w-xs max-h-24 object-contain"
                       onError={(e) => {
                         const img = e.target as HTMLImageElement;
+                        const imageUrl = logo.image_url;
+                        const isExternalUrl = imageUrl.startsWith('http://') || imageUrl.startsWith('https://');
+                        
+                        console.error('Failed to load logo image:', imageUrl, isExternalUrl ? '(External URL - may need conversion)' : '');
+                        
                         img.style.display = 'none';
                         // Show error message
                         const parent = img.parentElement;
                         if (parent && !parent.querySelector('.error-message')) {
                           const errorDiv = document.createElement('div');
                           errorDiv.className = 'error-message text-red-500 text-xs mt-2 text-center';
-                          errorDiv.textContent = 'Failed to load image';
+                          errorDiv.textContent = isExternalUrl 
+                            ? 'Failed to load image (external URL blocked)'
+                            : 'Failed to load image';
                           parent.appendChild(errorDiv);
                         }
-                        console.error('Failed to load logo image:', logo.image_url);
                       }}
                       onLoad={() => {
-                        console.log('Logo loaded successfully:', logo.image_url.substring(0, 50));
+                        const isBase64 = logo.image_url.startsWith('data:');
+                        console.log(`Logo loaded successfully: ${isBase64 ? 'base64' : 'URL'} (${logo.image_url.substring(0, 50)}...)`);
                       }}
                     />
                   </div>
@@ -487,19 +494,24 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           const img = e.target as HTMLImageElement;
+                          const imageUrl = asset.image_url;
+                          const isExternalUrl = imageUrl.startsWith('http://') || imageUrl.startsWith('https://');
+                          
+                          console.error('Failed to load brand image:', imageUrl.substring(0, 50), isExternalUrl ? '(External URL - may need conversion)' : '');
+                          
                           img.style.display = 'none';
                           // Show error indicator
                           const parent = img.parentElement;
                           if (parent && !parent.querySelector('.error-indicator')) {
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'error-indicator absolute inset-0 flex items-center justify-center bg-red-50';
-                            errorDiv.innerHTML = '<span class="text-red-500 text-xs">Failed to load</span>';
+                            errorDiv.innerHTML = `<span class="text-red-500 text-xs">${isExternalUrl ? 'External URL blocked' : 'Failed to load'}</span>`;
                             parent.appendChild(errorDiv);
                           }
-                          console.error('Failed to load brand image:', asset.image_url.substring(0, 50));
                         }}
                         onLoad={() => {
-                          console.log('Brand image loaded successfully:', asset.image_url.substring(0, 50));
+                          const isBase64 = asset.image_url.startsWith('data:');
+                          console.log(`Brand image loaded: ${isBase64 ? 'base64' : 'URL'} (${asset.image_url.substring(0, 50)}...)`);
                         }}
                       />
                       <button
