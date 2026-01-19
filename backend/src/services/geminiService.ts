@@ -558,12 +558,41 @@ export const generateCampaignStrategy = async (brandDNA: BrandDNA, campaignDetai
   return safeJsonParse(response.text || '{}');
 };
 
-export const generateImage = async (prompt: string): Promise<string> => {
+export const generateImage = async (prompt: string, width: number = 1080, height: number = 1080): Promise<string> => {
   const ai = getAIClient();
+  
+  // Calculate aspect ratio from dimensions (simplify to common ratios)
+  // Gemini API supports: "1:1", "9:16", "16:9", "4:3", "3:4"
+  let aspectRatio: string;
+  const ratio = width / height;
+  
+  if (Math.abs(ratio - 1) < 0.1) {
+    aspectRatio = "1:1"; // Square
+  } else if (Math.abs(ratio - 9/16) < 0.1 || Math.abs(ratio - 1080/1920) < 0.1) {
+    aspectRatio = "9:16"; // Portrait/Story
+  } else if (Math.abs(ratio - 16/9) < 0.1 || Math.abs(ratio - 1920/1080) < 0.1) {
+    aspectRatio = "16:9"; // Landscape
+  } else if (Math.abs(ratio - 4/3) < 0.1) {
+    aspectRatio = "4:3";
+  } else if (Math.abs(ratio - 3/4) < 0.1) {
+    aspectRatio = "3:4";
+  } else {
+    // Default to square for unknown ratios
+    aspectRatio = "1:1";
+  }
+  
+  // Determine image size based on larger dimension
+  const imageSize = Math.max(width, height) >= 2048 ? "4K" : "2K";
+  
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview', // Nano Banana Pro - higher fidelity, up to 4K output
     contents: { parts: [{ text: prompt }] },
-    config: { imageConfig: { aspectRatio: "1:1", imageSize: "2K" } }
+    config: { 
+      imageConfig: { 
+        aspectRatio: aspectRatio as any, 
+        imageSize: imageSize as any 
+      } 
+    }
   });
 
   for (const part of response.candidates?.[0]?.content?.parts || []) {

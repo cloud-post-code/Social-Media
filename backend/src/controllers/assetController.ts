@@ -43,7 +43,7 @@ export const getAssetById = async (req: Request, res: Response, next: NextFuncti
 
 export const generateProductAsset = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { brandId, productFocus, referenceImageBase64 } = req.body;
+    const { brandId, productFocus, referenceImageBase64, width, height } = req.body;
 
     if (!brandId || !productFocus) {
       return res.status(400).json({ 
@@ -68,7 +68,9 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
     }
 
     const baseImageUrl = await geminiService.generateImage(
-      imagePromptResult.imagen_prompt_final
+      imagePromptResult.imagen_prompt_final,
+      width || 1080,
+      height || 1080
     );
 
     // Step 2: Generate title and subtitle
@@ -193,6 +195,8 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
       x_percent: overlay_config.x_percent !== undefined ? overlay_config.x_percent : asset.overlay_config?.x_percent,
       y_percent: overlay_config.y_percent !== undefined ? overlay_config.y_percent : asset.overlay_config?.y_percent,
       text_anchor: overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle',
+      title_text_anchor: overlay_config.title_text_anchor !== undefined ? overlay_config.title_text_anchor : (asset.overlay_config?.title_text_anchor || overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle'),
+      subtitle_text_anchor: overlay_config.subtitle_text_anchor !== undefined ? overlay_config.subtitle_text_anchor : (asset.overlay_config?.subtitle_text_anchor || overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle'),
       position: overlay_config.position || asset.overlay_config?.position || 'bottom-right' // Keep for backward compatibility
     };
 

@@ -230,12 +230,16 @@ export const applyTextOverlay = async (
     let x: number;
     let y: number;
     let textAnchor: 'start' | 'middle' | 'end';
+    let titleTextAnchor: 'start' | 'middle' | 'end';
+    let subtitleTextAnchor: 'start' | 'middle' | 'end';
     
     if (overlayConfig.x_percent !== undefined && overlayConfig.y_percent !== undefined) {
       // Use pixel-based positioning (percentages)
       const requestedX = (width * overlayConfig.x_percent) / 100;
       const requestedY = (height * overlayConfig.y_percent) / 100;
       textAnchor = overlayConfig.text_anchor || 'middle';
+      titleTextAnchor = overlayConfig.title_text_anchor || overlayConfig.text_anchor || 'middle';
+      subtitleTextAnchor = overlayConfig.subtitle_text_anchor || overlayConfig.text_anchor || 'middle';
       
       // Boundary validation: ensure text stays within image bounds
       // Use larger padding to ensure text never overlaps edges
@@ -243,11 +247,12 @@ export const applyTextOverlay = async (
       const halfTextWidth = actualMaxWidth / 2;
       const halfTextHeight = totalTextHeight / 2;
       
-      // Adjust X based on text anchor to keep text within bounds
-      if (textAnchor === 'start') {
+      // Adjust X based on title text anchor (primary anchor) to keep text within bounds
+      const anchorForBounds = titleTextAnchor;
+      if (anchorForBounds === 'start') {
         // Left-aligned: ensure left edge doesn't go past padding, right edge doesn't exceed width
         x = Math.max(padding, Math.min(requestedX, width - actualMaxWidth - padding));
-      } else if (textAnchor === 'end') {
+      } else if (anchorForBounds === 'end') {
         // Right-aligned: ensure right edge doesn't go past width-padding, left edge doesn't go below padding
         x = Math.max(actualMaxWidth + padding, Math.min(requestedX, width - padding));
       } else {
@@ -283,6 +288,8 @@ export const applyTextOverlay = async (
         : overlayConfig.position?.includes('left') 
         ? 'start' 
         : 'middle';
+      titleTextAnchor = overlayConfig.title_text_anchor || textAnchor;
+      subtitleTextAnchor = overlayConfig.subtitle_text_anchor || textAnchor;
     }
     
     // Calculate Y positions for title and subtitle (accounting for multiple lines)
@@ -327,7 +334,7 @@ export const applyTextOverlay = async (
     const escapedSubtitleLines = subtitleLines.map(line => escapeXml(line));
     
     // Generate SVG text elements for each line
-    const generateTextElements = (lines: string[], startY: number, fontSize: number, lineHeight: number, fontWeight: string, opacity: number, color: string) => {
+    const generateTextElements = (lines: string[], startY: number, fontSize: number, lineHeight: number, fontWeight: string, opacity: number, color: string, anchor: 'start' | 'middle' | 'end') => {
       return lines.map((line, index) => {
         const yPos = startY + (index * lineHeight);
         return `<text
@@ -337,7 +344,7 @@ export const applyTextOverlay = async (
     font-size="${fontSize}"
     font-weight="${fontWeight}"
     fill="${color}"
-    text-anchor="${textAnchor}"
+    text-anchor="${anchor}"
     letter-spacing="${letterSpacing}"
     opacity="${opacity}"
     filter="url(#textShadow)"
@@ -360,8 +367,8 @@ export const applyTextOverlay = async (
       </feMerge>
     </filter>
   </defs>
-  ${generateTextElements(escapedTitleLines, titleStartY, titleFontSize, titleLineHeight, fontWeight, opacity, titleColor)}
-  ${subtitleLines.length > 0 ? generateTextElements(escapedSubtitleLines, subtitleStartY, subtitleFontSize, subtitleLineHeight, fontWeight === '700' ? '400' : fontWeight, opacity * 0.9, subtitleColor) : ''}
+  ${generateTextElements(escapedTitleLines, titleStartY, titleFontSize, titleLineHeight, fontWeight, opacity, titleColor, titleTextAnchor)}
+  ${subtitleLines.length > 0 ? generateTextElements(escapedSubtitleLines, subtitleStartY, subtitleFontSize, subtitleLineHeight, fontWeight === '700' ? '400' : fontWeight, opacity * 0.9, subtitleColor, subtitleTextAnchor) : ''}
 </svg>`;
     
     // Debug logging

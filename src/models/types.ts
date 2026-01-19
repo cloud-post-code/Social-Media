@@ -42,7 +42,9 @@ export interface OverlayConfig {
   // New: Pixel-based positioning (percentages 0-100)
   x_percent?: number; // Horizontal position as percentage (0 = left, 100 = right)
   y_percent?: number; // Vertical position as percentage (0 = top, 100 = bottom)
-  text_anchor?: 'start' | 'middle' | 'end'; // Horizontal alignment of text
+  text_anchor?: 'start' | 'middle' | 'end'; // Horizontal alignment of text (legacy, applies to both)
+  title_text_anchor?: 'start' | 'middle' | 'end'; // Separate anchor for title
+  subtitle_text_anchor?: 'start' | 'middle' | 'end'; // Separate anchor for subtitle
   // Legacy: String-based position (for backward compatibility)
   position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
   max_width_percent: number;

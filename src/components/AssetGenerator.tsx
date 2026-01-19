@@ -48,6 +48,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     x_percent?: number;
     y_percent?: number;
     text_anchor?: 'start' | 'middle' | 'end';
+    title_text_anchor?: 'start' | 'middle' | 'end'; // Separate anchor for title
+    subtitle_text_anchor?: 'start' | 'middle' | 'end'; // Separate anchor for subtitle
     // Legacy: String-based position
     position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
     max_width_percent?: number;
@@ -57,6 +59,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     title_max_lines?: number;
     subtitle_max_lines?: number;
   }>({});
+  
+  // Image size selector state
+  const [imageSizePreset, setImageSizePreset] = useState<'fb-story' | 'insta-story' | 'square' | 'custom'>('square');
+  const [customWidth, setCustomWidth] = useState<number>(1080);
+  const [customHeight, setCustomHeight] = useState<number>(1080);
   
   const [eyedropperActive, setEyedropperActive] = useState<'title' | 'subtitle' | null>(null);
   const [dragModeActive, setDragModeActive] = useState(false);
@@ -176,6 +183,21 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     }
   };
 
+  // Helper function to get image dimensions based on preset
+  const getImageDimensions = () => {
+    switch (imageSizePreset) {
+      case 'fb-story':
+      case 'insta-story':
+        return { width: 1080, height: 1920 };
+      case 'square':
+        return { width: 1080, height: 1080 };
+      case 'custom':
+        return { width: customWidth, height: customHeight };
+      default:
+        return { width: 1080, height: 1080 };
+    }
+  };
+
   const handleGenerate = async () => {
     if (!activeBrand) return;
     setLoading(true);
@@ -185,10 +207,13 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       let asset: GeneratedAsset;
 
       if (option === 'product') {
+        const dimensions = getImageDimensions();
         asset = await assetApi.generateProduct({
           brandId: activeBrand.id,
           productFocus,
-          referenceImageBase64: productImage || undefined
+          referenceImageBase64: productImage || undefined,
+          width: dimensions.width,
+          height: dimensions.height
         });
         setStatusText('Capturing high-fidelity visual...');
       } else if (option === 'non-product') {
@@ -370,6 +395,81 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                     className="w-full h-52 p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] outline-none focus:bg-white focus:ring-4 focus:ring-indigo-50/50 focus:border-indigo-500 transition-all text-xl font-medium leading-relaxed"
                   />
                 </div>
+                
+                {/* Image Size Selector */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Image Size</label>
+                  <div className="grid grid-cols-4 gap-3">
+                    <button
+                      onClick={() => setImageSizePreset('fb-story')}
+                      className={`p-4 rounded-2xl border-2 transition-all font-bold text-sm ${
+                        imageSizePreset === 'fb-story' 
+                          ? 'bg-indigo-600 text-white border-indigo-600' 
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      FB Story<br/><span className="text-xs opacity-80">1080×1920</span>
+                    </button>
+                    <button
+                      onClick={() => setImageSizePreset('insta-story')}
+                      className={`p-4 rounded-2xl border-2 transition-all font-bold text-sm ${
+                        imageSizePreset === 'insta-story' 
+                          ? 'bg-indigo-600 text-white border-indigo-600' 
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      Insta Story<br/><span className="text-xs opacity-80">1080×1920</span>
+                    </button>
+                    <button
+                      onClick={() => setImageSizePreset('square')}
+                      className={`p-4 rounded-2xl border-2 transition-all font-bold text-sm ${
+                        imageSizePreset === 'square' 
+                          ? 'bg-indigo-600 text-white border-indigo-600' 
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      Square<br/><span className="text-xs opacity-80">1080×1080</span>
+                    </button>
+                    <button
+                      onClick={() => setImageSizePreset('custom')}
+                      className={`p-4 rounded-2xl border-2 transition-all font-bold text-sm ${
+                        imageSizePreset === 'custom' 
+                          ? 'bg-indigo-600 text-white border-indigo-600' 
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      Custom
+                    </button>
+                  </div>
+                  {imageSizePreset === 'custom' && (
+                    <div className="flex gap-3 items-center">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Width</label>
+                        <input
+                          type="number"
+                          min="100"
+                          max="4096"
+                          value={customWidth}
+                          onChange={e => setCustomWidth(parseInt(e.target.value) || 1080)}
+                          className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl text-slate-800 font-bold"
+                        />
+                      </div>
+                      <span className="text-2xl font-black text-slate-400 mt-6">×</span>
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Height</label>
+                        <input
+                          type="number"
+                          min="100"
+                          max="4096"
+                          value={customHeight}
+                          onChange={e => setCustomHeight(parseInt(e.target.value) || 1080)}
+                          className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl text-slate-800 font-bold"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
                 <button 
                   onClick={handleGenerate}
                   disabled={loading || !productFocus}
@@ -472,7 +572,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       left: `${overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : (displayAsset.overlayConfig.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50)}%`,
                       top: `${overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : (displayAsset.overlayConfig.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80)}%`,
                       transform: 'translate(-50%, -50%)',
-                      textAlign: (overlayEdit.text_anchor || displayAsset.overlayConfig.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.text_anchor || displayAsset.overlayConfig.text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                      textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
                       maxWidth: `${Math.min(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80, 85)}%`,
                       padding: '0.5rem',
                       color: overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
@@ -597,7 +697,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           subtitle_max_lines: displayAsset.overlayConfig?.subtitle_max_lines || 3,
                           x_percent: displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50,
                           y_percent: displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80,
-                          text_anchor: displayAsset.overlayConfig?.text_anchor || 'middle'
+                          text_anchor: displayAsset.overlayConfig?.text_anchor || 'middle',
+                          title_text_anchor: displayAsset.overlayConfig?.title_text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle',
+                          subtitle_text_anchor: displayAsset.overlayConfig?.subtitle_text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle'
                         });
                       }
                     }}
@@ -706,6 +808,42 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           <span className="text-sm font-bold text-slate-500">px</span>
                         </div>
                       </div>
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Text Alignment</label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setOverlayEdit({...overlayEdit, title_text_anchor: 'start'})}
+                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
+                              (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'start'
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            Left
+                          </button>
+                          <button
+                            onClick={() => setOverlayEdit({...overlayEdit, title_text_anchor: 'middle'})}
+                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
+                              (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'middle'
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            Center
+                          </button>
+                          <button
+                            onClick={() => setOverlayEdit({...overlayEdit, title_text_anchor: 'end'})}
+                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
+                              (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'end'
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            Right
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Subtitle Section */}
@@ -787,6 +925,42 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             placeholder="Auto"
                           />
                           <span className="text-sm font-bold text-slate-500">px</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Text Alignment</label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setOverlayEdit({...overlayEdit, subtitle_text_anchor: 'start'})}
+                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
+                              (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'start'
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            Left
+                          </button>
+                          <button
+                            onClick={() => setOverlayEdit({...overlayEdit, subtitle_text_anchor: 'middle'})}
+                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
+                              (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'middle'
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            Center
+                          </button>
+                          <button
+                            onClick={() => setOverlayEdit({...overlayEdit, subtitle_text_anchor: 'end'})}
+                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
+                              (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'end'
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            Right
+                          </button>
                         </div>
                       </div>
                     </div>

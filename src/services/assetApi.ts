@@ -13,6 +13,8 @@ export const assetApi = {
     brandId: string;
     productFocus: string;
     referenceImageBase64?: string;
+    width?: number;
+    height?: number;
   }) => api.post<GeneratedAsset>('/assets/generate/product', data),
   
   generateNonProduct: (data: {
@@ -44,6 +46,8 @@ export const assetApi = {
     subtitle_font_size?: number;
     title_max_lines?: number;
     subtitle_max_lines?: number;
+    title_text_anchor?: 'start' | 'middle' | 'end';
+    subtitle_text_anchor?: 'start' | 'middle' | 'end';
   }) => api.put<GeneratedAsset>(`/assets/${id}/overlay`, { overlay_config: overlayConfig }),
   
   delete: (id: string) => api.delete<void>(`/assets/${id}`),
