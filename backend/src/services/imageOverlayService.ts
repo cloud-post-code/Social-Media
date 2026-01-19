@@ -114,10 +114,12 @@ export const applyTextOverlay = async (
     const opacity = overlayConfig.opacity !== undefined ? overlayConfig.opacity : 1.0;
     const letterSpacing = overlayConfig.letter_spacing === 'wide' ? '0.15em' : 'normal';
     
-    // Font sizes - title larger, subtitle smaller
-    const titleFontSize = Math.max(56, Math.min(width / 10, 120));
-    const subtitleFontSize = Math.max(32, Math.min(width / 16, 64));
+    // Font sizes - use custom sizes if provided, otherwise auto-calculate
+    const titleFontSize = overlayConfig.title_font_size || Math.max(56, Math.min(width / 10, 120));
+    const subtitleFontSize = overlayConfig.subtitle_font_size || Math.max(32, Math.min(width / 16, 64));
     const lineSpacing = subtitleFontSize * 0.3; // Space between title and subtitle
+    const titleLineHeight = titleFontSize * 1.2; // Line height for title
+    const subtitleLineHeight = subtitleFontSize * 1.2; // Line height for subtitle
     
     // Strip markdown syntax from text
     const stripMarkdown = (text: string): string => {
@@ -152,15 +154,72 @@ export const applyTextOverlay = async (
     const titleText = transformText(title);
     const subtitleText = subtitle ? transformText(subtitle) : '';
     
-    // Estimate total text height (title + spacing + subtitle)
-    const totalTextHeight = titleFontSize + (subtitleText ? (lineSpacing + subtitleFontSize) : 0);
+    // Function to split text by manual line breaks (\n) and then wrap if needed
+    const processTextLines = (text: string, fontSize: number, maxWidth: number, maxLines: number): string[] => {
+      // First, split by manual line breaks
+      const manualLines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      
+      // If we have manual line breaks, use them (but respect maxLines)
+      if (manualLines.length > 1) {
+        return manualLines.slice(0, maxLines);
+      }
+      
+      // Otherwise, auto-wrap the text
+      const words = text.split(' ');
+      const lines: string[] = [];
+      let currentLine = '';
+      
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        // Estimate width: approximate character width based on font size
+        const charWidthMultiplier = overlayConfig.font_weight === 'bold' ? 0.7 : 0.6;
+        const estimatedWidth = testLine.length * fontSize * charWidthMultiplier;
+        
+        if (estimatedWidth <= maxWidth || currentLine === '') {
+          currentLine = testLine;
+        } else {
+          if (lines.length < maxLines - 1) {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            // Last line - add ellipsis if needed
+            const lastLine = currentLine + ' ' + word;
+            if (lastLine.length * fontSize * charWidthMultiplier > maxWidth) {
+              currentLine = currentLine + '...';
+            } else {
+              currentLine = lastLine;
+            }
+            break;
+          }
+        }
+      }
+      
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      
+      return lines.slice(0, maxLines);
+    };
     
-    // Calculate position
-    const charWidthMultiplier = overlayConfig.font_weight === 'bold' ? 0.7 : 0.6;
-    const maxTitleWidth = title.length * titleFontSize * charWidthMultiplier;
-    const maxSubtitleWidth = subtitleText.length * subtitleFontSize * charWidthMultiplier;
-    const maxTextWidth = Math.max(maxTitleWidth, maxSubtitleWidth);
+    // Process text into lines (respecting manual line breaks)
+    const maxTitleLines = overlayConfig.title_max_lines || 3; // Increased default to allow more lines
+    const maxSubtitleLines = overlayConfig.subtitle_max_lines || 3; // Increased default
     const maxWidth = (width * overlayConfig.max_width_percent) / 100;
+    const titleLines = processTextLines(titleText, titleFontSize, maxWidth, maxTitleLines);
+    const subtitleLines = subtitleText ? processTextLines(subtitleText, subtitleFontSize, maxWidth, maxSubtitleLines) : [];
+    
+    // Calculate total text height including all lines
+    const titleHeight = titleLines.length * titleLineHeight;
+    const subtitleHeight = subtitleLines.length * subtitleLineHeight;
+    const totalTextHeight = titleHeight + (subtitleLines.length > 0 ? (lineSpacing + subtitleHeight) : 0);
+    
+    // Calculate position - estimate max text width from longest line
+    const charWidthMultiplier = overlayConfig.font_weight === 'bold' ? 0.7 : 0.6;
+    const maxTitleLineWidth = Math.max(...titleLines.map(line => line.length * titleFontSize * charWidthMultiplier));
+    const maxSubtitleLineWidth = subtitleLines.length > 0 
+      ? Math.max(...subtitleLines.map(line => line.length * subtitleFontSize * charWidthMultiplier))
+      : 0;
+    const maxTextWidth = Math.max(maxTitleLineWidth, maxSubtitleLineWidth);
     
     const positionResult = calculatePosition(
       overlayConfig.position,
@@ -186,21 +245,21 @@ export const applyTextOverlay = async (
       ? 'start' 
       : 'middle';
     
-    // Calculate Y positions for title and subtitle
-    let titleY = y;
-    let subtitleY = y;
+    // Calculate Y positions for title and subtitle (accounting for multiple lines)
+    let titleStartY = y;
+    let subtitleStartY = y;
     
     if (overlayConfig.position.includes('top')) {
-      titleY = y + titleFontSize;
-      subtitleY = titleY + lineSpacing + subtitleFontSize;
+      titleStartY = y + titleLineHeight;
+      subtitleStartY = titleStartY + titleHeight + lineSpacing + subtitleLineHeight;
     } else if (overlayConfig.position.includes('bottom')) {
-      subtitleY = y;
-      titleY = subtitleY - lineSpacing - titleFontSize;
+      subtitleStartY = y - subtitleHeight + subtitleLineHeight;
+      titleStartY = subtitleStartY - lineSpacing - titleHeight + titleLineHeight;
     } else {
       // Center - position title in middle, subtitle below
       const centerY = overlayConfig.position === 'floating-center' ? height / 2 : y;
-      titleY = centerY - (subtitleText ? lineSpacing / 2 : 0);
-      subtitleY = titleY + lineSpacing + subtitleFontSize;
+      titleStartY = centerY - (subtitleLines.length > 0 ? (lineSpacing + subtitleHeight) / 2 : 0) - titleHeight / 2 + titleLineHeight;
+      subtitleStartY = titleStartY + titleHeight + lineSpacing + subtitleLineHeight;
     }
     
     // Escape XML special characters
@@ -213,13 +272,31 @@ export const applyTextOverlay = async (
         .replace(/'/g, '&apos;');
     };
     
-    const escapedTitle = escapeXml(titleText);
-    const escapedSubtitle = subtitleText ? escapeXml(subtitleText) : '';
+    // Escape each line
+    const escapedTitleLines = titleLines.map(line => escapeXml(line));
+    const escapedSubtitleLines = subtitleLines.map(line => escapeXml(line));
     
-    // Create SVG with title and subtitle
-    // Embed fonts directly in SVG to ensure they're available on Linux servers
-    // Using system fonts that are commonly available, with generic fallbacks
-    const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    // Generate SVG text elements for each line
+    const generateTextElements = (lines: string[], startY: number, fontSize: number, lineHeight: number, fontWeight: string, opacity: number) => {
+      return lines.map((line, index) => {
+        const yPos = startY + (index * lineHeight);
+        return `<text
+    x="${x}"
+    y="${yPos}"
+    font-family="${fontFamily}"
+    font-size="${fontSize}"
+    font-weight="${fontWeight}"
+    fill="${textColor}"
+    text-anchor="${textAnchor}"
+    letter-spacing="${letterSpacing}"
+    opacity="${opacity}"
+    filter="url(#textShadow)"
+  >${line}</text>`;
+      }).join('\n  ');
+    };
+    
+    // Create SVG with title and subtitle (multiple lines)
+    const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
@@ -233,38 +310,18 @@ export const applyTextOverlay = async (
       </feMerge>
     </filter>
   </defs>
-  <text
-    x="${x}"
-    y="${titleY}"
-    font-family="${fontFamily}"
-    font-size="${titleFontSize}"
-    font-weight="${fontWeight}"
-    fill="${textColor}"
-    text-anchor="${textAnchor}"
-    letter-spacing="${letterSpacing}"
-    opacity="${opacity}"
-    filter="url(#textShadow)"
-  >${escapedTitle}</text>
-  ${subtitleText ? `<text
-    x="${x}"
-    y="${subtitleY}"
-    font-family="${fontFamily}"
-    font-size="${subtitleFontSize}"
-    font-weight="${fontWeight === '700' ? '400' : fontWeight}"
-    fill="${textColor}"
-    text-anchor="${textAnchor}"
-    letter-spacing="${letterSpacing}"
-    opacity="${opacity * 0.9}"
-    filter="url(#textShadow)"
-  >${escapedSubtitle}</text>` : ''}
+  ${generateTextElements(escapedTitleLines, titleStartY, titleFontSize, titleLineHeight, fontWeight, opacity)}
+  ${subtitleLines.length > 0 ? generateTextElements(escapedSubtitleLines, subtitleStartY, subtitleFontSize, subtitleLineHeight, fontWeight === '700' ? '400' : fontWeight, opacity * 0.9) : ''}
 </svg>`;
     
     // Debug logging
     console.log('Applying overlay:', {
       title: titleText,
       subtitle: subtitleText,
-      titleLength: titleText.length,
-      subtitleLength: subtitleText.length,
+      titleLines: titleLines.length,
+      subtitleLines: subtitleLines.length,
+      titleLinesText: titleLines,
+      subtitleLinesText: subtitleLines,
       fontFamily,
       fontWeight,
       position: overlayConfig.position,
@@ -272,11 +329,9 @@ export const applyTextOverlay = async (
       titleFontSize,
       subtitleFontSize,
       x,
-      titleY,
-      subtitleY,
-      imageSize: `${width}x${height}`,
-      escapedTitlePreview: escapedTitle.substring(0, 50),
-      escapedSubtitlePreview: escapedSubtitle.substring(0, 50)
+      titleStartY,
+      subtitleStartY,
+      imageSize: `${width}x${height}`
     });
     
     // Render SVG to PNG buffer first, then composite

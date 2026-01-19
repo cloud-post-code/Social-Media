@@ -45,6 +45,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
     max_width_percent?: number;
     opacity?: number;
+    title_font_size?: number;
+    subtitle_font_size?: number;
+    title_max_lines?: number;
+    subtitle_max_lines?: number;
   }>({});
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -394,7 +398,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           text_color_hex: displayAsset.overlayConfig?.text_color_hex,
                           position: displayAsset.overlayConfig?.position,
                           max_width_percent: displayAsset.overlayConfig?.max_width_percent,
-                          opacity: displayAsset.overlayConfig?.opacity
+                          opacity: displayAsset.overlayConfig?.opacity,
+                          title_font_size: displayAsset.overlayConfig?.title_font_size,
+                          subtitle_font_size: displayAsset.overlayConfig?.subtitle_font_size,
+                          title_max_lines: displayAsset.overlayConfig?.title_max_lines || 3,
+                          subtitle_max_lines: displayAsset.overlayConfig?.subtitle_max_lines || 3
                         });
                       }
                     }}
@@ -423,23 +431,35 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 ) : (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Title (max 5 words)</label>
-                      <input
-                        type="text"
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                        Title (Press Enter for new line)
+                      </label>
+                      <textarea
                         value={overlayEdit.title || ''}
                         onChange={e => setOverlayEdit({...overlayEdit, title: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                        placeholder="Enter title..."
+                        onKeyDown={e => {
+                          // Allow Enter to create new lines (textarea handles this naturally, but we can prevent default if needed)
+                          // No need to prevent default - textarea handles Enter naturally
+                        }}
+                        rows={3}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold resize-y"
+                        placeholder="Enter title... (Press Enter for new line)"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Subtitle (max 15 words)</label>
-                      <input
-                        type="text"
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                        Subtitle (Press Enter for new line)
+                      </label>
+                      <textarea
                         value={overlayEdit.subtitle || ''}
                         onChange={e => setOverlayEdit({...overlayEdit, subtitle: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium"
-                        placeholder="Enter subtitle..."
+                        onKeyDown={e => {
+                          // Allow Enter to create new lines (textarea handles this naturally)
+                          // No need to prevent default - textarea handles Enter naturally
+                        }}
+                        rows={3}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium resize-y"
+                        placeholder="Enter subtitle... (Press Enter for new line)"
                       />
                     </div>
 
@@ -535,6 +555,93 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           onChange={e => setOverlayEdit({...overlayEdit, max_width_percent: parseInt(e.target.value)})}
                           className="w-full"
                         />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                          Title Font Size: {overlayEdit.title_font_size ? `${overlayEdit.title_font_size}px` : 'Auto'}
+                        </label>
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="range"
+                            min="24"
+                            max="150"
+                            value={overlayEdit.title_font_size || 80}
+                            onChange={e => setOverlayEdit({...overlayEdit, title_font_size: parseInt(e.target.value)})}
+                            className="flex-1"
+                          />
+                          <input
+                            type="number"
+                            min="24"
+                            max="150"
+                            value={overlayEdit.title_font_size || ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setOverlayEdit({...overlayEdit, title_font_size: val ? parseInt(val) : undefined});
+                            }}
+                            className="w-20 p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold text-sm"
+                            placeholder="Auto"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                          Subtitle Font Size: {overlayEdit.subtitle_font_size ? `${overlayEdit.subtitle_font_size}px` : 'Auto'}
+                        </label>
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="range"
+                            min="16"
+                            max="100"
+                            value={overlayEdit.subtitle_font_size || 48}
+                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_font_size: parseInt(e.target.value)})}
+                            className="flex-1"
+                          />
+                          <input
+                            type="number"
+                            min="16"
+                            max="100"
+                            value={overlayEdit.subtitle_font_size || ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setOverlayEdit({...overlayEdit, subtitle_font_size: val ? parseInt(val) : undefined});
+                            }}
+                            className="w-20 p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold text-sm"
+                            placeholder="Auto"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Title Max Lines</label>
+                        <select
+                          value={overlayEdit.title_max_lines || 1}
+                          onChange={e => setOverlayEdit({...overlayEdit, title_max_lines: parseInt(e.target.value)})}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                        >
+                          <option value={1}>1 Line</option>
+                          <option value={2}>2 Lines</option>
+                          <option value={3}>3 Lines</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Subtitle Max Lines</label>
+                        <select
+                          value={overlayEdit.subtitle_max_lines || 2}
+                          onChange={e => setOverlayEdit({...overlayEdit, subtitle_max_lines: parseInt(e.target.value)})}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                        >
+                          <option value={1}>1 Line</option>
+                          <option value={2}>2 Lines</option>
+                          <option value={3}>3 Lines</option>
+                          <option value={4}>4 Lines</option>
+                        </select>
                       </div>
                     </div>
 
