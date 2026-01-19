@@ -207,75 +207,47 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
             <section>
               <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Visual Identity</h3>
               <div className="bg-slate-50 p-6 rounded-3xl space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                   <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Primary Color</label>
-                      <div className="flex gap-3">
-                        <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-                          <input 
-                            type="color" 
-                            className="absolute inset-0 w-[200%] h-[200%] cursor-pointer -translate-x-1/4 -translate-y-1/4" 
-                            value={formData.visual_identity?.primary_color_hex || '#4F46E5'} 
-                            onChange={e => {
-                              const hex = e.target.value.toUpperCase();
-                              updateNested('visual_identity.primary_color_hex', hex);
-                            }} 
-                          />
-                        </div>
-                        <input 
-                          type="text"
-                          value={formData.visual_identity?.primary_color_hex || ''} 
-                          onChange={e => {
-                            let value = e.target.value.toUpperCase().replace(/[^0-9A-F]/g, '');
-                            if (value.length > 0 && value[0] !== '#') value = '#' + value;
-                            if (value.length > 7) value = value.slice(0, 7);
-                            updateNested('visual_identity.primary_color_hex', value || '#4F46E5');
-                          }}
-                          onBlur={e => {
-                            const value = e.target.value;
-                            if (!value.match(/^#[0-9A-F]{6}$/i)) {
-                              updateNested('visual_identity.primary_color_hex', '#4F46E5');
-                            }
-                          }}
-                          className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono" 
-                          placeholder="#4F46E5"
-                        />
-                      </div>
-                   </div>
-                   <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Accent Color</label>
-                      <div className="flex gap-3">
-                        <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-                          <input 
-                            type="color" 
-                            className="absolute inset-0 w-[200%] h-[200%] cursor-pointer -translate-x-1/4 -translate-y-1/4" 
-                            value={formData.visual_identity?.accent_color_hex || '#F59E0B'} 
-                            onChange={e => {
-                              const hex = e.target.value.toUpperCase();
-                              updateNested('visual_identity.accent_color_hex', hex);
-                            }} 
-                          />
-                        </div>
-                        <input 
-                          type="text"
-                          value={formData.visual_identity?.accent_color_hex || ''} 
-                          onChange={e => {
-                            let value = e.target.value.toUpperCase().replace(/[^0-9A-F]/g, '');
-                            if (value.length > 0 && value[0] !== '#') value = '#' + value;
-                            if (value.length > 7) value = value.slice(0, 7);
-                            updateNested('visual_identity.accent_color_hex', value || '#F59E0B');
-                          }}
-                          onBlur={e => {
-                            const value = e.target.value;
-                            if (!value.match(/^#[0-9A-F]{6}$/i)) {
-                              updateNested('visual_identity.accent_color_hex', '#F59E0B');
-                            }
-                          }}
-                          className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono" 
-                          placeholder="#F59E0B"
-                        />
-                      </div>
-                   </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Primary Color</label>
+                  <input 
+                    type="text"
+                    value={formData.visual_identity?.primary_color_hex || ''} 
+                    onChange={e => {
+                      let value = e.target.value.toUpperCase().replace(/[^0-9A-F#]/g, '');
+                      if (value.length > 0 && value[0] !== '#') value = '#' + value;
+                      if (value.length > 7) value = value.slice(0, 7);
+                      updateNested('visual_identity.primary_color_hex', value || '#4F46E5');
+                    }}
+                    onBlur={e => {
+                      const value = e.target.value;
+                      if (!value.match(/^#[0-9A-F]{6}$/i)) {
+                        updateNested('visual_identity.primary_color_hex', '#4F46E5');
+                      }
+                    }}
+                    className="w-full p-4 bg-white border border-slate-200 rounded-xl" 
+                    placeholder="#4F46E5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Accent Color</label>
+                  <input 
+                    type="text"
+                    value={formData.visual_identity?.accent_color_hex || ''} 
+                    onChange={e => {
+                      let value = e.target.value.toUpperCase().replace(/[^0-9A-F#]/g, '');
+                      if (value.length > 0 && value[0] !== '#') value = '#' + value;
+                      if (value.length > 7) value = value.slice(0, 7);
+                      updateNested('visual_identity.accent_color_hex', value || '#F59E0B');
+                    }}
+                    onBlur={e => {
+                      const value = e.target.value;
+                      if (!value.match(/^#[0-9A-F]{6}$/i)) {
+                        updateNested('visual_identity.accent_color_hex', '#F59E0B');
+                      }
+                    }}
+                    className="w-full p-4 bg-white border border-slate-200 rounded-xl" 
+                    placeholder="#F59E0B"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Background Style</label>

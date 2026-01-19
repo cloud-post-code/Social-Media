@@ -28,8 +28,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   
   const [productFocus, setProductFocus] = useState('');
   const [userPurpose, setUserPurpose] = useState('');
-  const [campaignDetails, setCampaignDetails] = useState('');
-  const [campaignPostCount, setCampaignPostCount] = useState(3);
   const [productImage, setProductImage] = useState<string | null>(null);
   
   const [currentAsset, setCurrentAsset] = useState<GeneratedAsset | null>(null);
@@ -62,7 +60,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   }>({});
   
   // Image size selector state
-  const [imageSizePreset, setImageSizePreset] = useState<'fb-story' | 'insta-story' | 'square' | 'custom'>('square');
+  const [imageSizePreset, setImageSizePreset] = useState<'story' | 'square' | 'custom'>('square');
   const [customWidth, setCustomWidth] = useState<number>(1080);
   const [customHeight, setCustomHeight] = useState<number>(1080);
   
@@ -212,8 +210,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   // Helper function to get image dimensions based on preset
   const getImageDimensions = () => {
     switch (imageSizePreset) {
-      case 'fb-story':
-      case 'insta-story':
+      case 'story':
         return { width: 1080, height: 1920 };
       case 'square':
         return { width: 1080, height: 1080 };
@@ -242,19 +239,12 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           height: dimensions.height
         });
         setStatusText('Capturing high-fidelity visual...');
-      } else if (option === 'non-product') {
+      } else {
         asset = await assetApi.generateNonProduct({
           brandId: activeBrand.id,
           userPurpose
         });
         setStatusText('Visualizing abstract metaphor...');
-      } else {
-        asset = await assetApi.generateCampaign({
-          brandId: activeBrand.id,
-          campaignDetails,
-          postCount: campaignPostCount
-        });
-        setStatusText(`Orchestrating ${campaignPostCount} post series...`);
       }
 
       // Convert backend format to frontend format for display
@@ -370,7 +360,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         </div>
         
         <div className="flex bg-white/50 backdrop-blur-md p-2 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-200/50">
-          {(['product', 'campaign', 'non-product'] as const).map(opt => (
+          {(['product', 'non-product'] as const).map(opt => (
             <button 
               key={opt}
               onClick={() => { setOption(opt); setCurrentAsset(null); }}
@@ -425,26 +415,16 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 {/* Image Size Selector */}
                 <div className="space-y-3">
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Image Size</label>
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <button
-                      onClick={() => setImageSizePreset('fb-story')}
+                      onClick={() => setImageSizePreset('story')}
                       className={`p-4 rounded-2xl border-2 transition-all font-bold text-sm ${
-                        imageSizePreset === 'fb-story' 
+                        imageSizePreset === 'story' 
                           ? 'bg-indigo-600 text-white border-indigo-600' 
                           : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
                       }`}
                     >
-                      FB Story<br/><span className="text-xs opacity-80">1080×1920</span>
-                    </button>
-                    <button
-                      onClick={() => setImageSizePreset('insta-story')}
-                      className={`p-4 rounded-2xl border-2 transition-all font-bold text-sm ${
-                        imageSizePreset === 'insta-story' 
-                          ? 'bg-indigo-600 text-white border-indigo-600' 
-                          : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                      }`}
-                    >
-                      Insta Story<br/><span className="text-xs opacity-80">1080×1920</span>
+                      Story<br/><span className="text-xs opacity-80">1080×1920</span>
                     </button>
                     <button
                       onClick={() => setImageSizePreset('square')}
@@ -504,40 +484,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   {loading ? statusText : 'Draft Product Masterpiece'}
                 </button>
               </div>
-            </div>
-          )}
-
-          {option === 'campaign' && (
-            <div className="space-y-10">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <div className="md:col-span-3 space-y-3">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Campaign Core Vision</label>
-                  <textarea 
-                    value={campaignDetails}
-                    onChange={e => setCampaignDetails(e.target.value)}
-                    placeholder="Tell the story... what's the narrative arc for this sequence?"
-                    className="w-full p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] h-48 font-medium text-lg"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest text-center">Posts in Series</label>
-                  <div className="bg-slate-50 p-8 rounded-[2.5rem] h-48 flex flex-col items-center justify-center border-2 border-slate-100 shadow-inner">
-                    <span className="text-6xl font-black text-indigo-600 mb-4">{campaignPostCount}</span>
-                    <input 
-                      type="range" min="2" max="5" value={campaignPostCount} 
-                      onChange={e => setCampaignPostCount(parseInt(e.target.value))}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                    />
-                  </div>
-                </div>
-              </div>
-              <button 
-                onClick={handleGenerate}
-                disabled={loading || !campaignDetails}
-                className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300"
-              >
-                {loading ? statusText : 'Initialize Campaign Sequence'}
-              </button>
             </div>
           )}
 

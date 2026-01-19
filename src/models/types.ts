@@ -80,5 +80,5 @@ export interface GeneratedAsset {
   feedbackHistory?: string[];
 }
 
-export type GenerationOption = 'product' | 'campaign' | 'non-product';
+export type GenerationOption = 'product' | 'non-product';
 
