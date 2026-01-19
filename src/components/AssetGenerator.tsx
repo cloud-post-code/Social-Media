@@ -66,16 +66,20 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   
+  // Compute display asset and image URL from current asset
+  const displayAsset = currentAsset;
+  const imageUrl = currentAsset?.imageUrl || currentAsset?.image_url || '';
+  
   // Get actual image dimensions for accurate font scaling
   useEffect(() => {
-    if (imageUrl && displayAsset?.type === 'product') {
+    if (imageUrl && currentAsset?.type === 'product') {
       const img = new Image();
       img.onload = () => {
         setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
       };
       img.src = imageUrl;
     }
-  }, [imageUrl, displayAsset?.type]);
+  }, [imageUrl, currentAsset?.type]);
   
   // Calculate scale factor for font sizes to match preview with actual rendering
   const getFontScale = () => {
