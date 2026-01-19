@@ -817,73 +817,78 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         </div>
                       </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                      {/* Position - 9-Grid Preset Layout */}
                       <div>
                         <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                          Title Font Size
+                          Position (Drag text on image or click a preset)
                         </label>
-                        <div className="flex gap-2 items-center">
-                          <input
-                            type="number"
-                            min="12"
-                            max="200"
-                            value={overlayEdit.title_font_size || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setOverlayEdit({...overlayEdit, title_font_size: val ? parseInt(val) : undefined});
-                            }}
-                            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                            placeholder="Auto"
-                          />
-                          <span className="text-sm font-bold text-slate-500">px</span>
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                          {[
+                            { label: 'TL', x: 10, y: 10, anchor: 'start' as const, name: 'Top Left' },
+                            { label: 'TC', x: 50, y: 10, anchor: 'middle' as const, name: 'Top Center' },
+                            { label: 'TR', x: 90, y: 10, anchor: 'end' as const, name: 'Top Right' },
+                            { label: 'CL', x: 10, y: 50, anchor: 'start' as const, name: 'Center Left' },
+                            { label: 'C', x: 50, y: 50, anchor: 'middle' as const, name: 'Center' },
+                            { label: 'CR', x: 90, y: 50, anchor: 'end' as const, name: 'Center Right' },
+                            { label: 'BL', x: 10, y: 90, anchor: 'start' as const, name: 'Bottom Left' },
+                            { label: 'BC', x: 50, y: 90, anchor: 'middle' as const, name: 'Bottom Center' },
+                            { label: 'BR', x: 90, y: 90, anchor: 'end' as const, name: 'Bottom Right' },
+                          ].map((preset) => {
+                            const isSelected = overlayEdit.x_percent === preset.x && 
+                                             overlayEdit.y_percent === preset.y && 
+                                             (overlayEdit.text_anchor || 'middle') === preset.anchor;
+                            return (
+                              <button
+                                key={preset.label}
+                                onClick={() => setOverlayEdit({
+                                  ...overlayEdit,
+                                  x_percent: preset.x,
+                                  y_percent: preset.y,
+                                  text_anchor: preset.anchor
+                                })}
+                                className={`p-3 rounded-lg border-2 transition-all font-bold text-xs ${
+                                  isSelected
+                                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50/50'
+                                }`}
+                                title={preset.name}
+                              >
+                                {preset.label}
+                              </button>
+                            );
+                          })}
                         </div>
+                        <p className="text-xs text-slate-400">
+                          💡 Drag the text on the image to position it, or click a preset above.
+                        </p>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                          Subtitle Font Size
-                        </label>
-                        <div className="flex gap-2 items-center">
-                          <input
-                            type="number"
-                            min="12"
-                            max="200"
-                            value={overlayEdit.subtitle_font_size || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setOverlayEdit({...overlayEdit, subtitle_font_size: val ? parseInt(val) : undefined});
-                            }}
-                            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                            placeholder="Auto"
-                          />
-                          <span className="text-sm font-bold text-slate-500">px</span>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Letter Spacing</label>
+                          <select
+                            value={overlayEdit.letter_spacing || 'normal'}
+                            onChange={e => setOverlayEdit({...overlayEdit, letter_spacing: e.target.value as any})}
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                          >
+                            <option value="normal">Normal</option>
+                            <option value="wide">Wide</option>
+                          </select>
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Title Max Lines</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={overlayEdit.title_max_lines || 1}
-                          onChange={e => setOverlayEdit({...overlayEdit, title_max_lines: parseInt(e.target.value) || 1})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Subtitle Max Lines</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={overlayEdit.subtitle_max_lines || 2}
-                          onChange={e => setOverlayEdit({...overlayEdit, subtitle_max_lines: parseInt(e.target.value) || 2})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                        />
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                            Max Width: {overlayEdit.max_width_percent || 80}%
+                          </label>
+                          <input
+                            type="range"
+                            min="50"
+                            max="100"
+                            value={overlayEdit.max_width_percent || 80}
+                            onChange={e => setOverlayEdit({...overlayEdit, max_width_percent: parseInt(e.target.value)})}
+                            className="w-full"
+                          />
+                        </div>
                       </div>
                     </div>
 
