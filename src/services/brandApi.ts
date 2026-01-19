@@ -13,7 +13,7 @@ export const brandApi = {
   
   delete: (id: string) => api.delete<void>(`/brands/${id}`),
   
-  extractDNA: (input: { url?: string; imageBase64?: string }) =>
+  extractDNA: (input: { url?: string; imageBase64?: string; autoSave?: boolean }) =>
     api.post<BrandDNA & { extractedAssets?: { logoUrl?: string; imageUrls?: string[] } }>('/brands/extract', input),
 };
 

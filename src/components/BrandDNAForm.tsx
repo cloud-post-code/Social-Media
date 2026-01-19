@@ -77,16 +77,22 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     
     setIsExtracting(true);
     try {
-      const extracted: any = await brandApi.extractDNA({ url });
+      // Extract and auto-save: create brand immediately with assets
+      const extracted: any = await brandApi.extractDNA({ url, autoSave: true });
       
-      // Extract assets info if present
-      if (extracted.extractedAssets) {
-        setExtractedAssets(extracted.extractedAssets);
-        delete extracted.extractedAssets;
-      }
-      
+      // Brand is already created and saved with assets
       setFormData(extracted);
       setUrlInput(''); // Clear input after successful extraction
+      
+      // Trigger asset loading if brand ID exists
+      if (extracted.id) {
+        setTimeout(() => {
+          loadAssets();
+        }, 500);
+      }
+      
+      // Show success message
+      alert('Brand DNA extracted and saved successfully!');
     } catch (err: any) {
       const errorMessage = err?.message || 'Extraction failed. Please ensure the URL is valid and accessible.';
       alert(`Extraction failed: ${errorMessage}`);
@@ -104,9 +110,10 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     reader.onload = async (event) => {
       const base64 = event.target?.result as string;
       try {
+        // Extract DNA from screenshot (no autoSave for screenshots since they don't have URLs for image extraction)
         const extracted: any = await brandApi.extractDNA({ imageBase64: base64 });
         
-        // Extract assets info if present
+        // Extract assets info if present (though screenshots won't have extracted assets)
         if (extracted.extractedAssets) {
           setExtractedAssets(extracted.extractedAssets);
           delete extracted.extractedAssets;
@@ -191,20 +198,18 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
       }
     };
     
-    // Save brand first and get the saved brand (with confirmed ID)
+    // Save brand (create or update)
     const savedBrand = await onSave(finalData);
-    const savedBrandId = savedBrand.id;
     
-    // After brand is saved, save extracted assets if they exist
-    if (extractedAssets && savedBrandId) {
+    // If there are extracted assets that weren't saved yet (e.g., from screenshot extraction), save them now
+    if (extractedAssets && savedBrand.id) {
       try {
         const { brandAssetApi } = await import('../services/brandAssetApi.js');
         
         // Save logo if extracted
         if (extractedAssets.logoUrl) {
           try {
-            await brandAssetApi.uploadAsset(savedBrandId, extractedAssets.logoUrl, 'logo');
-            console.log('Logo saved successfully');
+            await brandAssetApi.uploadAsset(savedBrand.id, extractedAssets.logoUrl, 'logo');
           } catch (err: any) {
             // Logo might already exist, that's ok
             if (!err.message?.includes('already has a logo')) {
@@ -217,11 +222,9 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
         if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
           for (const imageUrl of extractedAssets.imageUrls.slice(0, 10)) {
             try {
-              await brandAssetApi.uploadAsset(savedBrandId, imageUrl, 'brand_image');
-              console.log('Brand image saved successfully:', imageUrl);
+              await brandAssetApi.uploadAsset(savedBrand.id, imageUrl, 'brand_image');
             } catch (err: any) {
               if (err.message?.includes('Maximum')) {
-                console.log('Maximum images reached, stopping');
                 break; // Reached max limit
               }
               console.error('Failed to save image:', err);
@@ -230,13 +233,17 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
         }
         
         setExtractedAssets(null);
-        // Update formData with saved brand to trigger asset loading
-        setFormData({ ...savedBrand });
+        // Reload assets to show them
+        setTimeout(() => {
+          loadAssets();
+        }, 500);
       } catch (err) {
         console.error('Failed to save extracted assets:', err);
-        alert('Brand saved but failed to save some extracted images. You can upload them manually.');
       }
     }
+    
+    // Update formData with saved brand
+    setFormData({ ...savedBrand });
   };
 
   const canUploadMoreImages = assets.length < 10;

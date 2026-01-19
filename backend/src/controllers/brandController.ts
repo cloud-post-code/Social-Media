@@ -57,7 +57,7 @@ export const deleteBrand = async (req: Request, res: Response, next: NextFunctio
 
 export const extractBrandDNA = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { url, imageBase64 } = req.body;
+    const { url, imageBase64, autoSave } = req.body; // autoSave option to create brand immediately
     
     if (!url && !imageBase64) {
       return res.status(400).json({ 
@@ -72,8 +72,46 @@ export const extractBrandDNA = async (req: Request, res: Response, next: NextFun
     const extractedAssets = extractedDNA._extractedAssets;
     delete (extractedDNA as any)._extractedAssets;
     
-    // Return DNA with extracted assets info
-    // Frontend will save assets to brand_assets table after creating/updating brand
+    // If autoSave is true, create the brand and save assets immediately
+    if (autoSave) {
+      // Create brand with extracted DNA
+      const createdBrand = await brandService.createBrand(extractedDNA);
+      
+      // Save extracted assets to brand_assets table
+      if (extractedAssets) {
+        try {
+          if (extractedAssets.logoUrl) {
+            try {
+              await brandAssetService.createBrandAsset(createdBrand.id, extractedAssets.logoUrl, 'logo');
+            } catch (err: any) {
+              // Logo might already exist or other error - log but continue
+              console.error('Failed to save extracted logo:', err.message);
+            }
+          }
+          
+          if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
+            for (const imageUrl of extractedAssets.imageUrls.slice(0, 10)) {
+              try {
+                await brandAssetService.createBrandAsset(createdBrand.id, imageUrl, 'brand_image');
+              } catch (err: any) {
+                if (err.message?.includes('Maximum')) {
+                  break; // Reached max limit
+                }
+                console.error('Failed to save extracted image:', err.message);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error saving extracted assets:', err);
+          // Continue even if asset saving fails - brand is already created
+        }
+      }
+      
+      // Return the created brand (assets are already saved)
+      return res.json(createdBrand);
+    }
+    
+    // Otherwise, return DNA with extracted assets info for frontend to save
     const response: any = { ...extractedDNA };
     if (extractedAssets) {
       response.extractedAssets = extractedAssets;

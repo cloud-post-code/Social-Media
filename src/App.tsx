@@ -27,15 +27,31 @@ const App: React.FC = () => {
 
   const handleSaveBrand = async (dna: BrandDNA): Promise<BrandDNA> => {
     try {
-      if (dna.id && brands.find(b => b.id === dna.id)) {
+      // Check if brand already exists (might have been created during extraction)
+      const existingBrand = brands.find(b => b.id === dna.id);
+      
+      if (existingBrand) {
+        // Update existing brand
         const updated = await updateBrand(dna.id, dna);
         setView('studio');
         return updated;
       } else {
-        const newBrand = await createBrand(dna);
-        setActiveBrandId(newBrand.id);
-        setView('studio');
-        return newBrand;
+        // Create new brand (or update if ID exists in database but not in local state)
+        try {
+          const newBrand = await createBrand(dna);
+          setActiveBrandId(newBrand.id);
+          setView('studio');
+          return newBrand;
+        } catch (createErr: any) {
+          // If creation fails because brand already exists, try to update instead
+          if (createErr.message?.includes('already exists') || createErr.statusCode === 409) {
+            const updated = await updateBrand(dna.id, dna);
+            setActiveBrandId(updated.id);
+            setView('studio');
+            return updated;
+          }
+          throw createErr;
+        }
       }
     } catch (err) {
       alert('Failed to save brand: ' + (err as Error).message);
