@@ -95,19 +95,3 @@ export const deleteBrandAsset = async (req: Request, res: Response, next: NextFu
   }
 };
 
-export const convertExternalUrls = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    
-    const brand = await brandService.getBrandById(id);
-    if (!brand) {
-      return res.status(404).json({ error: { message: 'Brand not found' } });
-    }
-    
-    const result = await brandAssetService.convertExternalUrlsToBase64(id);
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
-};
-

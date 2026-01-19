@@ -306,7 +306,7 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
 
   // Combine all extracted data
   const dna: BrandDNA = {
-    id: Date.now().toString(),
+    id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Add randomness to prevent collisions
     name: basicInfo.name || 'Unknown Brand',
     tagline: basicInfo.tagline || '',
     overview: basicInfo.overview || '',

@@ -43,8 +43,11 @@ const App: React.FC = () => {
           setView('studio');
           return newBrand;
         } catch (createErr: any) {
-          // If creation fails because brand already exists, try to update instead
-          if (createErr.message?.includes('already exists') || createErr.statusCode === 409) {
+          // If creation fails because brand already exists (duplicate key), try to update instead
+          if (createErr.message?.includes('duplicate key') || 
+              createErr.message?.includes('already exists') || 
+              createErr.statusCode === 409) {
+            console.log(`Brand ${dna.id} already exists in database, updating instead`);
             const updated = await updateBrand(dna.id, dna);
             setActiveBrandId(updated.id);
             setView('studio');
@@ -53,9 +56,10 @@ const App: React.FC = () => {
           throw createErr;
         }
       }
-    } catch (err) {
-      alert('Failed to save brand: ' + (err as Error).message);
-      throw err;
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to save brand';
+      alert('Failed to save brand: ' + errorMessage);
+      throw new Error(errorMessage);
     }
   };
 

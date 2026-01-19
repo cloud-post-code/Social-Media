@@ -74,51 +74,91 @@ export const extractBrandDNA = async (req: Request, res: Response, next: NextFun
     
     // If autoSave is true, create the brand and save assets immediately
     if (autoSave) {
-      // Create brand with extracted DNA
-      const createdBrand = await brandService.createBrand(extractedDNA);
-      
-      // Save extracted assets to brand_assets table
-      if (extractedAssets) {
-        try {
-          if (extractedAssets.logoUrl) {
-            try {
-              console.log(`[Extract] Saving logo: ${extractedAssets.logoUrl.substring(0, 100)}...`);
-              await brandAssetService.createBrandAsset(createdBrand.id, extractedAssets.logoUrl, 'logo');
-              console.log(`[Extract] Logo saved successfully`);
-            } catch (err: any) {
-              // Logo might already exist or conversion failed - log but continue
-              console.error(`[Extract] Failed to save extracted logo:`, err.message);
-              // Don't throw - brand is already created, just log the issue
-            }
-          }
-          
-          if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
-            let savedCount = 0;
-            for (const imageUrl of extractedAssets.imageUrls.slice(0, 10)) {
+      try {
+        // Create brand with extracted DNA
+        const createdBrand = await brandService.createBrand(extractedDNA);
+        
+        // Save extracted assets to brand_assets table
+        if (extractedAssets) {
+          try {
+            if (extractedAssets.logoUrl) {
               try {
-                console.log(`[Extract] Saving image ${savedCount + 1}/${Math.min(extractedAssets.imageUrls.length, 10)}: ${imageUrl.substring(0, 100)}...`);
-                await brandAssetService.createBrandAsset(createdBrand.id, imageUrl, 'brand_image');
-                savedCount++;
-                console.log(`[Extract] Image ${savedCount} saved successfully`);
+                console.log(`[Extract] Saving logo: ${extractedAssets.logoUrl.substring(0, 100)}...`);
+                await brandAssetService.createBrandAsset(createdBrand.id, extractedAssets.logoUrl, 'logo');
+                console.log(`[Extract] Logo saved successfully`);
               } catch (err: any) {
-                if (err.message?.includes('Maximum')) {
-                  console.log(`[Extract] Reached maximum image limit`);
-                  break; // Reached max limit
-                }
-                console.error(`[Extract] Failed to save extracted image:`, err.message);
-                // Continue with next image
+                console.error(`[Extract] Failed to save extracted logo:`, err.message);
               }
             }
-            console.log(`[Extract] Successfully saved ${savedCount} brand images`);
+            
+            if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
+              let savedCount = 0;
+              for (const imageUrl of extractedAssets.imageUrls.slice(0, 10)) {
+                try {
+                  console.log(`[Extract] Saving image ${savedCount + 1}/${Math.min(extractedAssets.imageUrls.length, 10)}: ${imageUrl.substring(0, 100)}...`);
+                  await brandAssetService.createBrandAsset(createdBrand.id, imageUrl, 'brand_image');
+                  savedCount++;
+                  console.log(`[Extract] Image ${savedCount} saved successfully`);
+                } catch (err: any) {
+                  if (err.message?.includes('Maximum')) {
+                    console.log(`[Extract] Reached maximum image limit`);
+                    break;
+                  }
+                  console.error(`[Extract] Failed to save extracted image:`, err.message);
+                }
+              }
+              console.log(`[Extract] Successfully saved ${savedCount} brand images`);
+            }
+          } catch (err) {
+            console.error('[Extract] Error saving extracted assets:', err);
           }
-        } catch (err) {
-          console.error('[Extract] Error saving extracted assets:', err);
-          // Continue even if asset saving fails - brand is already created
         }
+        
+        return res.json(createdBrand);
+      } catch (createErr: any) {
+        // If duplicate key error, try to update existing brand instead
+        if (createErr.message?.includes('duplicate key') || createErr.code === '23505') {
+          console.log(`[Extract] Brand ${extractedDNA.id} already exists, updating instead`);
+          try {
+            const updatedBrand = await brandService.updateBrand(extractedDNA.id, extractedDNA);
+            
+            // Still try to save assets even if brand already existed
+            if (extractedAssets) {
+              try {
+                if (extractedAssets.logoUrl) {
+                  try {
+                    await brandAssetService.createBrandAsset(updatedBrand.id, extractedAssets.logoUrl, 'logo');
+                  } catch (err: any) {
+                    if (!err.message?.includes('already has a logo')) {
+                      console.error(`[Extract] Failed to save logo:`, err.message);
+                    }
+                  }
+                }
+                
+                if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
+                  for (const imageUrl of extractedAssets.imageUrls.slice(0, 10)) {
+                    try {
+                      await brandAssetService.createBrandAsset(updatedBrand.id, imageUrl, 'brand_image');
+                    } catch (err: any) {
+                      if (!err.message?.includes('Maximum')) {
+                        console.error(`[Extract] Failed to save image:`, err.message);
+                      }
+                    }
+                  }
+                }
+              } catch (err) {
+                console.error('[Extract] Error saving assets for existing brand:', err);
+              }
+            }
+            
+            return res.json(updatedBrand);
+          } catch (updateErr) {
+            console.error('[Extract] Failed to update existing brand:', updateErr);
+            throw updateErr;
+          }
+        }
+        throw createErr;
       }
-      
-      // Return the created brand (assets are already saved)
-      return res.json(createdBrand);
     }
     
     // Otherwise, return DNA with extracted assets info for frontend to save
