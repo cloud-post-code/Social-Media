@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrandDNA, GenerationOption, GeneratedAsset } from '../models/types.js';
 import { assetApi } from '../services/assetApi.js';
 
@@ -42,6 +42,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
     letter_spacing?: 'normal' | 'wide';
     text_color_hex?: string;
+    // New: Pixel-based positioning
+    x_percent?: number;
+    y_percent?: number;
+    text_anchor?: 'start' | 'middle' | 'end';
+    // Legacy: String-based position
     position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
     max_width_percent?: number;
     opacity?: number;
@@ -50,6 +55,47 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     title_max_lines?: number;
     subtitle_max_lines?: number;
   }>({});
+  
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  
+  // Handle mouse move and up events globally when dragging
+  React.useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging && dragStart && displayAsset && editingOverlay) {
+        const imageContainer = document.querySelector('.relative.group.rounded-\\[4rem\\]');
+        if (imageContainer) {
+          const rect = imageContainer.getBoundingClientRect();
+          const x = ((e.clientX - rect.left) / rect.width) * 100;
+          const y = ((e.clientY - rect.top) / rect.height) * 100;
+          
+          // Boundary validation: keep within 5% to 95% to ensure text stays visible
+          const clampedX = Math.max(5, Math.min(95, x));
+          const clampedY = Math.max(5, Math.min(95, y));
+          
+          setOverlayEdit({
+            ...overlayEdit,
+            x_percent: clampedX,
+            y_percent: clampedY
+          });
+        }
+      }
+    };
+    
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      setDragStart(null);
+    };
+    
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragStart, overlayEdit, displayAsset, editingOverlay]);
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -328,11 +374,62 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       {displayAsset && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
           <div className="lg:col-span-6 space-y-8">
-            {/* Visual Preview */}
+            {/* Visual Preview with Draggable Text Overlay */}
             <div className="relative group rounded-[4rem] overflow-hidden shadow-[0_48px_80px_-24px_rgba(0,0,0,0.3)] border-[20px] border-white ring-1 ring-slate-200">
-              <img src={imageUrl} className="w-full aspect-square object-cover transition duration-700 group-hover:scale-105" />
+              <div className="relative w-full aspect-square">
+                <img src={imageUrl} className="w-full h-full object-cover transition duration-700 group-hover:scale-105" />
+                
+                {/* Draggable Text Overlay Preview (only when editing product assets) */}
+                {editingOverlay && displayAsset.type === 'product' && displayAsset.overlayConfig && (
+                  <div
+                    className="absolute cursor-move select-none border-2 border-dashed border-indigo-400 bg-indigo-50/20 rounded-lg p-3 backdrop-blur-sm"
+                    style={{
+                      left: `${overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : (displayAsset.overlayConfig.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50)}%`,
+                      top: `${overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : (displayAsset.overlayConfig.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80)}%`,
+                      transform: 'translate(-50%, -50%)',
+                      textAlign: (overlayEdit.text_anchor || displayAsset.overlayConfig.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.text_anchor || displayAsset.overlayConfig.text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                      maxWidth: `${overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80}%`,
+                      color: overlayEdit.text_color_hex || displayAsset.overlayConfig.text_color_hex || '#FFFFFF',
+                      opacity: overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1),
+                      fontFamily: overlayEdit.font_family || displayAsset.overlayConfig.font_family || 'sans-serif',
+                      fontWeight: overlayEdit.font_weight === 'bold' ? 'bold' : overlayEdit.font_weight === 'light' ? '300' : 'normal',
+                      fontSize: overlayEdit.title_font_size ? `${overlayEdit.title_font_size}px` : 'clamp(1.5rem, 4vw, 3rem)',
+                      letterSpacing: overlayEdit.letter_spacing === 'wide' ? '0.15em' : 'normal',
+                      textTransform: overlayEdit.font_transform || 'none',
+                      filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
+                      pointerEvents: 'all',
+                      zIndex: 10
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                      const rect = e.currentTarget.parentElement?.getBoundingClientRect();
+                      if (rect) {
+                        const x = ((e.clientX - rect.left) / rect.width) * 100;
+                        const y = ((e.clientY - rect.top) / rect.height) * 100;
+                        setDragStart({ x, y });
+                      }
+                    }}
+                  >
+                    <div style={{ whiteSpace: 'pre-line', pointerEvents: 'none' }}>
+                      {overlayEdit.title || displayAsset.overlayConfig.title || ''}
+                    </div>
+                    {(overlayEdit.subtitle || displayAsset.overlayConfig.subtitle) && (
+                      <div 
+                        style={{ 
+                          fontSize: overlayEdit.subtitle_font_size ? `${Math.max(12, overlayEdit.subtitle_font_size * 0.6)}px` : 'clamp(1rem, 2.5vw, 2rem)',
+                          marginTop: '0.5rem',
+                          opacity: 0.9,
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        {overlayEdit.subtitle || displayAsset.overlayConfig.subtitle}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               
-              {/* Overlay is now baked into the image for product assets */}
               {/* For non-product assets, show CSS overlay if needed */}
               {displayAsset.type !== 'product' && (
                 <div className={`absolute inset-0 flex flex-col p-16 pointer-events-none
@@ -402,7 +499,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           title_font_size: displayAsset.overlayConfig?.title_font_size,
                           subtitle_font_size: displayAsset.overlayConfig?.subtitle_font_size,
                           title_max_lines: displayAsset.overlayConfig?.title_max_lines || 3,
-                          subtitle_max_lines: displayAsset.overlayConfig?.subtitle_max_lines || 3
+                          subtitle_max_lines: displayAsset.overlayConfig?.subtitle_max_lines || 3,
+                          x_percent: displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50,
+                          y_percent: displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80,
+                          text_anchor: displayAsset.overlayConfig?.text_anchor || 'middle'
                         });
                       }
                     }}
@@ -511,23 +611,51 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Position</label>
-                      <select
-                        value={overlayEdit.position || 'bottom-center'}
-                        onChange={e => setOverlayEdit({...overlayEdit, position: e.target.value as any})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                      >
-                        <option value="top-left">Top Left</option>
-                        <option value="top-center">Top Center</option>
-                        <option value="top-right">Top Right</option>
-                        <option value="center-left">Center Left</option>
-                        <option value="center-middle">Center Middle</option>
-                        <option value="center-right">Center Right</option>
-                        <option value="bottom-left">Bottom Left</option>
-                        <option value="bottom-right">Bottom Right</option>
-                        <option value="floating-center">Floating Center</option>
-                      </select>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                          Position (Drag text on image or use controls below)
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-1">X Position (%)</label>
+                            <input
+                              type="number"
+                              min="5"
+                              max="95"
+                              value={overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : 50}
+                              onChange={e => setOverlayEdit({...overlayEdit, x_percent: parseInt(e.target.value)})}
+                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-1">Y Position (%)</label>
+                            <input
+                              type="number"
+                              min="5"
+                              max="95"
+                              value={overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : 50}
+                              onChange={e => setOverlayEdit({...overlayEdit, y_percent: parseInt(e.target.value)})}
+                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-1">Alignment</label>
+                            <select
+                              value={overlayEdit.text_anchor || 'middle'}
+                              onChange={e => setOverlayEdit({...overlayEdit, text_anchor: e.target.value as 'start' | 'middle' | 'end'})}
+                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold text-sm"
+                            >
+                              <option value="start">Left</option>
+                              <option value="middle">Center</option>
+                              <option value="end">Right</option>
+                            </select>
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-2">
+                          💡 Drag the text on the image to position it, or use the controls above. Values are constrained to keep text visible.
+                        </p>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

@@ -43,7 +43,7 @@ const getFontFamily = (family: OverlayConfig['font_family']): string => {
  * Calculate text position based on position string
  */
 const calculatePosition = (
-  position: OverlayConfig['position'],
+  position: string | undefined,
   imageWidth: number,
   imageHeight: number,
   textWidth: number,
@@ -56,12 +56,14 @@ const calculatePosition = (
   let x = 0;
   let y = 0;
   
+  const pos = position || 'center-middle';
+  
   // Horizontal positioning
-  if (position.includes('left')) {
+  if (pos.includes('left')) {
     x = padding;
-  } else if (position.includes('right')) {
+  } else if (pos.includes('right')) {
     x = imageWidth - Math.min(textWidth, actualMaxWidth) - padding;
-  } else if (position.includes('center') || position.includes('middle')) {
+  } else if (pos.includes('center') || pos.includes('middle')) {
     // center
     x = (imageWidth - Math.min(textWidth, actualMaxWidth)) / 2;
   } else {
@@ -70,11 +72,11 @@ const calculatePosition = (
   }
   
   // Vertical positioning
-  if (position.includes('top')) {
+  if (pos.includes('top')) {
     y = padding;
-  } else if (position.includes('bottom')) {
+  } else if (pos.includes('bottom')) {
     y = imageHeight - textHeight - padding;
-  } else if (position.includes('middle') || position.includes('center')) {
+  } else if (pos.includes('middle') || pos.includes('center')) {
     // middle/center
     y = (imageHeight - textHeight) / 2;
   } else {
@@ -220,46 +222,84 @@ export const applyTextOverlay = async (
       ? Math.max(...subtitleLines.map(line => line.length * subtitleFontSize * charWidthMultiplier))
       : 0;
     const maxTextWidth = Math.max(maxTitleLineWidth, maxSubtitleLineWidth);
+    const actualMaxWidth = Math.min(maxTextWidth, (width * overlayConfig.max_width_percent) / 100);
     
-    const positionResult = calculatePosition(
-      overlayConfig.position,
-      width,
-      height,
-      maxTextWidth,
-      totalTextHeight,
-      overlayConfig.max_width_percent
-    );
+    // Use pixel-based positioning if provided, otherwise fall back to string-based
+    let x: number;
+    let y: number;
+    let textAnchor: 'start' | 'middle' | 'end';
     
-    // Handle floating-center position
-    let x = positionResult.x;
-    let y = positionResult.y;
-    if (overlayConfig.position === 'floating-center') {
-      x = width / 2;
-      y = height / 2;
+    if (overlayConfig.x_percent !== undefined && overlayConfig.y_percent !== undefined) {
+      // Use pixel-based positioning (percentages)
+      x = (width * overlayConfig.x_percent) / 100;
+      y = (height * overlayConfig.y_percent) / 100;
+      textAnchor = overlayConfig.text_anchor || 'middle';
+      
+      // Boundary validation: ensure text stays within image bounds
+      const padding = 20;
+      
+      // Adjust X based on text anchor to keep text within bounds
+      if (textAnchor === 'start') {
+        x = Math.max(padding, Math.min(x, width - actualMaxWidth - padding));
+      } else if (textAnchor === 'end') {
+        x = Math.max(actualMaxWidth + padding, Math.min(x, width - padding));
+      } else {
+        // middle
+        x = Math.max(actualMaxWidth / 2 + padding, Math.min(x, width - actualMaxWidth / 2 - padding));
+      }
+      
+      // Adjust Y to keep text within bounds (y represents top of text block)
+      y = Math.max(totalTextHeight + padding, Math.min(y, height - padding));
+    } else {
+      // Fall back to string-based positioning (legacy)
+      const positionResult = calculatePosition(
+        overlayConfig.position || 'center-middle',
+        width,
+        height,
+        maxTextWidth,
+        totalTextHeight,
+        overlayConfig.max_width_percent
+      );
+      x = positionResult.x;
+      y = positionResult.y;
+      
+      if (overlayConfig.position === 'floating-center') {
+        x = width / 2;
+        y = height / 2;
+      }
+      
+      textAnchor = overlayConfig.position?.includes('right') 
+        ? 'end' 
+        : overlayConfig.position?.includes('left') 
+        ? 'start' 
+        : 'middle';
     }
     
-    // Calculate text anchor
-    const textAnchor = overlayConfig.position.includes('right') 
-      ? 'end' 
-      : overlayConfig.position.includes('left') 
-      ? 'start' 
-      : 'middle';
-    
     // Calculate Y positions for title and subtitle (accounting for multiple lines)
+    // If using pixel-based positioning, y represents the anchor point (middle of text block)
+    // If using string-based positioning, adjust based on position string
     let titleStartY = y;
     let subtitleStartY = y;
     
-    if (overlayConfig.position.includes('top')) {
-      titleStartY = y + titleLineHeight;
+    if (overlayConfig.x_percent !== undefined && overlayConfig.y_percent !== undefined) {
+      // Pixel-based: y is the anchor point, position title and subtitle relative to it
+      titleStartY = y - (totalTextHeight / 2) + titleLineHeight;
       subtitleStartY = titleStartY + titleHeight + lineSpacing + subtitleLineHeight;
-    } else if (overlayConfig.position.includes('bottom')) {
-      subtitleStartY = y - subtitleHeight + subtitleLineHeight;
-      titleStartY = subtitleStartY - lineSpacing - titleHeight + titleLineHeight;
     } else {
-      // Center - position title in middle, subtitle below
-      const centerY = overlayConfig.position === 'floating-center' ? height / 2 : y;
-      titleStartY = centerY - (subtitleLines.length > 0 ? (lineSpacing + subtitleHeight) / 2 : 0) - titleHeight / 2 + titleLineHeight;
-      subtitleStartY = titleStartY + titleHeight + lineSpacing + subtitleLineHeight;
+      // String-based positioning (legacy)
+      const position = overlayConfig.position || 'center-middle';
+      if (position.includes('top')) {
+        titleStartY = y + titleLineHeight;
+        subtitleStartY = titleStartY + titleHeight + lineSpacing + subtitleLineHeight;
+      } else if (position.includes('bottom')) {
+        subtitleStartY = y - subtitleHeight + subtitleLineHeight;
+        titleStartY = subtitleStartY - lineSpacing - titleHeight + titleLineHeight;
+      } else {
+        // Center - position title in middle, subtitle below
+        const centerY = position === 'floating-center' ? height / 2 : y;
+        titleStartY = centerY - (subtitleLines.length > 0 ? (lineSpacing + subtitleHeight) / 2 : 0) - titleHeight / 2 + titleLineHeight;
+        subtitleStartY = titleStartY + titleHeight + lineSpacing + subtitleLineHeight;
+      }
     }
     
     // Escape XML special characters

@@ -182,13 +182,16 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
       font_transform: overlay_config.font_transform || asset.overlay_config?.font_transform || 'none',
       letter_spacing: overlay_config.letter_spacing || asset.overlay_config?.letter_spacing || 'normal',
       text_color_hex: overlay_config.text_color_hex || asset.overlay_config?.text_color_hex || '#FFFFFF',
-      position: overlay_config.position || asset.overlay_config?.position || 'bottom-right',
       max_width_percent: overlay_config.max_width_percent || asset.overlay_config?.max_width_percent || 80,
       opacity: overlay_config.opacity !== undefined ? overlay_config.opacity : (asset.overlay_config?.opacity !== undefined ? asset.overlay_config.opacity : 1.0),
       title_font_size: overlay_config.title_font_size !== undefined ? overlay_config.title_font_size : asset.overlay_config?.title_font_size,
       subtitle_font_size: overlay_config.subtitle_font_size !== undefined ? overlay_config.subtitle_font_size : asset.overlay_config?.subtitle_font_size,
-      title_max_lines: overlay_config.title_max_lines !== undefined ? overlay_config.title_max_lines : (asset.overlay_config?.title_max_lines || 1),
-      subtitle_max_lines: overlay_config.subtitle_max_lines !== undefined ? overlay_config.subtitle_max_lines : (asset.overlay_config?.subtitle_max_lines || 2)
+      title_max_lines: overlay_config.title_max_lines !== undefined ? overlay_config.title_max_lines : (asset.overlay_config?.title_max_lines || 3),
+      subtitle_max_lines: overlay_config.subtitle_max_lines !== undefined ? overlay_config.subtitle_max_lines : (asset.overlay_config?.subtitle_max_lines || 3),
+      x_percent: overlay_config.x_percent !== undefined ? overlay_config.x_percent : asset.overlay_config?.x_percent,
+      y_percent: overlay_config.y_percent !== undefined ? overlay_config.y_percent : asset.overlay_config?.y_percent,
+      text_anchor: overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle',
+      position: overlay_config.position || asset.overlay_config?.position || 'bottom-right' // Keep for backward compatibility
     };
 
     const finalImageUrl = await imageOverlayService.updateOverlay(

@@ -30,20 +30,25 @@ export interface BrandDNA {
 }
 
 export interface OverlayConfig {
-  title: string; // Max 5 words
-  subtitle: string; // Max 15 words
+  title: string;
+  subtitle: string;
   font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
   font_weight: 'light' | 'regular' | 'bold';
   font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
   letter_spacing: 'normal' | 'wide';
   text_color_hex: string;
-  position: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
+  // New: Pixel-based positioning (percentages 0-100)
+  x_percent?: number; // Horizontal position as percentage (0 = left, 100 = right)
+  y_percent?: number; // Vertical position as percentage (0 = top, 100 = bottom)
+  text_anchor?: 'start' | 'middle' | 'end'; // Horizontal alignment of text
+  // Legacy: String-based position (for backward compatibility)
+  position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
   max_width_percent: number;
   opacity?: number;
-  title_font_size?: number; // Custom font size for title (default: auto-calculated)
-  subtitle_font_size?: number; // Custom font size for subtitle (default: auto-calculated)
-  title_max_lines?: number; // Maximum number of lines for title (default: 1)
-  subtitle_max_lines?: number; // Maximum number of lines for subtitle (default: 2)
+  title_font_size?: number;
+  subtitle_font_size?: number;
+  title_max_lines?: number;
+  subtitle_max_lines?: number;
   // Legacy support - will be removed
   text?: string;
 }
