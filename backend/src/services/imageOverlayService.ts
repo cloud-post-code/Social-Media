@@ -118,13 +118,13 @@ export const applyTextOverlay = async (
     const letterSpacing = overlayConfig.letter_spacing === 'wide' ? '0.15em' : 'normal';
     
     // Estimate text width (rough approximation - wider for bold)
-    const charWidthMultiplier = fontWeight === 'bold' ? 0.7 : 0.6;
+    const charWidthMultiplier = overlayConfig.font_weight === 'bold' ? 0.7 : 0.6;
     const avgCharWidth = fontSize * charWidthMultiplier;
     const textWidth = overlayConfig.text.length * avgCharWidth;
     const textHeight = fontSize * 1.4; // More space for descenders
     const maxWidth = (width * overlayConfig.max_width_percent) / 100;
     
-    const { x, y } = calculatePosition(
+    const positionResult = calculatePosition(
       overlayConfig.position,
       width,
       height,
@@ -132,6 +132,14 @@ export const applyTextOverlay = async (
       textHeight,
       overlayConfig.max_width_percent
     );
+    
+    // Handle floating-center position
+    let x = positionResult.x;
+    let y = positionResult.y;
+    if (overlayConfig.position === 'floating-center') {
+      x = width / 2;
+      y = height / 2;
+    }
     
     // Adjust y position - SVG text y is the baseline
     let textY = y;
@@ -143,9 +151,8 @@ export const applyTextOverlay = async (
       textY = y + fontSize / 2; // Center baseline
     }
     
-    // Handle floating-center position
+    // Adjust textY for floating-center
     if (overlayConfig.position === 'floating-center') {
-      x = width / 2;
       textY = height / 2;
     }
     
