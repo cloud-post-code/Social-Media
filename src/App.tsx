@@ -3,6 +3,7 @@ import { BrandDNA, GeneratedAsset } from './models/types.js';
 import { useBrands } from './hooks/useBrands.js';
 import { useAssets } from './hooks/useAssets.js';
 import BrandDNAPage from './views/BrandDNAPage.js';
+import BrandAssetsPage from './views/BrandAssetsPage.js';
 import ContentStudioPage from './views/ContentStudioPage.js';
 import HomePage from './views/HomePage.js';
 import LoadingSpinner from './components/LoadingSpinner.js';
@@ -12,7 +13,7 @@ const App: React.FC = () => {
   const { brands, loading: brandsLoading, error: brandsError, createBrand, updateBrand } = useBrands();
   const { assets, loading: assetsLoading, createAsset } = useAssets();
   const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
-  const [view, setView] = useState<'home' | 'dna' | 'studio'>('home');
+  const [view, setView] = useState<'home' | 'dna' | 'studio' | 'assets'>('home');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
 
@@ -227,6 +228,13 @@ const App: React.FC = () => {
                >
                  CONTENT STUDIO
                </button>
+               <button 
+                onClick={() => { if(activeBrand) setView('assets'); }}
+                disabled={!activeBrand}
+                className={`px-8 py-2.5 rounded-xl text-xs font-black transition-all ${view === 'assets' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600 disabled:opacity-30'}`}
+               >
+                 ASSETS
+               </button>
             </div>
           </div>
           
@@ -275,6 +283,11 @@ const App: React.FC = () => {
                   setView('home');
                 }
               }}
+              onViewAssets={() => {
+                if (activeBrand) {
+                  setView('assets');
+                }
+              }}
             />
           )}
           {view === 'studio' && (
@@ -282,6 +295,12 @@ const App: React.FC = () => {
               activeBrand={activeBrand}
               onAssetCreated={handleAssetCreated}
               initialAsset={editingAsset}
+            />
+          )}
+          {view === 'assets' && activeBrand && (
+            <BrandAssetsPage 
+              activeBrand={activeBrand}
+              onBack={() => setView('studio')}
             />
           )}
         </div>

@@ -7,6 +7,8 @@ router.get('/', brandController.getAllBrands);
 router.get('/:id', brandController.getBrandById);
 router.post('/', brandController.createBrand);
 router.post('/extract', brandController.extractBrandDNA);
+router.post('/:id/images', brandController.uploadBrandImage);
+router.delete('/:id/images', brandController.deleteBrandImage);
 router.put('/:id', brandController.updateBrand);
 router.delete('/:id', brandController.deleteBrand);
 

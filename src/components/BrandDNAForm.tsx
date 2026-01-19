@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { BrandDNA } from '../models/types.js';
 import { brandApi } from '../services/brandApi.js';
+import ColorPicker from './ColorPicker.js';
 
 interface BrandDNAFormProps {
   dna: Partial<BrandDNA>;
   onSave: (dna: BrandDNA) => void;
   onCancel: () => void;
+  onViewAssets?: () => void;
 }
 
-const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) => {
+const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onViewAssets }) => {
   const [formData, setFormData] = useState<Partial<BrandDNA>>(dna);
   const [urlInput, setUrlInput] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
@@ -82,6 +84,8 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
       name: formData.name || 'Untitled Brand',
       tagline: formData.tagline || '',
       overview: formData.overview || '',
+      logo_url: formData.logo_url || undefined,
+      brand_images: formData.brand_images || undefined,
       visual_identity: {
         primary_color_hex: formData.visual_identity?.primary_color_hex || '#4F46E5',
         accent_color_hex: formData.visual_identity?.accent_color_hex || '#F59E0B',
@@ -147,6 +151,15 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
           <div>
             <h2 className="text-2xl font-black text-slate-900">Brand DNA Profile</h2>
             <p className="text-slate-500 font-medium">Configure the core identity markers for this library.</p>
+            {(formData.logo_url || (formData.brand_images && formData.brand_images.length > 0)) && onViewAssets && (
+              <button
+                type="button"
+                onClick={onViewAssets}
+                className="mt-3 text-sm text-indigo-600 font-bold hover:text-indigo-700 transition"
+              >
+                View Extracted Assets →
+              </button>
+            )}
           </div>
           <div className="flex gap-4 w-full md:w-auto">
             <button type="button" onClick={onCancel} className="flex-1 md:flex-none px-8 py-3 text-slate-500 font-bold hover:text-slate-800 transition">Discard</button>
@@ -209,44 +222,16 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
               <div className="bg-slate-50 p-6 rounded-3xl space-y-6">
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Primary Color</label>
-                  <input 
-                    type="text"
-                    value={formData.visual_identity?.primary_color_hex || ''} 
-                    onChange={e => {
-                      let value = e.target.value.toUpperCase().replace(/[^0-9A-F#]/g, '');
-                      if (value.length > 0 && value[0] !== '#') value = '#' + value;
-                      if (value.length > 7) value = value.slice(0, 7);
-                      updateNested('visual_identity.primary_color_hex', value || '#4F46E5');
-                    }}
-                    onBlur={e => {
-                      const value = e.target.value;
-                      if (!value.match(/^#[0-9A-F]{6}$/i)) {
-                        updateNested('visual_identity.primary_color_hex', '#4F46E5');
-                      }
-                    }}
-                    className="w-full p-4 bg-white border border-slate-200 rounded-xl" 
-                    placeholder="#4F46E5"
+                  <ColorPicker
+                    value={formData.visual_identity?.primary_color_hex || '#4F46E5'}
+                    onChange={(hex) => updateNested('visual_identity.primary_color_hex', hex)}
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Accent Color</label>
-                  <input 
-                    type="text"
-                    value={formData.visual_identity?.accent_color_hex || ''} 
-                    onChange={e => {
-                      let value = e.target.value.toUpperCase().replace(/[^0-9A-F#]/g, '');
-                      if (value.length > 0 && value[0] !== '#') value = '#' + value;
-                      if (value.length > 7) value = value.slice(0, 7);
-                      updateNested('visual_identity.accent_color_hex', value || '#F59E0B');
-                    }}
-                    onBlur={e => {
-                      const value = e.target.value;
-                      if (!value.match(/^#[0-9A-F]{6}$/i)) {
-                        updateNested('visual_identity.accent_color_hex', '#F59E0B');
-                      }
-                    }}
-                    className="w-full p-4 bg-white border border-slate-200 rounded-xl" 
-                    placeholder="#F59E0B"
+                  <ColorPicker
+                    value={formData.visual_identity?.accent_color_hex || '#F59E0B'}
+                    onChange={(hex) => updateNested('visual_identity.accent_color_hex', hex)}
                   />
                 </div>
                 <div>
@@ -265,6 +250,72 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
             </section>
           </div>
         </div>
+
+        {/* Extracted Images Preview */}
+        {(formData.logo_url || (formData.brand_images && formData.brand_images.length > 0)) && (
+          <section className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-black text-slate-900">Extracted Assets</h3>
+              {onViewAssets && (
+                <button
+                  type="button"
+                  onClick={onViewAssets}
+                  className="text-sm text-indigo-600 font-bold hover:text-indigo-700 transition"
+                >
+                  View All →
+                </button>
+              )}
+            </div>
+            <div className="space-y-6">
+              {formData.logo_url && (
+                <div>
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Logo</h4>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 inline-block">
+                    <img
+                      src={formData.logo_url}
+                      alt="Brand logo"
+                      className="max-w-xs max-h-24 object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              {formData.brand_images && formData.brand_images.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">
+                    Brand Images ({formData.brand_images.length})
+                  </h4>
+                  <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                    {formData.brand_images.slice(0, 5).map((imageUrl, index) => (
+                      <div
+                        key={index}
+                        className="aspect-square rounded-xl overflow-hidden bg-white border border-slate-200"
+                      >
+                        <img
+                          src={imageUrl}
+                          alt={`Brand image ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ))}
+                    {formData.brand_images.length > 5 && (
+                      <div className="aspect-square rounded-xl bg-slate-200 border border-slate-300 flex items-center justify-center">
+                        <span className="text-xs font-bold text-slate-600">
+                          +{formData.brand_images.length - 5} more
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </form>
     </div>
   );

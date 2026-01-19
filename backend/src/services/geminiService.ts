@@ -250,12 +250,70 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
     strategicInfo = {};
   }
 
+  // Step 5: Extract Brand Images (Logo + Key Images) - Only when URL is provided
+  let imagesInfo: any = {};
+  if (input.url) {
+    const imagesPrompt = `
+      You are an expert Web Scraper and Brand Asset Analyst.
+      Analyze the website at ${input.url} to extract brand images.
+      ${urlContext}
+      
+      Your task:
+      1. Identify the logo image URL (the main brand logo, typically in header/navbar)
+      2. Extract 3-10 key brand images (hero images, product images, lifestyle images, etc.)
+         - Prioritize high-quality, representative images
+         - Avoid duplicates or very similar images
+         - Focus on images that represent the brand visually
+         - Look for images in the main content area, hero sections, and product galleries
+      
+      Return ONLY a JSON object with this exact structure:
+      {
+        "logo_url": "Full URL to the logo image (or empty string if not found)",
+        "image_urls": [
+          "Full URL to image 1",
+          "Full URL to image 2",
+          "Full URL to image 3",
+          ...
+        ]
+      }
+      
+      Important:
+      - Return absolute URLs (include https:// or http://)
+      - Return 3-10 images in image_urls array (minimum 3 if available)
+      - If logo is not found, return empty string for logo_url
+      - Ensure URLs are directly accessible (not relative paths)
+      - Return ONLY JSON. No markdown, no explanations.
+    `;
+
+    const imagesContents = { parts: [{ text: imagesPrompt }] };
+
+    try {
+      const imagesResponse = await ai.models.generateContent({
+        model,
+        contents: imagesContents,
+        config: { responseMimeType: "application/json" }
+      });
+      if (!imagesResponse.text) {
+        throw new Error('No response text from Gemini API');
+      }
+      imagesInfo = safeJsonParse(imagesResponse.text || '{}') || {};
+    } catch (error: any) {
+      console.error('Error extracting brand images:', error);
+      // Continue with defaults instead of throwing to allow partial extraction
+      imagesInfo = {};
+    }
+  }
+
   // Combine all extracted data
   const dna: BrandDNA = {
     id: Date.now().toString(),
     name: basicInfo.name || 'Unknown Brand',
     tagline: basicInfo.tagline || '',
     overview: basicInfo.overview || '',
+    logo_url: imagesInfo.logo_url || undefined,
+    brand_images: imagesInfo.image_urls && imagesInfo.image_urls.length > 0 
+      ? imagesInfo.image_urls.slice(0, 10) // Limit to max 10 images
+      : undefined,
     visual_identity: {
       primary_color_hex: visualInfo.primary_color_hex || '#4F46E5',
       accent_color_hex: visualInfo.accent_color_hex || '#F59E0B',

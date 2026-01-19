@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS brands (
   tagline TEXT,
   overview TEXT,
   logo_url TEXT,
+  brand_images JSONB,
   visual_identity JSONB NOT NULL,
   brand_voice JSONB NOT NULL,
   strategic_profile JSONB NOT NULL,
@@ -44,6 +45,20 @@ export async function migrate() {
     
     await client.query('BEGIN');
     await client.query(schema);
+    
+    // Add brand_images column if it doesn't exist (for existing databases)
+    await client.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'brands' AND column_name = 'brand_images'
+        ) THEN
+          ALTER TABLE brands ADD COLUMN brand_images JSONB;
+        END IF;
+      END $$;
+    `);
+    
     await client.query('COMMIT');
     
     console.log('Migrations completed successfully!');
@@ -51,7 +66,27 @@ export async function migrate() {
     await client.query('ROLLBACK').catch(() => {}); // Ignore rollback errors
     // Check if error is because tables already exist (migrations already ran)
     if (error?.code === '42P07' || error?.message?.includes('already exists')) {
-      console.log('Tables already exist, skipping migrations');
+      console.log('Tables already exist, applying incremental migrations...');
+      // Try to add the column anyway
+      try {
+        await client.query(`
+          DO $$ 
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns 
+              WHERE table_name = 'brands' AND column_name = 'brand_images'
+            ) THEN
+              ALTER TABLE brands ADD COLUMN brand_images JSONB;
+            END IF;
+          END $$;
+        `);
+        console.log('Incremental migrations completed');
+      } catch (alterError: any) {
+        // Column might already exist, that's fine
+        if (alterError?.code !== '42701') { // 42701 = duplicate_column
+          console.error('Error adding brand_images column:', alterError);
+        }
+      }
       return; // Success - migrations already applied
     }
     console.error('Migration failed:', error);

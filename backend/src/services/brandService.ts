@@ -20,9 +20,9 @@ export const getBrandById = async (id: string): Promise<BrandDNA | null> => {
 export const createBrand = async (brand: BrandDNA): Promise<BrandDNA> => {
   const result = await pool.query<BrandRow>(
     `INSERT INTO brands (
-      id, name, tagline, overview, logo_url, visual_identity, 
+      id, name, tagline, overview, logo_url, brand_images, visual_identity, 
       brand_voice, strategic_profile, image_generation_prompt_prefix
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING *`,
     [
       brand.id,
@@ -30,6 +30,7 @@ export const createBrand = async (brand: BrandDNA): Promise<BrandDNA> => {
       brand.tagline || null,
       brand.overview || null,
       brand.logo_url || null,
+      brand.brand_images ? JSON.stringify(brand.brand_images) : null,
       JSON.stringify(brand.visual_identity),
       JSON.stringify(brand.brand_voice),
       JSON.stringify(brand.strategic_profile),
@@ -49,16 +50,17 @@ export const updateBrand = async (id: string, brand: Partial<BrandDNA>): Promise
   
   const result = await pool.query<BrandRow>(
     `UPDATE brands SET
-      name = $1, tagline = $2, overview = $3, logo_url = $4,
-      visual_identity = $5, brand_voice = $6, strategic_profile = $7,
-      image_generation_prompt_prefix = $8, updated_at = CURRENT_TIMESTAMP
-    WHERE id = $9
+      name = $1, tagline = $2, overview = $3, logo_url = $4, brand_images = $5,
+      visual_identity = $6, brand_voice = $7, strategic_profile = $8,
+      image_generation_prompt_prefix = $9, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $10
     RETURNING *`,
     [
       updated.name,
       updated.tagline || null,
       updated.overview || null,
       updated.logo_url || null,
+      updated.brand_images ? JSON.stringify(updated.brand_images) : null,
       JSON.stringify(updated.visual_identity),
       JSON.stringify(updated.brand_voice),
       JSON.stringify(updated.strategic_profile),
@@ -83,6 +85,7 @@ function rowToBrandDNA(row: BrandRow): BrandDNA {
     tagline: row.tagline || undefined,
     overview: row.overview || undefined,
     logo_url: row.logo_url || undefined,
+    brand_images: row.brand_images && Array.isArray(row.brand_images) ? row.brand_images : undefined,
     visual_identity: row.visual_identity,
     brand_voice: row.brand_voice,
     strategic_profile: row.strategic_profile,

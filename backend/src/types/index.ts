@@ -6,6 +6,7 @@ export interface BrandDNA {
   tagline?: string;
   overview?: string;
   logo_url?: string;
+  brand_images?: string[]; // Array of image URLs/base64 (3-10 key images)
   visual_identity: {
     primary_color_hex: string;
     accent_color_hex: string;
@@ -77,6 +78,7 @@ export interface BrandRow {
   tagline?: string;
   overview?: string;
   logo_url?: string;
+  brand_images?: any;
   visual_identity: any;
   brand_voice: any;
   strategic_profile: any;

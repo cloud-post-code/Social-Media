@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS brands (
   tagline TEXT,
   overview TEXT,
   logo_url TEXT,
+  brand_images JSONB,
   visual_identity JSONB NOT NULL,
   brand_voice JSONB NOT NULL,
   strategic_profile JSONB NOT NULL,
