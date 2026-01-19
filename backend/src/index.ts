@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import brandRoutes from './routes/brandRoutes.js';
+import brandAssetRoutes from './routes/brandAssetRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { migrate } from './migrations/migrate.js';
@@ -21,7 +22,8 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes
+// Routes - brandAssetRoutes must come before brandRoutes for proper route matching
+app.use('/api/brands', brandAssetRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/assets', assetRoutes);
 

@@ -1,24 +1,70 @@
 import React, { useState, useEffect } from 'react';
 import { BrandDNA } from '../models/types.js';
 import { brandApi } from '../services/brandApi.js';
+import { useBrandAssets } from '../hooks/useBrandAssets.js';
 import ColorPicker from './ColorPicker.js';
 
 interface BrandDNAFormProps {
   dna: Partial<BrandDNA>;
   onSave: (dna: BrandDNA) => void;
   onCancel: () => void;
-  onViewAssets?: () => void;
 }
 
-const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onViewAssets }) => {
+const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) => {
   const [formData, setFormData] = useState<Partial<BrandDNA>>(dna);
   const [urlInput, setUrlInput] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
+  const [extractedAssets, setExtractedAssets] = useState<{ logoUrl?: string; imageUrls?: string[] } | null>(null);
+  
+  const brandId = formData.id;
+  const { assets, logo, loading: assetsLoading, uploadAsset, deleteAsset, loadAssets } = useBrandAssets(brandId);
 
   // Sync state if prop changes
   useEffect(() => {
     setFormData(dna);
+    if (dna.id) {
+      loadAssets();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dna]);
+
+  // Save extracted assets after brand is saved
+  useEffect(() => {
+    if (extractedAssets && brandId) {
+      const saveExtractedAssets = async () => {
+        try {
+          if (extractedAssets.logoUrl) {
+            try {
+              await uploadAsset(extractedAssets.logoUrl, 'logo');
+            } catch (err: any) {
+              // Logo might already exist, that's ok
+              if (!err.message?.includes('already has a logo')) {
+                console.error('Failed to save logo:', err);
+              }
+            }
+          }
+          if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
+            for (const imageUrl of extractedAssets.imageUrls.slice(0, 10)) {
+              try {
+                await uploadAsset(imageUrl, 'brand_image');
+              } catch (err: any) {
+                if (err.message?.includes('Maximum')) {
+                  break; // Reached max limit
+                }
+                console.error('Failed to save image:', err);
+              }
+            }
+          }
+          setExtractedAssets(null);
+          await loadAssets();
+        } catch (err) {
+          console.error('Failed to save extracted assets:', err);
+        }
+      };
+      saveExtractedAssets();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brandId, extractedAssets]);
 
   const handleExtract = async () => {
     if (!urlInput) return;
@@ -31,7 +77,14 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onVi
     
     setIsExtracting(true);
     try {
-      const extracted = await brandApi.extractDNA({ url });
+      const extracted: any = await brandApi.extractDNA({ url });
+      
+      // Extract assets info if present
+      if (extracted.extractedAssets) {
+        setExtractedAssets(extracted.extractedAssets);
+        delete extracted.extractedAssets;
+      }
+      
       setFormData(extracted);
       setUrlInput(''); // Clear input after successful extraction
     } catch (err: any) {
@@ -51,7 +104,14 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onVi
     reader.onload = async (event) => {
       const base64 = event.target?.result as string;
       try {
-        const extracted = await brandApi.extractDNA({ imageBase64: base64 });
+        const extracted: any = await brandApi.extractDNA({ imageBase64: base64 });
+        
+        // Extract assets info if present
+        if (extracted.extractedAssets) {
+          setExtractedAssets(extracted.extractedAssets);
+          delete extracted.extractedAssets;
+        }
+        
         setFormData(extracted);
       } catch (err) {
         alert('Failed to analyze screenshot.');
@@ -60,6 +120,32 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onVi
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>, assetType: 'logo' | 'brand_image') => {
+    const file = e.target.files?.[0];
+    if (!file || !brandId) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      try {
+        await uploadAsset(base64, assetType);
+      } catch (err: any) {
+        alert(err.message || 'Failed to upload image.');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAssetDelete = async (assetId: string, assetType: 'logo' | 'brand_image') => {
+    if (!confirm('Are you sure you want to delete this asset?')) return;
+    
+    try {
+      await deleteAsset(assetId, assetType);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete asset.');
+    }
   };
 
   const updateNested = (path: string, value: any) => {
@@ -84,8 +170,6 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onVi
       name: formData.name || 'Untitled Brand',
       tagline: formData.tagline || '',
       overview: formData.overview || '',
-      logo_url: formData.logo_url || undefined,
-      brand_images: formData.brand_images || undefined,
       visual_identity: {
         primary_color_hex: formData.visual_identity?.primary_color_hex || '#4F46E5',
         accent_color_hex: formData.visual_identity?.accent_color_hex || '#F59E0B',
@@ -108,6 +192,9 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onVi
     };
     onSave(finalData);
   };
+
+  const canUploadMoreImages = assets.length < 10;
+  const hasLogo = !!logo;
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-20 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -151,15 +238,6 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onVi
           <div>
             <h2 className="text-2xl font-black text-slate-900">Brand DNA Profile</h2>
             <p className="text-slate-500 font-medium">Configure the core identity markers for this library.</p>
-            {(formData.logo_url || (formData.brand_images && formData.brand_images.length > 0)) && onViewAssets && (
-              <button
-                type="button"
-                onClick={onViewAssets}
-                className="mt-3 text-sm text-indigo-600 font-bold hover:text-indigo-700 transition"
-              >
-                View Extracted Assets →
-              </button>
-            )}
           </div>
           <div className="flex gap-4 w-full md:w-auto">
             <button type="button" onClick={onCancel} className="flex-1 md:flex-none px-8 py-3 text-slate-500 font-bold hover:text-slate-800 transition">Discard</button>
@@ -251,28 +329,32 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onVi
           </div>
         </div>
 
-        {/* Extracted Images Preview */}
-        {(formData.logo_url || (formData.brand_images && formData.brand_images.length > 0)) && (
+        {/* Brand Assets Section */}
+        {brandId && (
           <section className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-black text-slate-900">Extracted Assets</h3>
-              {onViewAssets && (
-                <button
-                  type="button"
-                  onClick={onViewAssets}
-                  className="text-sm text-indigo-600 font-bold hover:text-indigo-700 transition"
-                >
-                  View All →
-                </button>
-              )}
-            </div>
-            <div className="space-y-6">
-              {formData.logo_url && (
-                <div>
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Logo</h4>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 inline-block">
+            <h3 className="text-lg font-black text-slate-900 mb-6">Brand Assets</h3>
+            
+            {/* Logo Section */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Logo</h4>
+                {!hasLogo && (
+                  <label className="text-xs text-indigo-600 font-bold cursor-pointer hover:text-indigo-700 transition">
+                    + Upload Logo
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={(e) => handleAssetUpload(e, 'logo')}
+                    />
+                  </label>
+                )}
+              </div>
+              {hasLogo ? (
+                <div className="relative inline-block group">
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200">
                     <img
-                      src={formData.logo_url}
+                      src={logo.image_url}
                       alt="Brand logo"
                       className="max-w-xs max-h-24 object-contain"
                       onError={(e) => {
@@ -280,37 +362,80 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onVi
                       }}
                     />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAssetDelete(logo.id, 'logo')}
+                    className="absolute -top-2 -right-2 bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-white p-12 rounded-2xl border-2 border-dashed border-slate-200 text-center">
+                  <p className="text-slate-400 text-sm font-medium">No logo uploaded</p>
                 </div>
               )}
-              {formData.brand_images && formData.brand_images.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">
-                    Brand Images ({formData.brand_images.length})
-                  </h4>
-                  <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                    {formData.brand_images.slice(0, 5).map((imageUrl, index) => (
-                      <div
-                        key={index}
-                        className="aspect-square rounded-xl overflow-hidden bg-white border border-slate-200"
+            </div>
+
+            {/* Brand Images Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">
+                  Brand Images ({assets.length} / 10)
+                </h4>
+                {canUploadMoreImages && (
+                  <label className="text-xs text-indigo-600 font-bold cursor-pointer hover:text-indigo-700 transition">
+                    + Upload Image
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={(e) => handleAssetUpload(e, 'brand_image')}
+                    />
+                  </label>
+                )}
+              </div>
+              {assets.length > 0 ? (
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                  {assets.map((asset) => (
+                    <div key={asset.id} className="relative group aspect-square rounded-xl overflow-hidden bg-white border border-slate-200">
+                      <img
+                        src={asset.image_url}
+                        alt={`Brand image ${asset.id}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAssetDelete(asset.id, 'brand_image')}
+                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                       >
-                        <img
-                          src={imageUrl}
-                          alt={`Brand image ${index + 1}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    ))}
-                    {formData.brand_images.length > 5 && (
-                      <div className="aspect-square rounded-xl bg-slate-200 border border-slate-300 flex items-center justify-center">
-                        <span className="text-xs font-bold text-slate-600">
-                          +{formData.brand_images.length - 5} more
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                        <span className="bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-bold">Delete</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white p-12 rounded-2xl border-2 border-dashed border-slate-200 text-center">
+                  <p className="text-slate-400 text-sm font-medium mb-2">No brand images yet</p>
+                  {canUploadMoreImages && (
+                    <label className="text-xs text-indigo-600 font-bold cursor-pointer hover:text-indigo-700 transition inline-block">
+                      + Upload First Image
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => handleAssetUpload(e, 'brand_image')}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+              {!canUploadMoreImages && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-xs text-amber-800">Maximum of 10 images reached. Delete an image to upload a new one.</p>
                 </div>
               )}
             </div>
@@ -322,4 +447,3 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel, onVi
 };
 
 export default BrandDNAForm;
-

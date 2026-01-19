@@ -310,10 +310,6 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
     name: basicInfo.name || 'Unknown Brand',
     tagline: basicInfo.tagline || '',
     overview: basicInfo.overview || '',
-    logo_url: imagesInfo.logo_url || undefined,
-    brand_images: imagesInfo.image_urls && imagesInfo.image_urls.length > 0 
-      ? imagesInfo.image_urls.slice(0, 10) // Limit to max 10 images
-      : undefined,
     visual_identity: {
       primary_color_hex: visualInfo.primary_color_hex || '#4F46E5',
       accent_color_hex: visualInfo.accent_color_hex || '#F59E0B',
@@ -335,7 +331,16 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
     }
   };
 
-  return dna;
+  // Return DNA with extracted assets info for saving to brand_assets table
+  return {
+    ...dna,
+    _extractedAssets: {
+      logoUrl: imagesInfo.logo_url || undefined,
+      imageUrls: imagesInfo.image_urls && imagesInfo.image_urls.length > 0 
+        ? imagesInfo.image_urls.slice(0, 10) // Limit to max 10 images
+        : undefined
+    }
+  } as BrandDNA & { _extractedAssets?: { logoUrl?: string; imageUrls?: string[] } };
 };
 
 /**

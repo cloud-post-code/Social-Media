@@ -14,12 +14,6 @@ export const brandApi = {
   delete: (id: string) => api.delete<void>(`/brands/${id}`),
   
   extractDNA: (input: { url?: string; imageBase64?: string }) =>
-    api.post<BrandDNA>('/brands/extract', input),
-  
-  uploadImage: (id: string, imageBase64: string) =>
-    api.post<BrandDNA>(`/brands/${id}/images`, { imageBase64 }),
-  
-  deleteImage: (id: string, imageIndex: number) =>
-    api.delete<BrandDNA>(`/brands/${id}/images?imageIndex=${imageIndex}`),
+    api.post<BrandDNA & { extractedAssets?: { logoUrl?: string; imageUrls?: string[] } }>('/brands/extract', input),
 };
 

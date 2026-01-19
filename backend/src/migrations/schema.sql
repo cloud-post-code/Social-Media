@@ -27,8 +27,19 @@ CREATE TABLE IF NOT EXISTS generated_assets (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Brand assets table
+CREATE TABLE IF NOT EXISTS brand_assets (
+  id VARCHAR(255) PRIMARY KEY,
+  brand_id VARCHAR(255) NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  asset_type VARCHAR(50) NOT NULL CHECK (asset_type IN ('logo', 'brand_image')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_generated_assets_brand_id ON generated_assets(brand_id);
 CREATE INDEX IF NOT EXISTS idx_generated_assets_created_at ON generated_assets(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_brands_created_at ON brands(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_brand_assets_brand_id ON brand_assets(brand_id);
+CREATE INDEX IF NOT EXISTS idx_brand_assets_asset_type ON brand_assets(asset_type);
 

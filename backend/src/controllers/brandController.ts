@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as brandService from '../services/brandService.js';
 import * as geminiService from '../services/geminiService.js';
+import * as brandAssetService from '../services/brandAssetService.js';
 import { BrandDNA } from '../types/index.js';
 
 export const getAllBrands = async (req: Request, res: Response, next: NextFunction) => {
@@ -64,8 +65,20 @@ export const extractBrandDNA = async (req: Request, res: Response, next: NextFun
       });
     }
 
-    const extractedDNA = await geminiService.extractBrandDNA({ url, imageBase64 });
-    res.json(extractedDNA);
+    const extractedResult = await geminiService.extractBrandDNA({ url, imageBase64 });
+    const extractedDNA = extractedResult as BrandDNA & { _extractedAssets?: { logoUrl?: string; imageUrls?: string[] } };
+    
+    // Extract assets info and remove from response
+    const extractedAssets = extractedDNA._extractedAssets;
+    delete (extractedDNA as any)._extractedAssets;
+    
+    // Return DNA with extracted assets info
+    // Frontend will save assets to brand_assets table after creating/updating brand
+    const response: any = { ...extractedDNA };
+    if (extractedAssets) {
+      response.extractedAssets = extractedAssets;
+    }
+    res.json(response);
   } catch (error: any) {
     console.error('Error in extractBrandDNA controller:', error);
     const errorMessage = error?.message || 'Failed to extract brand DNA';
@@ -76,72 +89,4 @@ export const extractBrandDNA = async (req: Request, res: Response, next: NextFun
   }
 };
 
-export const uploadBrandImage = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const { imageBase64 } = req.body;
-    
-    if (!imageBase64) {
-      return res.status(400).json({ 
-        error: { message: 'imageBase64 is required' } 
-      });
-    }
-
-    const brand = await brandService.getBrandById(id);
-    if (!brand) {
-      return res.status(404).json({ error: { message: 'Brand not found' } });
-    }
-
-    // Append new image to existing brand_images array (max 10 total)
-    const currentImages = brand.brand_images || [];
-    if (currentImages.length >= 10) {
-      return res.status(400).json({ 
-        error: { message: 'Maximum of 10 brand images allowed' } 
-      });
-    }
-
-    const updatedImages = [...currentImages, imageBase64];
-    const updatedBrand = await brandService.updateBrand(id, { 
-      brand_images: updatedImages 
-    });
-    
-    res.json(updatedBrand);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const deleteBrandImage = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const imageIndex = parseInt(req.query.imageIndex as string, 10);
-    
-    if (isNaN(imageIndex) || imageIndex < 0) {
-      return res.status(400).json({ 
-        error: { message: 'Valid imageIndex query parameter is required' } 
-      });
-    }
-
-    const brand = await brandService.getBrandById(id);
-    if (!brand) {
-      return res.status(404).json({ error: { message: 'Brand not found' } });
-    }
-
-    const currentImages = brand.brand_images || [];
-    if (imageIndex >= currentImages.length) {
-      return res.status(400).json({ 
-        error: { message: 'Invalid imageIndex' } 
-      });
-    }
-
-    const updatedImages = currentImages.filter((_, index) => index !== imageIndex);
-    const updatedBrand = await brandService.updateBrand(id, { 
-      brand_images: updatedImages.length > 0 ? updatedImages : undefined
-    });
-    
-    res.json(updatedBrand);
-  } catch (error) {
-    next(error);
-  }
-};
 

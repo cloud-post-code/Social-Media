@@ -5,8 +5,6 @@ export interface BrandDNA {
   name: string;
   tagline?: string;
   overview?: string;
-  logo_url?: string;
-  brand_images?: string[]; // Array of image URLs/base64 (3-10 key images)
   visual_identity: {
     primary_color_hex: string;
     accent_color_hex: string;
@@ -79,6 +77,14 @@ export interface GeneratedAsset {
   baseImageUrl?: string;
   userPrompt?: string;
   feedbackHistory?: string[];
+}
+
+export interface BrandAsset {
+  id: string;
+  brand_id: string;
+  image_url: string;
+  asset_type: 'logo' | 'brand_image';
+  created_at?: Date;
 }
 
 export type GenerationOption = 'product' | 'non-product';

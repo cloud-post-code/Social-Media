@@ -29,8 +29,8 @@ export const createBrand = async (brand: BrandDNA): Promise<BrandDNA> => {
       brand.name,
       brand.tagline || null,
       brand.overview || null,
-      brand.logo_url || null,
-      brand.brand_images ? JSON.stringify(brand.brand_images) : null,
+      null, // logo_url deprecated - use brand_assets table
+      null, // brand_images deprecated - use brand_assets table
       JSON.stringify(brand.visual_identity),
       JSON.stringify(brand.brand_voice),
       JSON.stringify(brand.strategic_profile),
@@ -59,8 +59,8 @@ export const updateBrand = async (id: string, brand: Partial<BrandDNA>): Promise
       updated.name,
       updated.tagline || null,
       updated.overview || null,
-      updated.logo_url || null,
-      updated.brand_images ? JSON.stringify(updated.brand_images) : null,
+      null, // logo_url deprecated - use brand_assets table
+      null, // brand_images deprecated - use brand_assets table
       JSON.stringify(updated.visual_identity),
       JSON.stringify(updated.brand_voice),
       JSON.stringify(updated.strategic_profile),
@@ -84,8 +84,7 @@ function rowToBrandDNA(row: BrandRow): BrandDNA {
     name: row.name,
     tagline: row.tagline || undefined,
     overview: row.overview || undefined,
-    logo_url: row.logo_url || undefined,
-    brand_images: row.brand_images && Array.isArray(row.brand_images) ? row.brand_images : undefined,
+    // logo_url and brand_images removed - use brand_assets table instead
     visual_identity: row.visual_identity,
     brand_voice: row.brand_voice,
     strategic_profile: row.strategic_profile,
