@@ -89,9 +89,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     }).join('')}`;
     
     if (target === 'title') {
-      setOverlayEdit({...overlayEdit, title_color_hex: hex});
+      setOverlayEdit(prev => ({...prev, title_color_hex: hex}));
     } else {
-      setOverlayEdit({...overlayEdit, subtitle_color_hex: hex});
+      setOverlayEdit(prev => ({...prev, subtitle_color_hex: hex}));
     }
     
     setEyedropperActive(null);
@@ -133,7 +133,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart, displayAsset, editingOverlay]);
+  }, [isDragging, dragStart, currentAsset, editingOverlay, overlayEdit]);
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
