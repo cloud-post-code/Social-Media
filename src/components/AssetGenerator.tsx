@@ -60,10 +60,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   
   // Handle mouse move and up events globally when dragging
-  React.useEffect(() => {
+  useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging && dragStart && displayAsset && editingOverlay) {
-        const imageContainer = document.querySelector('.relative.group.rounded-\\[4rem\\]');
+        const imageContainer = document.querySelector('.relative.group.rounded-\\[4rem\\] .relative.w-full.aspect-square');
         if (imageContainer) {
           const rect = imageContainer.getBoundingClientRect();
           const x = ((e.clientX - rect.left) / rect.width) * 100;
@@ -73,11 +73,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           const clampedX = Math.max(5, Math.min(95, x));
           const clampedY = Math.max(5, Math.min(95, y));
           
-          setOverlayEdit({
-            ...overlayEdit,
+          setOverlayEdit(prev => ({
+            ...prev,
             x_percent: clampedX,
             y_percent: clampedY
-          });
+          }));
         }
       }
     };
@@ -95,7 +95,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart, overlayEdit, displayAsset, editingOverlay]);
+  }, [isDragging, dragStart, displayAsset, editingOverlay]);
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
