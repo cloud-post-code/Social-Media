@@ -40,6 +40,10 @@ export interface OverlayConfig {
   position: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
   max_width_percent: number;
   opacity?: number;
+  title_font_size?: number; // Custom font size for title (default: auto-calculated)
+  subtitle_font_size?: number; // Custom font size for subtitle (default: auto-calculated)
+  title_max_lines?: number; // Maximum number of lines for title (default: 1)
+  subtitle_max_lines?: number; // Maximum number of lines for subtitle (default: 2)
   // Legacy support
   text?: string;
 }

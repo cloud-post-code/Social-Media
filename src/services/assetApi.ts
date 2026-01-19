@@ -40,6 +40,10 @@ export const assetApi = {
     position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
     max_width_percent?: number;
     opacity?: number;
+    title_font_size?: number;
+    subtitle_font_size?: number;
+    title_max_lines?: number;
+    subtitle_max_lines?: number;
   }) => api.put<GeneratedAsset>(`/assets/${id}/overlay`, { overlay_config: overlayConfig }),
   
   delete: (id: string) => api.delete<void>(`/assets/${id}`),
