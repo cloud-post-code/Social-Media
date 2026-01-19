@@ -589,212 +589,278 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                        Title (Press Enter for new line)
-                      </label>
-                      <textarea
-                        value={overlayEdit.title || ''}
-                        onChange={e => setOverlayEdit({...overlayEdit, title: e.target.value})}
-                        onKeyDown={e => {
-                          // Allow Enter to create new lines (textarea handles this naturally, but we can prevent default if needed)
-                          // No need to prevent default - textarea handles Enter naturally
-                        }}
-                        rows={3}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold resize-y"
-                        placeholder="Enter title... (Press Enter for new line)"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                        Subtitle (Press Enter for new line)
-                      </label>
-                      <textarea
-                        value={overlayEdit.subtitle || ''}
-                        onChange={e => setOverlayEdit({...overlayEdit, subtitle: e.target.value})}
-                        onKeyDown={e => {
-                          // Allow Enter to create new lines (textarea handles this naturally)
-                          // No need to prevent default - textarea handles Enter naturally
-                        }}
-                        rows={3}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium resize-y"
-                        placeholder="Enter subtitle... (Press Enter for new line)"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font</label>
-                        <select
-                          value={overlayEdit.font_family || 'sans-serif'}
-                          onChange={e => setOverlayEdit({...overlayEdit, font_family: e.target.value as any})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                        >
-                          <option value="sans-serif">Sans-serif</option>
-                          <option value="serif">Serif</option>
-                          <option value="cursive">Cursive</option>
-                          <option value="handwritten">Handwritten</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Weight</label>
-                        <select
-                          value={overlayEdit.font_weight || 'bold'}
-                          onChange={e => setOverlayEdit({...overlayEdit, font_weight: e.target.value as any})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                        >
-                          <option value="light">Light</option>
-                          <option value="regular">Regular</option>
-                          <option value="bold">Bold</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Title Color */}
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Title Color</label>
-                      <div className="space-y-2">
-                        {/* Brand Colors */}
-                        {activeBrand && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setOverlayEdit({...overlayEdit, title_color_hex: activeBrand.visual_identity.primary_color_hex})}
-                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
-                              style={{ backgroundColor: activeBrand.visual_identity.primary_color_hex }}
-                              title="Primary Brand Color"
-                            />
-                            <button
-                              onClick={() => setOverlayEdit({...overlayEdit, title_color_hex: activeBrand.visual_identity.accent_color_hex})}
-                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
-                              style={{ backgroundColor: activeBrand.visual_identity.accent_color_hex }}
-                              title="Accent Brand Color"
-                            />
-                            <button
-                              onClick={() => setEyedropperActive('title')}
-                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm bg-white flex items-center justify-center"
-                              title="Pick color from image"
-                            >
-                              <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                        {/* Custom Color Picker */}
-                        <div className="flex gap-2">
-                          <input
-                            type="color"
-                            value={overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
-                            onChange={e => setOverlayEdit({...overlayEdit, title_color_hex: e.target.value})}
-                            className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
-                          />
-                          <input
-                            type="text"
-                            value={overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
-                            onChange={e => setOverlayEdit({...overlayEdit, title_color_hex: e.target.value})}
-                            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                            placeholder="#FFFFFF"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Subtitle Color */}
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Subtitle Color</label>
-                      <div className="space-y-2">
-                        {/* Brand Colors */}
-                        {activeBrand && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setOverlayEdit({...overlayEdit, subtitle_color_hex: activeBrand.visual_identity.primary_color_hex})}
-                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
-                              style={{ backgroundColor: activeBrand.visual_identity.primary_color_hex }}
-                              title="Primary Brand Color"
-                            />
-                            <button
-                              onClick={() => setOverlayEdit({...overlayEdit, subtitle_color_hex: activeBrand.visual_identity.accent_color_hex})}
-                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
-                              style={{ backgroundColor: activeBrand.visual_identity.accent_color_hex }}
-                              title="Accent Brand Color"
-                            />
-                            <button
-                              onClick={() => setEyedropperActive('subtitle')}
-                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm bg-white flex items-center justify-center"
-                              title="Pick color from image"
-                            >
-                              <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                        {/* Custom Color Picker */}
-                        <div className="flex gap-2">
-                          <input
-                            type="color"
-                            value={overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
-                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_color_hex: e.target.value})}
-                            className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
-                          />
-                          <input
-                            type="text"
-                            value={overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
-                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_color_hex: e.target.value})}
-                            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                            placeholder="#FFFFFF"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
+                  <div className="space-y-6">
+                    {/* Title Section */}
+                    <div className="space-y-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider">Title</h3>
+                      
                       <div>
                         <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                          Position (Drag text on image or use controls below)
+                          Text (Press Enter for new line)
                         </label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <label className="block text-xs text-slate-500 mb-1">X Position (%)</label>
+                        <textarea
+                          value={overlayEdit.title || ''}
+                          onChange={e => setOverlayEdit({...overlayEdit, title: e.target.value})}
+                          rows={3}
+                          className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold resize-y"
+                          placeholder="Enter title... (Press Enter for new line)"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Color</label>
+                        <div className="space-y-2">
+                          {activeBrand && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setOverlayEdit({...overlayEdit, title_color_hex: activeBrand.visual_identity.primary_color_hex})}
+                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
+                                style={{ backgroundColor: activeBrand.visual_identity.primary_color_hex }}
+                                title="Primary Brand Color"
+                              />
+                              <button
+                                onClick={() => setOverlayEdit({...overlayEdit, title_color_hex: activeBrand.visual_identity.accent_color_hex})}
+                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
+                                style={{ backgroundColor: activeBrand.visual_identity.accent_color_hex }}
+                                title="Accent Brand Color"
+                              />
+                              <button
+                                onClick={() => setEyedropperActive('title')}
+                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm bg-white flex items-center justify-center"
+                                title="Pick color from image"
+                              >
+                                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
                             <input
-                              type="number"
-                              min="5"
-                              max="95"
-                              value={overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : 50}
-                              onChange={e => setOverlayEdit({...overlayEdit, x_percent: parseInt(e.target.value)})}
-                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold text-sm"
+                              type="color"
+                              value={overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                              onChange={e => setOverlayEdit({...overlayEdit, title_color_hex: e.target.value})}
+                              className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
                             />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-slate-500 mb-1">Y Position (%)</label>
                             <input
-                              type="number"
-                              min="5"
-                              max="95"
-                              value={overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : 50}
-                              onChange={e => setOverlayEdit({...overlayEdit, y_percent: parseInt(e.target.value)})}
-                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold text-sm"
+                              type="text"
+                              value={overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                              onChange={e => setOverlayEdit({...overlayEdit, title_color_hex: e.target.value})}
+                              className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                              placeholder="#FFFFFF"
                             />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-slate-500 mb-1">Alignment</label>
-                            <select
-                              value={overlayEdit.text_anchor || 'middle'}
-                              onChange={e => setOverlayEdit({...overlayEdit, text_anchor: e.target.value as 'start' | 'middle' | 'end'})}
-                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold text-sm"
-                            >
-                              <option value="start">Left</option>
-                              <option value="middle">Center</option>
-                              <option value="end">Right</option>
-                            </select>
                           </div>
                         </div>
-                        <p className="text-xs text-slate-400 mt-2">
-                          💡 Drag the text on the image to position it, or use the controls above. Values are constrained to keep text visible.
-                        </p>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Size</label>
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="number"
+                              min="12"
+                              max="200"
+                              value={overlayEdit.title_font_size || ''}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setOverlayEdit({...overlayEdit, title_font_size: val ? parseInt(val) : undefined});
+                              }}
+                              className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                              placeholder="Auto"
+                            />
+                            <span className="text-sm font-bold text-slate-500">px</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Max Lines</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={overlayEdit.title_max_lines || 1}
+                            onChange={e => setOverlayEdit({...overlayEdit, title_max_lines: parseInt(e.target.value) || 1})}
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Subtitle Section */}
+                    <div className="space-y-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider">Subtitle</h3>
+                      
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                          Text (Press Enter for new line)
+                        </label>
+                        <textarea
+                          value={overlayEdit.subtitle || ''}
+                          onChange={e => setOverlayEdit({...overlayEdit, subtitle: e.target.value})}
+                          rows={3}
+                          className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium resize-y"
+                          placeholder="Enter subtitle... (Press Enter for new line)"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Color</label>
+                        <div className="space-y-2">
+                          {activeBrand && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setOverlayEdit({...overlayEdit, subtitle_color_hex: activeBrand.visual_identity.primary_color_hex})}
+                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
+                                style={{ backgroundColor: activeBrand.visual_identity.primary_color_hex }}
+                                title="Primary Brand Color"
+                              />
+                              <button
+                                onClick={() => setOverlayEdit({...overlayEdit, subtitle_color_hex: activeBrand.visual_identity.accent_color_hex})}
+                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
+                                style={{ backgroundColor: activeBrand.visual_identity.accent_color_hex }}
+                                title="Accent Brand Color"
+                              />
+                              <button
+                                onClick={() => setEyedropperActive('subtitle')}
+                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm bg-white flex items-center justify-center"
+                                title="Pick color from image"
+                              >
+                                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                              onChange={e => setOverlayEdit({...overlayEdit, subtitle_color_hex: e.target.value})}
+                              className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              value={overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                              onChange={e => setOverlayEdit({...overlayEdit, subtitle_color_hex: e.target.value})}
+                              className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                              placeholder="#FFFFFF"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Size</label>
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="number"
+                              min="12"
+                              max="200"
+                              value={overlayEdit.subtitle_font_size || ''}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setOverlayEdit({...overlayEdit, subtitle_font_size: val ? parseInt(val) : undefined});
+                              }}
+                              className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                              placeholder="Auto"
+                            />
+                            <span className="text-sm font-bold text-slate-500">px</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Max Lines</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={overlayEdit.subtitle_max_lines || 2}
+                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_max_lines: parseInt(e.target.value) || 2})}
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Shared Settings */}
+                    <div className="space-y-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider">Shared Settings</h3>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font</label>
+                          <select
+                            value={overlayEdit.font_family || 'sans-serif'}
+                            onChange={e => setOverlayEdit({...overlayEdit, font_family: e.target.value as any})}
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                          >
+                            <option value="sans-serif">Sans-serif</option>
+                            <option value="serif">Serif</option>
+                            <option value="cursive">Cursive</option>
+                            <option value="handwritten">Handwritten</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Weight</label>
+                          <select
+                            value={overlayEdit.font_weight || 'bold'}
+                            onChange={e => setOverlayEdit({...overlayEdit, font_weight: e.target.value as any})}
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                          >
+                            <option value="light">Light</option>
+                            <option value="regular">Regular</option>
+                            <option value="bold">Bold</option>
+                          </select>
+                        </div>
+                      </div>
+
+                    {/* Position - 9-Grid Preset Layout */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                        Position (Drag text on image or click a preset)
+                      </label>
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        {[
+                          { label: 'TL', x: 10, y: 10, anchor: 'start' as const, name: 'Top Left' },
+                          { label: 'TC', x: 50, y: 10, anchor: 'middle' as const, name: 'Top Center' },
+                          { label: 'TR', x: 90, y: 10, anchor: 'end' as const, name: 'Top Right' },
+                          { label: 'CL', x: 10, y: 50, anchor: 'start' as const, name: 'Center Left' },
+                          { label: 'C', x: 50, y: 50, anchor: 'middle' as const, name: 'Center' },
+                          { label: 'CR', x: 90, y: 50, anchor: 'end' as const, name: 'Center Right' },
+                          { label: 'BL', x: 10, y: 90, anchor: 'start' as const, name: 'Bottom Left' },
+                          { label: 'BC', x: 50, y: 90, anchor: 'middle' as const, name: 'Bottom Center' },
+                          { label: 'BR', x: 90, y: 90, anchor: 'end' as const, name: 'Bottom Right' },
+                        ].map((preset) => {
+                          const isSelected = overlayEdit.x_percent === preset.x && 
+                                           overlayEdit.y_percent === preset.y && 
+                                           (overlayEdit.text_anchor || 'middle') === preset.anchor;
+                          return (
+                            <button
+                              key={preset.label}
+                              onClick={() => setOverlayEdit({
+                                ...overlayEdit,
+                                x_percent: preset.x,
+                                y_percent: preset.y,
+                                text_anchor: preset.anchor
+                              })}
+                              className={`p-3 rounded-lg border-2 transition-all font-bold text-xs ${
+                                isSelected
+                                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                                  : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50/50'
+                              }`}
+                              title={preset.name}
+                            >
+                              {preset.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        💡 Drag the text on the image to position it, or click a preset above.
+                      </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -828,57 +894,43 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                          Title Font Size: {overlayEdit.title_font_size ? `${overlayEdit.title_font_size}px` : 'Auto'}
+                          Title Font Size
                         </label>
                         <div className="flex gap-2 items-center">
                           <input
-                            type="range"
-                            min="24"
-                            max="150"
-                            value={overlayEdit.title_font_size || 80}
-                            onChange={e => setOverlayEdit({...overlayEdit, title_font_size: parseInt(e.target.value)})}
-                            className="flex-1"
-                          />
-                          <input
                             type="number"
-                            min="24"
-                            max="150"
+                            min="12"
+                            max="200"
                             value={overlayEdit.title_font_size || ''}
                             onChange={e => {
                               const val = e.target.value;
                               setOverlayEdit({...overlayEdit, title_font_size: val ? parseInt(val) : undefined});
                             }}
-                            className="w-20 p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold text-sm"
+                            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
                             placeholder="Auto"
                           />
+                          <span className="text-sm font-bold text-slate-500">px</span>
                         </div>
                       </div>
 
                       <div>
                         <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                          Subtitle Font Size: {overlayEdit.subtitle_font_size ? `${overlayEdit.subtitle_font_size}px` : 'Auto'}
+                          Subtitle Font Size
                         </label>
                         <div className="flex gap-2 items-center">
                           <input
-                            type="range"
-                            min="16"
-                            max="100"
-                            value={overlayEdit.subtitle_font_size || 48}
-                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_font_size: parseInt(e.target.value)})}
-                            className="flex-1"
-                          />
-                          <input
                             type="number"
-                            min="16"
-                            max="100"
+                            min="12"
+                            max="200"
                             value={overlayEdit.subtitle_font_size || ''}
                             onChange={e => {
                               const val = e.target.value;
                               setOverlayEdit({...overlayEdit, subtitle_font_size: val ? parseInt(val) : undefined});
                             }}
-                            className="w-20 p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold text-sm"
+                            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
                             placeholder="Auto"
                           />
+                          <span className="text-sm font-bold text-slate-500">px</span>
                         </div>
                       </div>
                     </div>
@@ -886,29 +938,26 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Title Max Lines</label>
-                        <select
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
                           value={overlayEdit.title_max_lines || 1}
-                          onChange={e => setOverlayEdit({...overlayEdit, title_max_lines: parseInt(e.target.value)})}
+                          onChange={e => setOverlayEdit({...overlayEdit, title_max_lines: parseInt(e.target.value) || 1})}
                           className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                        >
-                          <option value={1}>1 Line</option>
-                          <option value={2}>2 Lines</option>
-                          <option value={3}>3 Lines</option>
-                        </select>
+                        />
                       </div>
 
                       <div>
                         <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Subtitle Max Lines</label>
-                        <select
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
                           value={overlayEdit.subtitle_max_lines || 2}
-                          onChange={e => setOverlayEdit({...overlayEdit, subtitle_max_lines: parseInt(e.target.value)})}
+                          onChange={e => setOverlayEdit({...overlayEdit, subtitle_max_lines: parseInt(e.target.value) || 2})}
                           className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                        >
-                          <option value={1}>1 Line</option>
-                          <option value={2}>2 Lines</option>
-                          <option value={3}>3 Lines</option>
-                          <option value={4}>4 Lines</option>
-                        </select>
+                        />
                       </div>
                     </div>
 
