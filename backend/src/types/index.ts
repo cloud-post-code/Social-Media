@@ -31,12 +31,14 @@ export interface BrandDNA {
 
 export interface OverlayConfig {
   text: string;
-  font_family: 'sans-serif' | 'serif' | 'cursive';
-  font_weight: 'bold' | 'normal';
-  font_transform: 'uppercase' | 'none';
+  font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+  font_weight: 'light' | 'regular' | 'bold';
+  font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+  letter_spacing: 'normal' | 'wide';
   text_color_hex: string;
-  position: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right';
+  position: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
   max_width_percent: number;
+  opacity?: number;
 }
 
 export interface GeneratedAsset {

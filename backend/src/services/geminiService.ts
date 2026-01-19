@@ -287,26 +287,37 @@ export const generateProductImagePrompt = async (
   brandDNA: BrandDNA,
   productFocus: string,
   referenceImageBase64?: string
-): Promise<{ imagen_prompt_final: string; reasoning: string; includes_person: boolean; composition_notes: string }> => {
+): Promise<{ imagen_prompt_final: string; reasoning: string; includes_person: boolean; composition_notes: string; step_1_analysis?: any }> => {
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
 
   const prompt = `
-    You are an elite Creative Director specializing in product photography.
-    Goal: Create a detailed image generation prompt for a product shown in use, aligned with the Brand DNA.
+You are an elite Product Photographer and Art Director.
+Goal: Create a highly technical image generation prompt that captures the *exact* physical reality of the product while placing it in a lifestyle context.
 
-    ### INPUT DATA
-    Brand DNA JSON: ${JSON.stringify(brandDNA)}
-    Product Focus: ${productFocus}
+### INPUT DATA
+Brand DNA: ${JSON.stringify(brandDNA)}
+Product Focus: ${productFocus}
 
-    ### OUTPUT FORMAT (JSON)
-    Return ONLY:
-    {
-      "reasoning": "Brief explanation of the visual strategy",
-      "includes_person": boolean,
-      "composition_notes": "Notes about composition and placement",
-      "imagen_prompt_final": "Detailed, vivid prompt for Imagen 3. Include brand colors, style, and mood. Show the product being used naturally. NO text in the image."
-    }
+### CRITICAL INSTRUCTION: VISUAL ANCHORING
+You must prevent "product hallucination." Before writing the final prompt, you must mentally isolate the product's **Material Physics**:
+1. **Texture:** Is it ribbed? Woven? Smooth? Matte? Glossy?
+2. **Weight/Drape:** Does it hang heavily (like wool) or float light (like silk)?
+3. **Imperfections:** Real products have grain and weave. Mentioning these creates realism.
+
+### OUTPUT FORMAT (JSON)
+Return ONLY:
+{
+  "step_1_analysis": {
+    "texture_lock": "A few words describing the specific material surface (e.g., 'coarse woven linen', 'ribbed wool knit').",
+    "lighting_strategy": "How light hits the texture (e.g., 'Raking side light to accentuate the weave').",
+    "composition_logic": "Where the subject is placed to leave 'Negative Space' for text overlay later."
+  },
+  "reasoning": "Brief explanation of the visual strategy",
+  "includes_person": boolean,
+  "composition_notes": "Notes about composition and placement",
+  "imagen_prompt_final": "A prompt following this strict structure: [SUBJECT DEFINITION: detailed description of ${productFocus} focusing on texture, weave, and material weight] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + [LIGHTING: Specific lighting to highlight material quality] + [TECH SPECS: 8k, macro details, commercial photography, depth of field]. NO text in image."
+}
   `;
 
   let parts: any[] = [{ text: prompt }];
@@ -328,7 +339,8 @@ export const generateProductImagePrompt = async (
     imagen_prompt_final: result.imagen_prompt_final || '',
     reasoning: result.reasoning || '',
     includes_person: result.includes_person || false,
-    composition_notes: result.composition_notes || ''
+    composition_notes: result.composition_notes || '',
+    step_1_analysis: result.step_1_analysis || null
   };
 };
 
@@ -345,31 +357,27 @@ export const generateProductTagline = async (
   const model = 'gemini-3-pro-preview';
 
   const prompt = `
-    You are an elite Copywriter and Lead Creative Director.
-    Goal: Create a punchy, memorable tagline (max 10 words) for a social media product post.
+You are a Lead Copywriter for a luxury brand.
+Goal: Write a tagline that fits the *visual mood* established in the Brand DNA.
 
-    ### INPUT DATA
-    Brand DNA JSON: ${JSON.stringify(brandDNA)}
-    Product Focus: ${productFocus}
-    
-    ### BRAND VOICE GUIDELINES
-    Tone: ${brandDNA.brand_voice.tone_adjectives.join(', ')}
-    Writing Style: ${brandDNA.brand_voice.writing_style}
-    Keywords to use: ${brandDNA.brand_voice.keywords_to_use.join(', ')}
-    Taboo words (avoid): ${brandDNA.brand_voice.taboo_words.join(', ')}
+### INPUT DATA
+Brand DNA: ${JSON.stringify(brandDNA)}
+Product Focus: ${productFocus}
 
-    ### OUTPUT
-    Return ONLY the tagline text (no quotes, no JSON, just the tagline). Maximum 10 words. Make it punchy, memorable, and aligned with the brand voice.
+### INSTRUCTIONS
+- **Less is More:** High-end brands use fewer words.
+- **Visual Connection:** If the product is soft/cozy, the words should feel soft. If the product is sleek/hard, the words should be punchy.
+- **Voice Check:** Ensure the tone matches: ${brandDNA.brand_voice.tone_adjectives.join(', ')}.
+- **Writing Style:** ${brandDNA.brand_voice.writing_style}
+- **Keywords to use:** ${brandDNA.brand_voice.keywords_to_use.join(', ')}
+- **Taboo words (avoid):** ${brandDNA.brand_voice.taboo_words.join(', ')}
+
+### OUTPUT FORMAT (Raw Text)
+Return ONLY the tagline text. No quotes. No JSON.
+(Max 8 words. Focus on emotion or benefit, not features.)
   `;
 
-  const base64Data = productImageBase64.includes(',') 
-    ? productImageBase64.split(',')[1] 
-    : productImageBase64;
-
-  const parts = [
-    { text: prompt },
-    { inlineData: { mimeType: "image/png", data: base64Data } }
-  ];
+  const parts = [{ text: prompt }];
 
   if (onChunk) {
     // Streaming mode
@@ -393,7 +401,11 @@ export const generateProductTagline = async (
       model,
       contents: { parts }
     });
-    return (response.text || '').trim();
+    // Clean up any markdown formatting or quotes that might be returned
+    let tagline = (response.text || '').trim();
+    // Remove quotes if present
+    tagline = tagline.replace(/^["']|["']$/g, '');
+    return tagline;
   }
 };
 
@@ -405,42 +417,41 @@ export const designTextOverlay = async (
   tagline: string,
   productImageBase64: string
 ): Promise<{
-  font_family: 'sans-serif' | 'serif' | 'cursive';
-  font_weight: 'bold' | 'normal';
-  font_transform: 'uppercase' | 'none';
+  font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+  font_weight: 'light' | 'regular' | 'bold';
+  font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+  letter_spacing: 'normal' | 'wide';
   text_color_hex: string;
-  position: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right';
+  position: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
   max_width_percent: number;
+  opacity: number;
   reasoning: string;
 }> => {
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
 
   const prompt = `
-    You are an expert Graphic Designer and Typography Specialist.
-    Goal: Design the perfect text overlay for a social media product post that follows the Brand DNA.
+You are a UI/UX Designer specializing in Social Media aesthetics.
+Goal: Determine the CSS/Design properties to overlay the tagline onto the image.
 
-    ### INPUT DATA
-    Brand DNA JSON: ${JSON.stringify(brandDNA)}
-    Tagline: "${tagline}"
-    
-    ### BRAND VISUAL IDENTITY
-    Primary Color: ${brandDNA.visual_identity.primary_color_hex}
-    Accent Color: ${brandDNA.visual_identity.accent_color_hex}
-    Typography Vibe: ${brandDNA.visual_identity.font_vibe}
-    Background Style: ${brandDNA.visual_identity.background_style}
+### INPUT DATA
+Brand DNA: ${JSON.stringify(brandDNA)}
+Tagline: "${tagline}"
 
-    ### OUTPUT FORMAT (JSON)
-    Return ONLY:
-    {
-      "font_family": "sans-serif" | "serif" | "cursive",
-      "font_weight": "bold" | "normal",
-      "font_transform": "uppercase" | "none",
-      "text_color_hex": "#HEXCODE (use brand color or high-contrast color for readability)",
-      "position": "top-center" | "bottom-left" | "bottom-right" | "center-middle" | "top-left" | "top-right" | "center-left" | "center-right",
-      "max_width_percent": 80,
-      "reasoning": "Brief explanation of design choices"
-    }
+### OUTPUT FORMAT (JSON)
+Return ONLY:
+{
+  "design_strategy": {
+    "font_family_category": "sans-serif" | "serif" | "handwritten",
+    "font_weight": "light" | "regular" | "bold",
+    "text_transform": "uppercase" | "lowercase" | "capitalize",
+    "letter_spacing": "normal" | "wide",
+    "text_color_hex": "Choose a color from ${brandDNA.visual_identity.primary_color_hex} OR white/black depending on contrast needs.",
+    "suggested_position": "top-center" | "bottom-right" | "center-left" | "floating-center",
+    "opacity": 1.0
+  },
+  "reasoning": "Why this font and position complements the 'luxury product' vibe."
+}
   `;
 
   const base64Data = productImageBase64.includes(',') 
@@ -459,13 +470,17 @@ export const designTextOverlay = async (
   });
 
   const result = safeJsonParse(response.text || '{}');
+  const designStrategy = result.design_strategy || {};
+  
   return {
-    font_family: result.font_family || 'sans-serif',
-    font_weight: result.font_weight || 'bold',
-    font_transform: result.font_transform || 'none',
-    text_color_hex: result.text_color_hex || brandDNA.visual_identity.primary_color_hex,
-    position: result.position || 'bottom-center',
+    font_family: designStrategy.font_family_category || result.font_family || 'sans-serif',
+    font_weight: designStrategy.font_weight || result.font_weight || 'bold',
+    font_transform: designStrategy.text_transform || result.font_transform || 'none',
+    letter_spacing: designStrategy.letter_spacing || result.letter_spacing || 'normal',
+    text_color_hex: designStrategy.text_color_hex || result.text_color_hex || brandDNA.visual_identity.primary_color_hex,
+    position: designStrategy.suggested_position || result.position || 'bottom-right',
     max_width_percent: result.max_width_percent || 80,
+    opacity: designStrategy.opacity !== undefined ? designStrategy.opacity : (result.opacity !== undefined ? result.opacity : 1.0),
     reasoning: result.reasoning || ''
   };
 };
@@ -536,9 +551,9 @@ export const generateCampaignStrategy = async (brandDNA: BrandDNA, campaignDetai
 export const generateImage = async (prompt: string): Promise<string> => {
   const ai = getAIClient();
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3-pro-image-preview', // Nano Banana Pro - higher fidelity, up to 4K output
     contents: { parts: [{ text: prompt }] },
-    config: { imageConfig: { aspectRatio: "1:1" } }
+    config: { imageConfig: { aspectRatio: "1:1", imageSize: "2K" } }
   });
 
   for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -556,13 +571,14 @@ export const editImage = async (originalImageBase64: string, feedback: string): 
     : originalImageBase64;
   
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3-pro-image-preview', // Nano Banana Pro - higher fidelity, up to 4K output
     contents: {
       parts: [
         { inlineData: { mimeType: "image/png", data: base64Data } },
         { text: `Edit this image based on feedback: ${feedback}` }
       ]
-    }
+    },
+    config: { imageConfig: { aspectRatio: "1:1", imageSize: "2K" } }
   });
 
   for (const part of response.candidates?.[0]?.content?.parts || []) {

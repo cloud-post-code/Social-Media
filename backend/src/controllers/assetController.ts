@@ -82,9 +82,11 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
       font_family: overlayDesign.font_family,
       font_weight: overlayDesign.font_weight,
       font_transform: overlayDesign.font_transform,
+      letter_spacing: overlayDesign.letter_spacing,
       text_color_hex: overlayDesign.text_color_hex,
       position: overlayDesign.position,
-      max_width_percent: overlayDesign.max_width_percent
+      max_width_percent: overlayDesign.max_width_percent,
+      opacity: overlayDesign.opacity
     };
 
     const finalImageUrl = await imageOverlayService.applyTextOverlay(
@@ -95,6 +97,7 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
     // Store strategy information
     const strategy = {
       step_1_image_generation: {
+        step_1_analysis: imagePromptResult.step_1_analysis,
         reasoning: imagePromptResult.reasoning,
         includes_person: imagePromptResult.includes_person,
         composition_notes: imagePromptResult.composition_notes,
@@ -159,9 +162,11 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
       font_family: overlay_config.font_family || asset.overlay_config?.font_family || 'sans-serif',
       font_weight: overlay_config.font_weight || asset.overlay_config?.font_weight || 'bold',
       font_transform: overlay_config.font_transform || asset.overlay_config?.font_transform || 'none',
+      letter_spacing: overlay_config.letter_spacing || asset.overlay_config?.letter_spacing || 'normal',
       text_color_hex: overlay_config.text_color_hex || asset.overlay_config?.text_color_hex || '#FFFFFF',
-      position: overlay_config.position || asset.overlay_config?.position || 'bottom-center',
-      max_width_percent: overlay_config.max_width_percent || asset.overlay_config?.max_width_percent || 80
+      position: overlay_config.position || asset.overlay_config?.position || 'bottom-right',
+      max_width_percent: overlay_config.max_width_percent || asset.overlay_config?.max_width_percent || 80,
+      opacity: overlay_config.opacity !== undefined ? overlay_config.opacity : (asset.overlay_config?.opacity !== undefined ? asset.overlay_config.opacity : 1.0)
     };
 
     const finalImageUrl = await imageOverlayService.updateOverlay(

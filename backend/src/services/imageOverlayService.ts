@@ -27,6 +27,8 @@ const getFontFamily = (family: OverlayConfig['font_family']): string => {
       return 'Georgia, serif';
     case 'cursive':
       return 'Brush Script MT, cursive';
+    case 'handwritten':
+      return 'Brush Script MT, "Lucida Handwriting", cursive';
     case 'sans-serif':
     default:
       return 'Arial, Helvetica, sans-serif';
@@ -97,9 +99,23 @@ export const applyTextOverlay = async (
     // Use larger font size for better visibility
     const fontSize = Math.max(48, Math.min(width / 12, 96));
     const fontFamily = getFontFamily(overlayConfig.font_family);
-    const fontWeight = overlayConfig.font_weight === 'bold' ? 'bold' : 'normal';
-    const textTransform = overlayConfig.font_transform === 'uppercase' ? 'uppercase' : 'none';
+    // Map font weights: light -> 300, regular -> 400, bold -> 700
+    const fontWeight = overlayConfig.font_weight === 'bold' ? '700' : 
+                      overlayConfig.font_weight === 'light' ? '300' : '400';
+    // Handle text transform
+    let textToTransform = overlayConfig.text;
+    if (overlayConfig.font_transform === 'uppercase') {
+      textToTransform = overlayConfig.text.toUpperCase();
+    } else if (overlayConfig.font_transform === 'lowercase') {
+      textToTransform = overlayConfig.text.toLowerCase();
+    } else if (overlayConfig.font_transform === 'capitalize') {
+      textToTransform = overlayConfig.text.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' ');
+    }
     const textColor = overlayConfig.text_color_hex;
+    const opacity = overlayConfig.opacity !== undefined ? overlayConfig.opacity : 1.0;
+    const letterSpacing = overlayConfig.letter_spacing === 'wide' ? '0.15em' : 'normal';
     
     // Estimate text width (rough approximation - wider for bold)
     const charWidthMultiplier = fontWeight === 'bold' ? 0.7 : 0.6;
@@ -117,25 +133,24 @@ export const applyTextOverlay = async (
       overlayConfig.max_width_percent
     );
     
-    // Adjust y position - SVG text y is the baseline, so we need to add fontSize
-    // For top positions, we want the text to start at y, so baseline should be y + fontSize
-    // For bottom positions, we want the baseline near y, so adjust accordingly
+    // Adjust y position - SVG text y is the baseline
     let textY = y;
     if (overlayConfig.position.includes('top')) {
       textY = y + fontSize; // Baseline position for top-aligned text
     } else if (overlayConfig.position.includes('bottom')) {
-      textY = y; // y already accounts for text height, so baseline is y
+      textY = y; // y already accounts for text height
     } else {
       textY = y + fontSize / 2; // Center baseline
     }
     
-    // Create SVG text overlay with proper XML declaration
-    const textToRender = textTransform === 'uppercase' 
-      ? overlayConfig.text.toUpperCase() 
-      : overlayConfig.text;
+    // Handle floating-center position
+    if (overlayConfig.position === 'floating-center') {
+      x = width / 2;
+      textY = height / 2;
+    }
     
     // Escape XML special characters
-    const escapedText = textToRender
+    const escapedText = textToTransform
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -148,27 +163,21 @@ export const applyTextOverlay = async (
       ? 'start' 
       : 'middle';
     
-    // Determine stroke color for contrast (dark stroke for light text, light stroke for dark text)
-    const isLightColor = textColor === '#FFFFFF' || textColor === '#ffffff' || 
-                         textColor.toLowerCase() === 'white' ||
-                         (textColor.startsWith('#') && parseInt(textColor.slice(1, 3), 16) > 200);
-    const strokeColor = isLightColor ? '#000000' : '#FFFFFF';
-    
-    // Create SVG with proper namespace and structure
-    // Simplified shadow using multiple text elements for better compatibility
+    // Create SVG with clean filter-based shadow (no double text, no stroke artifacts)
     const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-  <text
-    x="${x}"
-    y="${textY}"
-    font-family="${fontFamily}"
-    font-size="${fontSize}"
-    font-weight="${fontWeight}"
-    fill="${strokeColor}"
-    text-anchor="${textAnchor}"
-    stroke="${strokeColor}"
-    stroke-width="3"
-    opacity="0.5"
-  >${escapedText}</text>
+  <defs>
+    <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+      <feOffset dx="2" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.5"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
   <text
     x="${x}"
     y="${textY}"
@@ -177,8 +186,9 @@ export const applyTextOverlay = async (
     font-weight="${fontWeight}"
     fill="${textColor}"
     text-anchor="${textAnchor}"
-    stroke="${strokeColor}"
-    stroke-width="1"
+    letter-spacing="${letterSpacing}"
+    opacity="${opacity}"
+    filter="url(#textShadow)"
   >${escapedText}</text>
 </svg>`;
     
