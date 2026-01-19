@@ -58,11 +58,44 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     subtitle_max_lines?: number;
   }>({});
   
-  const [colorPickerOpen, setColorPickerOpen] = useState<'title' | 'subtitle' | null>(null);
-  const [eyedropperActive, setEyedropperActive] = useState(false);
+  const [eyedropperActive, setEyedropperActive] = useState<'title' | 'subtitle' | null>(null);
   
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  
+  // Function to pick color from image using canvas
+  const pickColorFromImage = async (e: React.MouseEvent<HTMLImageElement>, target: 'title' | 'subtitle') => {
+    if (!eyedropperActive || eyedropperActive !== target) return;
+    
+    const img = e.currentTarget;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+    
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    ctx.drawImage(img, 0, 0);
+    
+    const rect = img.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) * (img.naturalWidth / rect.width));
+    const y = Math.floor((e.clientY - rect.top) * (img.naturalHeight / rect.height));
+    
+    const imageData = ctx.getImageData(x, y, 1, 1);
+    const [r, g, b] = imageData.data;
+    const hex = `#${[r, g, b].map(x => {
+      const hex = x.toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    }).join('')}`;
+    
+    if (target === 'title') {
+      setOverlayEdit({...overlayEdit, title_color_hex: hex});
+    } else {
+      setOverlayEdit({...overlayEdit, subtitle_color_hex: hex});
+    }
+    
+    setEyedropperActive(null);
+  };
   
   // Handle mouse move and up events globally when dragging
   useEffect(() => {
