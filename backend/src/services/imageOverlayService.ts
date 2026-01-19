@@ -94,16 +94,18 @@ export const applyTextOverlay = async (
     const height = metadata.height || 1024;
     
     // Calculate text dimensions (approximate)
-    const fontSize = Math.max(32, Math.min(width / 15, 72));
+    // Use larger font size for better visibility
+    const fontSize = Math.max(48, Math.min(width / 12, 96));
     const fontFamily = getFontFamily(overlayConfig.font_family);
     const fontWeight = overlayConfig.font_weight === 'bold' ? 'bold' : 'normal';
     const textTransform = overlayConfig.font_transform === 'uppercase' ? 'uppercase' : 'none';
     const textColor = overlayConfig.text_color_hex;
     
-    // Estimate text width (rough approximation)
-    const avgCharWidth = fontSize * 0.6;
+    // Estimate text width (rough approximation - wider for bold)
+    const charWidthMultiplier = fontWeight === 'bold' ? 0.7 : 0.6;
+    const avgCharWidth = fontSize * charWidthMultiplier;
     const textWidth = overlayConfig.text.length * avgCharWidth;
-    const textHeight = fontSize * 1.2;
+    const textHeight = fontSize * 1.4; // More space for descenders
     const maxWidth = (width * overlayConfig.max_width_percent) / 100;
     
     const { x, y } = calculatePosition(
@@ -115,37 +117,94 @@ export const applyTextOverlay = async (
       overlayConfig.max_width_percent
     );
     
-    // Create SVG text overlay
+    // Adjust y position - SVG text y is the baseline, so we need to add fontSize
+    // For top positions, we want the text to start at y, so baseline should be y + fontSize
+    // For bottom positions, we want the baseline near y, so adjust accordingly
+    let textY = y;
+    if (overlayConfig.position.includes('top')) {
+      textY = y + fontSize; // Baseline position for top-aligned text
+    } else if (overlayConfig.position.includes('bottom')) {
+      textY = y; // y already accounts for text height, so baseline is y
+    } else {
+      textY = y + fontSize / 2; // Center baseline
+    }
+    
+    // Create SVG text overlay with proper XML declaration
     const textToRender = textTransform === 'uppercase' 
       ? overlayConfig.text.toUpperCase() 
       : overlayConfig.text;
     
-    const svgText = `
-      <svg width="${width}" height="${height}">
-        <text
-          x="${x}"
-          y="${y + fontSize}"
-          font-family="${fontFamily}"
-          font-size="${fontSize}"
-          font-weight="${fontWeight}"
-          fill="${textColor}"
-          text-anchor="${overlayConfig.position.includes('right') ? 'end' : overlayConfig.position.includes('left') ? 'start' : 'middle'}"
-          style="text-shadow: 2px 2px 4px rgba(0,0,0,0.5);"
-        >
-          ${textToRender.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
-        </text>
-      </svg>
-    `;
+    // Escape XML special characters
+    const escapedText = textToRender
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+    
+    const textAnchor = overlayConfig.position.includes('right') 
+      ? 'end' 
+      : overlayConfig.position.includes('left') 
+      ? 'start' 
+      : 'middle';
+    
+    // Determine stroke color for contrast (dark stroke for light text, light stroke for dark text)
+    const isLightColor = textColor === '#FFFFFF' || textColor === '#ffffff' || 
+                         textColor.toLowerCase() === 'white' ||
+                         (textColor.startsWith('#') && parseInt(textColor.slice(1, 3), 16) > 200);
+    const strokeColor = isLightColor ? '#000000' : '#FFFFFF';
+    
+    // Create SVG with proper namespace and structure
+    // Simplified shadow using multiple text elements for better compatibility
+    const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  <text
+    x="${x}"
+    y="${textY}"
+    font-family="${fontFamily}"
+    font-size="${fontSize}"
+    font-weight="${fontWeight}"
+    fill="${strokeColor}"
+    text-anchor="${textAnchor}"
+    stroke="${strokeColor}"
+    stroke-width="3"
+    opacity="0.5"
+  >${escapedText}</text>
+  <text
+    x="${x}"
+    y="${textY}"
+    font-family="${fontFamily}"
+    font-size="${fontSize}"
+    font-weight="${fontWeight}"
+    fill="${textColor}"
+    text-anchor="${textAnchor}"
+    stroke="${strokeColor}"
+    stroke-width="1"
+  >${escapedText}</text>
+</svg>`;
+    
+    // Debug logging
+    console.log('Applying overlay:', {
+      text: overlayConfig.text,
+      position: overlayConfig.position,
+      color: overlayConfig.text_color_hex,
+      fontSize,
+      x,
+      y: textY,
+      imageSize: `${width}x${height}`,
+      svgPreview: svgText.substring(0, 200)
+    });
     
     const svgBuffer = Buffer.from(svgText);
     
     // Composite the text overlay onto the image
+    // Sharp will auto-detect SVG format from the buffer
     const outputBuffer = await image
       .composite([
         {
           input: svgBuffer,
           top: 0,
           left: 0,
+          blend: 'over'
         },
       ])
       .png()
@@ -154,6 +213,7 @@ export const applyTextOverlay = async (
     return bufferToBase64(outputBuffer);
   } catch (error) {
     console.error('Error applying text overlay:', error);
+    console.error('Overlay config:', overlayConfig);
     throw new Error(`Failed to apply text overlay: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
