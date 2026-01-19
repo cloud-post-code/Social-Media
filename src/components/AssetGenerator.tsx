@@ -591,7 +591,15 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 )}
                 
                 {/* Draggable Text Overlay Preview (only when editing product assets) */}
-                {editingOverlay && displayAsset.type === 'product' && displayAsset.overlayConfig && (
+                {editingOverlay && displayAsset.type === 'product' && displayAsset.overlayConfig && (() => {
+                  const scale = getFontScale();
+                  const titleFontSize = overlayEdit.title_font_size || displayAsset.overlayConfig?.title_font_size;
+                  const subtitleFontSize = overlayEdit.subtitle_font_size || displayAsset.overlayConfig?.subtitle_font_size;
+                  // Scale font sizes to match preview container size
+                  const scaledTitleFontSize = titleFontSize ? `${titleFontSize * scale}px` : 'clamp(1.5rem, 4vw, 3rem)';
+                  const scaledSubtitleFontSize = subtitleFontSize ? `${subtitleFontSize * scale}px` : 'clamp(1rem, 2.5vw, 2rem)';
+                  
+                  return (
                   <div
                     className="absolute cursor-move select-none border-2 border-dashed border-indigo-400 bg-indigo-50/20 rounded-lg p-3 backdrop-blur-sm"
                     style={{
@@ -605,7 +613,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       opacity: overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1),
                       fontFamily: overlayEdit.font_family || displayAsset.overlayConfig.font_family || 'sans-serif',
                       fontWeight: overlayEdit.font_weight === 'bold' ? 'bold' : overlayEdit.font_weight === 'light' ? '300' : 'normal',
-                      fontSize: overlayEdit.title_font_size ? `${overlayEdit.title_font_size}px` : 'clamp(1.5rem, 4vw, 3rem)',
+                      fontSize: scaledTitleFontSize,
                       letterSpacing: overlayEdit.letter_spacing === 'wide' ? '0.15em' : 'normal',
                       textTransform: overlayEdit.font_transform || 'none',
                       filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
@@ -637,7 +645,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                     {(overlayEdit.subtitle || displayAsset.overlayConfig.subtitle) && (
                       <div 
                         style={{ 
-                          fontSize: overlayEdit.subtitle_font_size ? `${Math.max(12, overlayEdit.subtitle_font_size * 0.6)}px` : 'clamp(1rem, 2.5vw, 2rem)',
+                          fontSize: scaledSubtitleFontSize,
                           marginTop: '0.5rem',
                           opacity: 0.9,
                           pointerEvents: 'none',
@@ -648,7 +656,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       </div>
                     )}
                   </div>
-                )}
+                  );
+                })()}
               </div>
               
               {/* For non-product assets, show CSS overlay if needed */}
