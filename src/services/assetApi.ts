@@ -30,7 +30,8 @@ export const assetApi = {
     api.put<GeneratedAsset>(`/assets/${id}/edit`, { feedback }),
   
   updateOverlay: (id: string, overlayConfig: {
-    text?: string;
+    title?: string;
+    subtitle?: string;
     font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
     font_weight?: 'light' | 'regular' | 'bold';
     font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';

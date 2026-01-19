@@ -22,13 +22,16 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [feedback, setFeedback] = useState('');
   const [editingOverlay, setEditingOverlay] = useState(false);
   const [overlayEdit, setOverlayEdit] = useState<{
-    text?: string;
-    font_family?: 'sans-serif' | 'serif' | 'cursive';
-    font_weight?: 'bold' | 'normal';
-    font_transform?: 'uppercase' | 'none';
+    title?: string;
+    subtitle?: string;
+    font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+    font_weight?: 'light' | 'regular' | 'bold';
+    font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+    letter_spacing?: 'normal' | 'wide';
     text_color_hex?: string;
-    position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right';
+    position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
     max_width_percent?: number;
+    opacity?: number;
   }>({});
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -370,13 +373,15 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       } else {
                         setEditingOverlay(true);
                         setOverlayEdit({
-                          text: displayAsset.overlayConfig?.text,
+                          title: displayAsset.overlayConfig?.title || displayAsset.overlayConfig?.text || '',
+                          subtitle: displayAsset.overlayConfig?.subtitle || '',
                           font_family: displayAsset.overlayConfig?.font_family,
                           font_weight: displayAsset.overlayConfig?.font_weight,
                           font_transform: displayAsset.overlayConfig?.font_transform,
                           text_color_hex: displayAsset.overlayConfig?.text_color_hex,
                           position: displayAsset.overlayConfig?.position,
-                          max_width_percent: displayAsset.overlayConfig?.max_width_percent
+                          max_width_percent: displayAsset.overlayConfig?.max_width_percent,
+                          opacity: displayAsset.overlayConfig?.opacity
                         });
                       }
                     }}
@@ -388,7 +393,12 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
 
                 {!editingOverlay ? (
                   <div className="space-y-3">
-                    <p className="text-lg font-bold text-slate-800">{displayAsset.overlayConfig.text}</p>
+                    <div>
+                      <p className="text-xl font-black text-slate-800">{displayAsset.overlayConfig.title || displayAsset.overlayConfig.text}</p>
+                      {displayAsset.overlayConfig.subtitle && (
+                        <p className="text-sm font-medium text-slate-600 mt-1">{displayAsset.overlayConfig.subtitle}</p>
+                      )}
+                    </div>
                     <div className="flex gap-4 text-xs text-slate-500">
                       <span>{displayAsset.overlayConfig.font_family}</span>
                       <span>•</span>
@@ -400,12 +410,23 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 ) : (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Text</label>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Title (max 5 words)</label>
                       <input
                         type="text"
-                        value={overlayEdit.text || ''}
-                        onChange={e => setOverlayEdit({...overlayEdit, text: e.target.value})}
+                        value={overlayEdit.title || ''}
+                        onChange={e => setOverlayEdit({...overlayEdit, title: e.target.value})}
                         className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                        placeholder="Enter title..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Subtitle (max 15 words)</label>
+                      <input
+                        type="text"
+                        value={overlayEdit.subtitle || ''}
+                        onChange={e => setOverlayEdit({...overlayEdit, subtitle: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium"
+                        placeholder="Enter subtitle..."
                       />
                     </div>
 
@@ -420,6 +441,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           <option value="sans-serif">Sans-serif</option>
                           <option value="serif">Serif</option>
                           <option value="cursive">Cursive</option>
+                          <option value="handwritten">Handwritten</option>
                         </select>
                       </div>
 
@@ -430,8 +452,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           onChange={e => setOverlayEdit({...overlayEdit, font_weight: e.target.value as any})}
                           className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
                         >
+                          <option value="light">Light</option>
+                          <option value="regular">Regular</option>
                           <option value="bold">Bold</option>
-                          <option value="normal">Normal</option>
                         </select>
                       </div>
                     </div>
@@ -470,21 +493,36 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         <option value="center-right">Center Right</option>
                         <option value="bottom-left">Bottom Left</option>
                         <option value="bottom-right">Bottom Right</option>
+                        <option value="floating-center">Floating Center</option>
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                        Max Width: {overlayEdit.max_width_percent || 80}%
-                      </label>
-                      <input
-                        type="range"
-                        min="50"
-                        max="100"
-                        value={overlayEdit.max_width_percent || 80}
-                        onChange={e => setOverlayEdit({...overlayEdit, max_width_percent: parseInt(e.target.value)})}
-                        className="w-full"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Letter Spacing</label>
+                        <select
+                          value={overlayEdit.letter_spacing || 'normal'}
+                          onChange={e => setOverlayEdit({...overlayEdit, letter_spacing: e.target.value as any})}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                        >
+                          <option value="normal">Normal</option>
+                          <option value="wide">Wide</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                          Max Width: {overlayEdit.max_width_percent || 80}%
+                        </label>
+                        <input
+                          type="range"
+                          min="50"
+                          max="100"
+                          value={overlayEdit.max_width_percent || 80}
+                          onChange={e => setOverlayEdit({...overlayEdit, max_width_percent: parseInt(e.target.value)})}
+                          className="w-full"
+                        />
+                      </div>
                     </div>
 
                     <button
@@ -514,10 +552,13 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                     displayAsset.strategy?.step_1_visual_concept?.visual_metaphor_reasoning || 
                     "Campaign coordinated sequence focusing on multi-touch narrative."}"
                 </p>
-                {displayAsset.type === 'product' && displayAsset.strategy?.step_2_tagline && (
+                {displayAsset.type === 'product' && displayAsset.strategy?.step_2_title_subtitle && (
                   <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Tagline</p>
-                    <p className="text-lg font-black text-indigo-900">{displayAsset.strategy.step_2_tagline.tagline}</p>
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Title & Subtitle</p>
+                    <p className="text-lg font-black text-indigo-900 mb-1">{displayAsset.strategy.step_2_title_subtitle.title}</p>
+                    {displayAsset.strategy.step_2_title_subtitle.subtitle && (
+                      <p className="text-sm font-medium text-indigo-700">{displayAsset.strategy.step_2_title_subtitle.subtitle}</p>
+                    )}
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4">

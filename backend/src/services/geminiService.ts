@@ -345,26 +345,27 @@ Return ONLY:
 };
 
 /**
- * Step 2: Generate tagline for the marketing post (with streaming support)
+ * Step 2: Generate title and subtitle for the marketing post
  */
-export const generateProductTagline = async (
+export const generateProductTitleSubtitle = async (
   brandDNA: BrandDNA,
   productFocus: string,
-  productImageBase64: string,
-  onChunk?: (chunk: string) => void
-): Promise<string> => {
+  productImageBase64: string
+): Promise<{ title: string; subtitle: string }> => {
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
 
   const prompt = `
 You are a Lead Copywriter for a luxury brand.
-Goal: Write a tagline that fits the *visual mood* established in the Brand DNA.
+Goal: Write a title and subtitle that fits the *visual mood* established in the Brand DNA.
 
 ### INPUT DATA
 Brand DNA: ${JSON.stringify(brandDNA)}
 Product Focus: ${productFocus}
 
 ### INSTRUCTIONS
+- **Title (max 5 words):** Punchy, attention-grabbing, emotion-driven. This is the hero text.
+- **Subtitle (max 15 words):** Supporting detail that expands on the title. Can include benefit or feature.
 - **Less is More:** High-end brands use fewer words.
 - **Visual Connection:** If the product is soft/cozy, the words should feel soft. If the product is sleek/hard, the words should be punchy.
 - **Voice Check:** Ensure the tone matches: ${brandDNA.brand_voice.tone_adjectives.join(', ')}.
@@ -372,41 +373,27 @@ Product Focus: ${productFocus}
 - **Keywords to use:** ${brandDNA.brand_voice.keywords_to_use.join(', ')}
 - **Taboo words (avoid):** ${brandDNA.brand_voice.taboo_words.join(', ')}
 
-### OUTPUT FORMAT (Raw Text)
-Return ONLY the tagline text. No quotes. No JSON.
-(Max 8 words. Focus on emotion or benefit, not features.)
+### OUTPUT FORMAT (JSON)
+Return ONLY:
+{
+  "title": "Punchy title, max 5 words",
+  "subtitle": "Supporting subtitle, max 15 words"
+}
   `;
 
   const parts = [{ text: prompt }];
 
-  if (onChunk) {
-    // Streaming mode
-    const stream = await ai.models.generateContentStream({
-      model,
-      contents: { parts }
-    });
+  const response = await ai.models.generateContent({
+    model,
+    contents: { parts },
+    config: { responseMimeType: "application/json" }
+  });
 
-    let fullText = '';
-    for await (const chunk of stream) {
-      const text = chunk.text || '';
-      if (text) {
-        fullText += text;
-        onChunk(text);
-      }
-    }
-    return fullText.trim();
-  } else {
-    // Non-streaming mode
-    const response = await ai.models.generateContent({
-      model,
-      contents: { parts }
-    });
-    // Clean up any markdown formatting or quotes that might be returned
-    let tagline = (response.text || '').trim();
-    // Remove quotes if present
-    tagline = tagline.replace(/^["']|["']$/g, '');
-    return tagline;
-  }
+  const result = safeJsonParse(response.text || '{}');
+  return {
+    title: (result.title || '').trim(),
+    subtitle: (result.subtitle || '').trim()
+  };
 };
 
 /**
@@ -414,7 +401,8 @@ Return ONLY the tagline text. No quotes. No JSON.
  */
 export const designTextOverlay = async (
   brandDNA: BrandDNA,
-  tagline: string,
+  title: string,
+  subtitle: string,
   productImageBase64: string
 ): Promise<{
   font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
@@ -432,11 +420,18 @@ export const designTextOverlay = async (
 
   const prompt = `
 You are a UI/UX Designer specializing in Social Media aesthetics.
-Goal: Determine the CSS/Design properties to overlay the tagline onto the image.
+Goal: Determine the CSS/Design properties to overlay the title and subtitle onto the image.
 
 ### INPUT DATA
 Brand DNA: ${JSON.stringify(brandDNA)}
-Tagline: "${tagline}"
+Title: "${title}"
+Subtitle: "${subtitle}"
+
+### INSTRUCTIONS
+- Design styling that works for both title (larger, bolder) and subtitle (smaller, supporting)
+- Consider spacing between title and subtitle (typically 8-12px)
+- Ensure good contrast and readability
+- Position should leave room for both text elements
 
 ### OUTPUT FORMAT (JSON)
 Return ONLY:
@@ -450,7 +445,7 @@ Return ONLY:
     "suggested_position": "top-center" | "bottom-right" | "center-left" | "floating-center",
     "opacity": 1.0
   },
-  "reasoning": "Why this font and position complements the 'luxury product' vibe."
+  "reasoning": "Why this font and position complements the 'luxury product' vibe and works for both title and subtitle."
 }
   `;
 

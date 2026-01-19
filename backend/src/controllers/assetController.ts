@@ -58,27 +58,29 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
       imagePromptResult.imagen_prompt_final
     );
 
-    // Step 2: Generate tagline (non-streaming for initial generation)
-    const tagline = await geminiService.generateProductTagline(
+    // Step 2: Generate title and subtitle
+    const titleSubtitle = await geminiService.generateProductTitleSubtitle(
       brand,
       productFocus,
       baseImageUrl
     );
 
-    if (!tagline) {
-      throw new Error('Tagline generation failed');
+    if (!titleSubtitle.title || !titleSubtitle.subtitle) {
+      throw new Error('Title/subtitle generation failed');
     }
 
     // Step 3: Design overlay strategy
     const overlayDesign = await geminiService.designTextOverlay(
       brand,
-      tagline,
+      titleSubtitle.title,
+      titleSubtitle.subtitle,
       baseImageUrl
     );
 
     // Apply overlay to image
     const overlayConfig: OverlayConfig = {
-      text: tagline,
+      title: titleSubtitle.title,
+      subtitle: titleSubtitle.subtitle,
       font_family: overlayDesign.font_family,
       font_weight: overlayDesign.font_weight,
       font_transform: overlayDesign.font_transform,
@@ -103,8 +105,9 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
         composition_notes: imagePromptResult.composition_notes,
         imagen_prompt_final: imagePromptResult.imagen_prompt_final
       },
-      step_2_tagline: {
-        tagline: tagline
+      step_2_title_subtitle: {
+        title: titleSubtitle.title,
+        subtitle: titleSubtitle.subtitle
       },
       step_3_overlay_design: {
         reasoning: overlayDesign.reasoning,
@@ -158,7 +161,8 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
     const baseImage = asset.base_image_url || asset.image_url;
     
     const updatedOverlayConfig: OverlayConfig = {
-      text: overlay_config.text || asset.overlay_config?.text || '',
+      title: overlay_config.title || asset.overlay_config?.title || asset.overlay_config?.text || '',
+      subtitle: overlay_config.subtitle || asset.overlay_config?.subtitle || '',
       font_family: overlay_config.font_family || asset.overlay_config?.font_family || 'sans-serif',
       font_weight: overlay_config.font_weight || asset.overlay_config?.font_weight || 'bold',
       font_transform: overlay_config.font_transform || asset.overlay_config?.font_transform || 'none',

@@ -30,7 +30,8 @@ export interface BrandDNA {
 }
 
 export interface OverlayConfig {
-  text: string;
+  title: string; // Max 5 words
+  subtitle: string; // Max 15 words
   font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
   font_weight: 'light' | 'regular' | 'bold';
   font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
@@ -39,6 +40,8 @@ export interface OverlayConfig {
   position: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
   max_width_percent: number;
   opacity?: number;
+  // Legacy support
+  text?: string;
 }
 
 export interface GeneratedAsset {

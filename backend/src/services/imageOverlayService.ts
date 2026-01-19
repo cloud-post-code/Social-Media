@@ -95,41 +95,59 @@ export const applyTextOverlay = async (
     const width = metadata.width || 1024;
     const height = metadata.height || 1024;
     
-    // Calculate text dimensions (approximate)
-    // Use larger font size for better visibility
-    const fontSize = Math.max(48, Math.min(width / 12, 96));
+    // Get title and subtitle (support legacy 'text' field for backward compatibility)
+    const title = overlayConfig.title || overlayConfig.text || '';
+    const subtitle = overlayConfig.subtitle || '';
+    
+    if (!title) {
+      throw new Error('Title is required for overlay');
+    }
+    
     const fontFamily = getFontFamily(overlayConfig.font_family);
-    // Map font weights: light -> 300, regular -> 400, bold -> 700
     const fontWeight = overlayConfig.font_weight === 'bold' ? '700' : 
                       overlayConfig.font_weight === 'light' ? '300' : '400';
-    // Handle text transform
-    let textToTransform = overlayConfig.text;
-    if (overlayConfig.font_transform === 'uppercase') {
-      textToTransform = overlayConfig.text.toUpperCase();
-    } else if (overlayConfig.font_transform === 'lowercase') {
-      textToTransform = overlayConfig.text.toLowerCase();
-    } else if (overlayConfig.font_transform === 'capitalize') {
-      textToTransform = overlayConfig.text.split(' ').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-      ).join(' ');
-    }
     const textColor = overlayConfig.text_color_hex;
     const opacity = overlayConfig.opacity !== undefined ? overlayConfig.opacity : 1.0;
     const letterSpacing = overlayConfig.letter_spacing === 'wide' ? '0.15em' : 'normal';
     
-    // Estimate text width (rough approximation - wider for bold)
+    // Font sizes - title larger, subtitle smaller
+    const titleFontSize = Math.max(56, Math.min(width / 10, 120));
+    const subtitleFontSize = Math.max(32, Math.min(width / 16, 64));
+    const lineSpacing = subtitleFontSize * 0.3; // Space between title and subtitle
+    
+    // Handle text transform
+    const transformText = (text: string) => {
+      if (overlayConfig.font_transform === 'uppercase') {
+        return text.toUpperCase();
+      } else if (overlayConfig.font_transform === 'lowercase') {
+        return text.toLowerCase();
+      } else if (overlayConfig.font_transform === 'capitalize') {
+        return text.split(' ').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+      }
+      return text;
+    };
+    
+    const titleText = transformText(title);
+    const subtitleText = subtitle ? transformText(subtitle) : '';
+    
+    // Estimate total text height (title + spacing + subtitle)
+    const totalTextHeight = titleFontSize + (subtitleText ? (lineSpacing + subtitleFontSize) : 0);
+    
+    // Calculate position
     const charWidthMultiplier = overlayConfig.font_weight === 'bold' ? 0.7 : 0.6;
-    const avgCharWidth = fontSize * charWidthMultiplier;
-    const textWidth = overlayConfig.text.length * avgCharWidth;
-    const textHeight = fontSize * 1.4; // More space for descenders
+    const maxTitleWidth = title.length * titleFontSize * charWidthMultiplier;
+    const maxSubtitleWidth = subtitleText.length * subtitleFontSize * charWidthMultiplier;
+    const maxTextWidth = Math.max(maxTitleWidth, maxSubtitleWidth);
     const maxWidth = (width * overlayConfig.max_width_percent) / 100;
     
     const positionResult = calculatePosition(
       overlayConfig.position,
       width,
       height,
-      textWidth,
-      textHeight,
+      maxTextWidth,
+      totalTextHeight,
       overlayConfig.max_width_percent
     );
     
@@ -141,93 +159,144 @@ export const applyTextOverlay = async (
       y = height / 2;
     }
     
-    // Adjust y position - SVG text y is the baseline
-    let textY = y;
-    if (overlayConfig.position.includes('top')) {
-      textY = y + fontSize; // Baseline position for top-aligned text
-    } else if (overlayConfig.position.includes('bottom')) {
-      textY = y; // y already accounts for text height
-    } else {
-      textY = y + fontSize / 2; // Center baseline
-    }
-    
-    // Adjust textY for floating-center
-    if (overlayConfig.position === 'floating-center') {
-      textY = height / 2;
-    }
-    
-    // Escape XML special characters
-    const escapedText = textToTransform
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
-    
+    // Calculate text anchor
     const textAnchor = overlayConfig.position.includes('right') 
       ? 'end' 
       : overlayConfig.position.includes('left') 
       ? 'start' 
       : 'middle';
     
-    // Create SVG with clean filter-based shadow (no double text, no stroke artifacts)
+    // Calculate Y positions for title and subtitle
+    let titleY = y;
+    let subtitleY = y;
+    
+    if (overlayConfig.position.includes('top')) {
+      titleY = y + titleFontSize;
+      subtitleY = titleY + lineSpacing + subtitleFontSize;
+    } else if (overlayConfig.position.includes('bottom')) {
+      subtitleY = y;
+      titleY = subtitleY - lineSpacing - titleFontSize;
+    } else {
+      // Center - position title in middle, subtitle below
+      const centerY = overlayConfig.position === 'floating-center' ? height / 2 : y;
+      titleY = centerY - (subtitleText ? lineSpacing / 2 : 0);
+      subtitleY = titleY + lineSpacing + subtitleFontSize;
+    }
+    
+    // Escape XML special characters
+    const escapeXml = (text: string) => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    };
+    
+    const escapedTitle = escapeXml(titleText);
+    const escapedSubtitle = subtitleText ? escapeXml(subtitleText) : '';
+    
+    // Create SVG with title and subtitle
+    // Use simpler approach - render SVG to PNG first to ensure it works
     const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
       <feOffset dx="2" dy="2" result="offsetblur"/>
-      <feComponentTransfer>
-        <feFuncA type="linear" slope="0.5"/>
+      <feComponentTransfer result="shadow">
+        <feFuncA type="linear" slope="0.6"/>
       </feComponentTransfer>
       <feMerge>
-        <feMergeNode/>
+        <feMergeNode in="shadow"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
   </defs>
   <text
     x="${x}"
-    y="${textY}"
+    y="${titleY}"
     font-family="${fontFamily}"
-    font-size="${fontSize}"
+    font-size="${titleFontSize}"
     font-weight="${fontWeight}"
     fill="${textColor}"
     text-anchor="${textAnchor}"
     letter-spacing="${letterSpacing}"
     opacity="${opacity}"
     filter="url(#textShadow)"
-  >${escapedText}</text>
+  >${escapedTitle}</text>
+  ${subtitleText ? `<text
+    x="${x}"
+    y="${subtitleY}"
+    font-family="${fontFamily}"
+    font-size="${subtitleFontSize}"
+    font-weight="${fontWeight === '700' ? '400' : fontWeight}"
+    fill="${textColor}"
+    text-anchor="${textAnchor}"
+    letter-spacing="${letterSpacing}"
+    opacity="${opacity * 0.9}"
+    filter="url(#textShadow)"
+  >${escapedSubtitle}</text>` : ''}
 </svg>`;
     
     // Debug logging
     console.log('Applying overlay:', {
-      text: overlayConfig.text,
+      title,
+      subtitle,
       position: overlayConfig.position,
       color: overlayConfig.text_color_hex,
-      fontSize,
+      titleFontSize,
+      subtitleFontSize,
       x,
-      y: textY,
-      imageSize: `${width}x${height}`,
-      svgPreview: svgText.substring(0, 200)
+      titleY,
+      subtitleY,
+      imageSize: `${width}x${height}`
     });
     
+    // Render SVG to PNG buffer first, then composite
+    // This ensures the SVG is properly rendered
+    // Use higher density for better text quality
     const svgBuffer = Buffer.from(svgText);
     
-    // Composite the text overlay onto the image
-    // Sharp will auto-detect SVG format from the buffer
-    const outputBuffer = await image
-      .composite([
-        {
-          input: svgBuffer,
-          top: 0,
-          left: 0,
-          blend: 'over'
-        },
-      ])
-      .png()
-      .toBuffer();
+    try {
+      // Try rendering SVG with density first
+      const svgImage = sharp(svgBuffer, { density: 300 });
+      const svgRendered = await svgImage
+        .resize(width, height, { fit: 'fill' })
+        .png()
+        .toBuffer();
+      
+      // Composite the rendered SVG onto the image
+      const outputBuffer = await image
+        .composite([
+          {
+            input: svgRendered,
+            top: 0,
+            left: 0,
+            blend: 'over'
+          },
+        ])
+        .png()
+        .toBuffer();
+      
+      return bufferToBase64(outputBuffer);
+    } catch (svgError) {
+      console.warn('SVG rendering with density failed, trying direct composite:', svgError);
+      // Fallback: try direct SVG composite
+      const outputBuffer = await image
+        .composite([
+          {
+            input: svgBuffer,
+            top: 0,
+            left: 0,
+            blend: 'over'
+          },
+        ])
+        .png()
+        .toBuffer();
+      
+      return bufferToBase64(outputBuffer);
+    }
     
-    return bufferToBase64(outputBuffer);
   } catch (error) {
     console.error('Error applying text overlay:', error);
     console.error('Overlay config:', overlayConfig);
