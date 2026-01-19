@@ -1,5 +1,29 @@
 import pool from '../config/database.js';
-import { GeneratedAsset, AssetRow } from '../types/index.js';
+import { GeneratedAsset, AssetRow, OverlayConfig } from '../types/index.js';
+
+// Utility function to strip markdown syntax from text
+const stripMarkdown = (text: string): string => {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
+    .replace(/\*(.*?)\*/g, '$1')       // Remove *italic*
+    .replace(/__(.*?)__/g, '$1')       // Remove __bold__
+    .replace(/_(.*?)_/g, '$1')         // Remove _italic_
+    .replace(/~~(.*?)~~/g, '$1')       // Remove ~~strikethrough~~
+    .replace(/`(.*?)`/g, '$1')         // Remove `code`
+    .trim();
+};
+
+// Clean markdown from overlay config
+const cleanOverlayConfig = (config: any): OverlayConfig | undefined => {
+  if (!config) return undefined;
+  return {
+    ...config,
+    title: config.title ? stripMarkdown(config.title) : config.title,
+    subtitle: config.subtitle ? stripMarkdown(config.subtitle) : config.subtitle,
+    text: config.text ? stripMarkdown(config.text) : config.text
+  };
+};
 
 export const getAllAssets = async (brandId?: string): Promise<GeneratedAsset[]> => {
   let query = 'SELECT * FROM generated_assets';
@@ -102,6 +126,9 @@ function rowToAsset(row: AssetRow): GeneratedAsset {
   // Remove metadata from strategy before returning
   const { _overlay_config, _base_image_url, ...cleanStrategy } = strategy;
   
+  // Clean markdown from overlay_config when retrieving from database
+  const cleanedOverlayConfig = cleanOverlayConfig(overlay_config);
+  
   return {
     id: row.id,
     brand_id: row.brand_id,
@@ -109,7 +136,7 @@ function rowToAsset(row: AssetRow): GeneratedAsset {
     image_url: row.image_url,
     campaign_images: row.campaign_images || undefined,
     strategy: cleanStrategy,
-    overlay_config,
+    overlay_config: cleanedOverlayConfig,
     base_image_url,
     user_prompt: row.user_prompt || undefined,
     feedback_history: row.feedback_history || undefined,

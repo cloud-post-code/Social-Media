@@ -2,6 +2,19 @@ import React, { useState } from 'react';
 import { BrandDNA, GenerationOption, GeneratedAsset } from '../models/types.js';
 import { assetApi } from '../services/assetApi.js';
 
+// Utility function to strip markdown syntax from text
+const stripMarkdown = (text: string): string => {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
+    .replace(/\*(.*?)\*/g, '$1')       // Remove *italic*
+    .replace(/__(.*?)__/g, '$1')       // Remove __bold__
+    .replace(/_(.*?)_/g, '$1')         // Remove _italic_
+    .replace(/~~(.*?)~~/g, '$1')       // Remove ~~strikethrough~~
+    .replace(/`(.*?)`/g, '$1')         // Remove `code`
+    .trim();
+};
+
 interface AssetGeneratorProps {
   activeBrand: BrandDNA | null;
   onAssetCreated: (asset: GeneratedAsset) => void;
@@ -394,9 +407,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 {!editingOverlay ? (
                   <div className="space-y-3">
                     <div>
-                      <p className="text-xl font-black text-slate-800">{displayAsset.overlayConfig.title || displayAsset.overlayConfig.text}</p>
+                      <p className="text-xl font-black text-slate-800">{stripMarkdown(displayAsset.overlayConfig.title || displayAsset.overlayConfig.text || '')}</p>
                       {displayAsset.overlayConfig.subtitle && (
-                        <p className="text-sm font-medium text-slate-600 mt-1">{displayAsset.overlayConfig.subtitle}</p>
+                        <p className="text-sm font-medium text-slate-600 mt-1">{stripMarkdown(displayAsset.overlayConfig.subtitle)}</p>
                       )}
                     </div>
                     <div className="flex gap-4 text-xs text-slate-500">

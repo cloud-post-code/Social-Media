@@ -5,6 +5,19 @@ import * as geminiService from '../services/geminiService.js';
 import * as imageOverlayService from '../services/imageOverlayService.js';
 import { BrandDNA, OverlayConfig } from '../types/index.js';
 
+// Utility function to strip markdown syntax from text
+const stripMarkdown = (text: string): string => {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
+    .replace(/\*(.*?)\*/g, '$1')       // Remove *italic*
+    .replace(/__(.*?)__/g, '$1')       // Remove __bold__
+    .replace(/_(.*?)_/g, '$1')         // Remove _italic_
+    .replace(/~~(.*?)~~/g, '$1')       // Remove ~~strikethrough~~
+    .replace(/`(.*?)`/g, '$1')         // Remove `code`
+    .trim();
+};
+
 export const getAllAssets = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const brandId = req.query.brandId as string | undefined;
@@ -77,10 +90,10 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
       baseImageUrl
     );
 
-    // Apply overlay to image
+    // Apply overlay to image - strip markdown before storing
     const overlayConfig: OverlayConfig = {
-      title: titleSubtitle.title,
-      subtitle: titleSubtitle.subtitle,
+      title: stripMarkdown(titleSubtitle.title),
+      subtitle: stripMarkdown(titleSubtitle.subtitle),
       font_family: overlayDesign.font_family,
       font_weight: overlayDesign.font_weight,
       font_transform: overlayDesign.font_transform,
@@ -160,9 +173,10 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
     // Use base image if available, otherwise use current image
     const baseImage = asset.base_image_url || asset.image_url;
     
+    // Strip markdown from title and subtitle before storing
     const updatedOverlayConfig: OverlayConfig = {
-      title: overlay_config.title || asset.overlay_config?.title || asset.overlay_config?.text || '',
-      subtitle: overlay_config.subtitle || asset.overlay_config?.subtitle || '',
+      title: stripMarkdown(overlay_config.title || asset.overlay_config?.title || asset.overlay_config?.text || ''),
+      subtitle: stripMarkdown(overlay_config.subtitle || asset.overlay_config?.subtitle || ''),
       font_family: overlay_config.font_family || asset.overlay_config?.font_family || 'sans-serif',
       font_weight: overlay_config.font_weight || asset.overlay_config?.font_weight || 'bold',
       font_transform: overlay_config.font_transform || asset.overlay_config?.font_transform || 'none',
