@@ -767,36 +767,22 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Size</label>
-                          <div className="flex gap-2 items-center">
-                            <input
-                              type="number"
-                              min="12"
-                              max="200"
-                              value={overlayEdit.subtitle_font_size || ''}
-                              onChange={e => {
-                                const val = e.target.value;
-                                setOverlayEdit({...overlayEdit, subtitle_font_size: val ? parseInt(val) : undefined});
-                              }}
-                              className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                              placeholder="Auto"
-                            />
-                            <span className="text-sm font-bold text-slate-500">px</span>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Max Lines</label>
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Size</label>
+                        <div className="flex gap-2 items-center">
                           <input
                             type="number"
-                            min="1"
-                            max="10"
-                            value={overlayEdit.subtitle_max_lines || 2}
-                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_max_lines: parseInt(e.target.value) || 2})}
-                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                            min="12"
+                            max="200"
+                            value={overlayEdit.subtitle_font_size || ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setOverlayEdit({...overlayEdit, subtitle_font_size: val ? parseInt(val) : undefined});
+                            }}
+                            className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                            placeholder="Auto"
                           />
+                          <span className="text-sm font-bold text-slate-500">px</span>
                         </div>
                       </div>
                     </div>
