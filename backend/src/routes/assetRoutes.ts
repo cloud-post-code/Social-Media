@@ -9,6 +9,7 @@ router.post('/generate/product', assetController.generateProductAsset);
 router.post('/generate/non-product', assetController.generateNonProductAsset);
 router.post('/generate/campaign', assetController.generateCampaignAsset);
 router.put('/:id/edit', assetController.editAssetImage);
+router.put('/:id/overlay', assetController.updateProductOverlay);
 router.delete('/:id', assetController.deleteAsset);
 
 export default router;

@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import * as assetService from '../services/assetService.js';
 import * as brandService from '../services/brandService.js';
 import * as geminiService from '../services/geminiService.js';
-import { BrandDNA } from '../types/index.js';
+import * as imageOverlayService from '../services/imageOverlayService.js';
+import { BrandDNA, OverlayConfig } from '../types/index.js';
 
 export const getAllAssets = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -42,30 +43,148 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
       return res.status(404).json({ error: { message: 'Brand not found' } });
     }
 
-    const strategy = await geminiService.generateProductStrategy(
+    // Step 1: Generate image prompt and create product image
+    const imagePromptResult = await geminiService.generateProductImagePrompt(
       brand,
       productFocus,
       referenceImageBase64
     );
 
-    if (!strategy?.step_1_visual_strategy?.imagen_prompt_final) {
-      throw new Error('Strategy generation failed to provide a prompt');
+    if (!imagePromptResult.imagen_prompt_final) {
+      throw new Error('Image prompt generation failed');
     }
 
-    const imageUrl = await geminiService.generateImage(
-      strategy.step_1_visual_strategy.imagen_prompt_final
+    const baseImageUrl = await geminiService.generateImage(
+      imagePromptResult.imagen_prompt_final
     );
+
+    // Step 2: Generate tagline (non-streaming for initial generation)
+    const tagline = await geminiService.generateProductTagline(
+      brand,
+      productFocus,
+      baseImageUrl
+    );
+
+    if (!tagline) {
+      throw new Error('Tagline generation failed');
+    }
+
+    // Step 3: Design overlay strategy
+    const overlayDesign = await geminiService.designTextOverlay(
+      brand,
+      tagline,
+      baseImageUrl
+    );
+
+    // Apply overlay to image
+    const overlayConfig: OverlayConfig = {
+      text: tagline,
+      font_family: overlayDesign.font_family,
+      font_weight: overlayDesign.font_weight,
+      font_transform: overlayDesign.font_transform,
+      text_color_hex: overlayDesign.text_color_hex,
+      position: overlayDesign.position,
+      max_width_percent: overlayDesign.max_width_percent
+    };
+
+    const finalImageUrl = await imageOverlayService.applyTextOverlay(
+      baseImageUrl,
+      overlayConfig
+    );
+
+    // Store strategy information
+    const strategy = {
+      step_1_image_generation: {
+        reasoning: imagePromptResult.reasoning,
+        includes_person: imagePromptResult.includes_person,
+        composition_notes: imagePromptResult.composition_notes,
+        imagen_prompt_final: imagePromptResult.imagen_prompt_final
+      },
+      step_2_tagline: {
+        tagline: tagline
+      },
+      step_3_overlay_design: {
+        reasoning: overlayDesign.reasoning,
+        overlay_config: overlayConfig
+      }
+    };
 
     const asset = await assetService.createAsset({
       id: Date.now().toString(),
       brand_id: brandId,
       type: 'product',
-      image_url: imageUrl,
+      image_url: finalImageUrl,
+      base_image_url: baseImageUrl,
+      overlay_config: overlayConfig,
       strategy,
       user_prompt: productFocus
     });
 
     res.status(201).json(asset);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update product overlay (colors, text, typography)
+ */
+export const updateProductOverlay = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { overlay_config } = req.body;
+
+    if (!overlay_config) {
+      return res.status(400).json({ 
+        error: { message: 'overlay_config is required' } 
+      });
+    }
+
+    const asset = await assetService.getAssetById(id);
+    if (!asset) {
+      return res.status(404).json({ error: { message: 'Asset not found' } });
+    }
+
+    if (asset.type !== 'product') {
+      return res.status(400).json({ 
+        error: { message: 'This endpoint is only for product assets' } 
+      });
+    }
+
+    // Use base image if available, otherwise use current image
+    const baseImage = asset.base_image_url || asset.image_url;
+    
+    const updatedOverlayConfig: OverlayConfig = {
+      text: overlay_config.text || asset.overlay_config?.text || '',
+      font_family: overlay_config.font_family || asset.overlay_config?.font_family || 'sans-serif',
+      font_weight: overlay_config.font_weight || asset.overlay_config?.font_weight || 'bold',
+      font_transform: overlay_config.font_transform || asset.overlay_config?.font_transform || 'none',
+      text_color_hex: overlay_config.text_color_hex || asset.overlay_config?.text_color_hex || '#FFFFFF',
+      position: overlay_config.position || asset.overlay_config?.position || 'bottom-center',
+      max_width_percent: overlay_config.max_width_percent || asset.overlay_config?.max_width_percent || 80
+    };
+
+    const finalImageUrl = await imageOverlayService.updateOverlay(
+      baseImage,
+      updatedOverlayConfig
+    );
+
+    // Update strategy with new overlay config
+    const updatedStrategy = {
+      ...asset.strategy,
+      step_3_overlay_design: {
+        ...asset.strategy?.step_3_overlay_design,
+        overlay_config: updatedOverlayConfig
+      }
+    };
+
+    const updatedAsset = await assetService.updateAsset(id, {
+      image_url: finalImageUrl,
+      overlay_config: updatedOverlayConfig,
+      strategy: updatedStrategy
+    });
+
+    res.json(updatedAsset);
   } catch (error) {
     next(error);
   }

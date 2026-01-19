@@ -26,6 +26,13 @@ export const getAssetById = async (id: string): Promise<GeneratedAsset | null> =
 };
 
 export const createAsset = async (asset: GeneratedAsset): Promise<GeneratedAsset> => {
+  // Store overlay_config and base_image_url in strategy for now (no migration needed)
+  const strategyWithMetadata = {
+    ...asset.strategy,
+    _overlay_config: asset.overlay_config,
+    _base_image_url: asset.base_image_url
+  };
+
   const result = await pool.query<AssetRow>(
     `INSERT INTO generated_assets (
       id, brand_id, type, image_url, campaign_images, 
@@ -38,7 +45,7 @@ export const createAsset = async (asset: GeneratedAsset): Promise<GeneratedAsset
       asset.type,
       asset.image_url,
       asset.campaign_images ? JSON.stringify(asset.campaign_images) : null,
-      JSON.stringify(asset.strategy),
+      JSON.stringify(strategyWithMetadata),
       asset.user_prompt || null,
       asset.feedback_history ? JSON.stringify(asset.feedback_history) : null
     ]
@@ -54,6 +61,13 @@ export const updateAsset = async (id: string, asset: Partial<GeneratedAsset>): P
 
   const updated = { ...existing, ...asset };
   
+  // Store overlay_config and base_image_url in strategy
+  const strategyWithMetadata = {
+    ...updated.strategy,
+    _overlay_config: updated.overlay_config,
+    _base_image_url: updated.base_image_url
+  };
+  
   const result = await pool.query<AssetRow>(
     `UPDATE generated_assets SET
       image_url = $1, campaign_images = $2, strategy = $3,
@@ -63,7 +77,7 @@ export const updateAsset = async (id: string, asset: Partial<GeneratedAsset>): P
     [
       updated.image_url,
       updated.campaign_images ? JSON.stringify(updated.campaign_images) : null,
-      JSON.stringify(updated.strategy),
+      JSON.stringify(strategyWithMetadata),
       updated.user_prompt || null,
       updated.feedback_history ? JSON.stringify(updated.feedback_history) : null,
       id
@@ -80,13 +94,23 @@ export const deleteAsset = async (id: string): Promise<void> => {
 };
 
 function rowToAsset(row: AssetRow): GeneratedAsset {
+  // Extract overlay_config and base_image_url from strategy if present
+  const strategy = row.strategy || {};
+  const overlay_config = strategy._overlay_config || undefined;
+  const base_image_url = strategy._base_image_url || undefined;
+  
+  // Remove metadata from strategy before returning
+  const { _overlay_config, _base_image_url, ...cleanStrategy } = strategy;
+  
   return {
     id: row.id,
     brand_id: row.brand_id,
     type: row.type as 'product' | 'campaign' | 'non-product',
     image_url: row.image_url,
     campaign_images: row.campaign_images || undefined,
-    strategy: row.strategy,
+    strategy: cleanStrategy,
+    overlay_config,
+    base_image_url,
     user_prompt: row.user_prompt || undefined,
     feedback_history: row.feedback_history || undefined,
     created_at: row.created_at

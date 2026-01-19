@@ -20,6 +20,16 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   
   const [currentAsset, setCurrentAsset] = useState<GeneratedAsset | null>(null);
   const [feedback, setFeedback] = useState('');
+  const [editingOverlay, setEditingOverlay] = useState(false);
+  const [overlayEdit, setOverlayEdit] = useState<{
+    text?: string;
+    font_family?: 'sans-serif' | 'serif' | 'cursive';
+    font_weight?: 'bold' | 'normal';
+    font_transform?: 'uppercase' | 'none';
+    text_color_hex?: string;
+    position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right';
+    max_width_percent?: number;
+  }>({});
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,6 +76,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         imageUrl: asset.image_url,
         brandId: asset.brand_id,
         campaignImages: asset.campaign_images,
+        overlayConfig: asset.overlay_config,
+        baseImageUrl: asset.base_image_url,
         userPrompt: asset.user_prompt,
         feedbackHistory: asset.feedback_history,
         timestamp: asset.created_at ? new Date(asset.created_at).getTime() : Date.now()
@@ -93,6 +105,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         imageUrl: updated.image_url,
         brandId: updated.brand_id,
         campaignImages: updated.campaign_images,
+        overlayConfig: updated.overlay_config,
+        baseImageUrl: updated.base_image_url,
         userPrompt: updated.user_prompt,
         feedbackHistory: updated.feedback_history,
         timestamp: updated.created_at ? new Date(updated.created_at).getTime() : Date.now()
@@ -103,6 +117,34 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       alert('Revision failed.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateOverlay = async () => {
+    if (!currentAsset || currentAsset.type !== 'product') return;
+    setLoading(true);
+    setStatusText('Updating overlay...');
+    try {
+      const updated = await assetApi.updateOverlay(currentAsset.id, overlayEdit);
+      const frontendAsset: GeneratedAsset = {
+        ...updated,
+        imageUrl: updated.image_url,
+        brandId: updated.brand_id,
+        campaignImages: updated.campaign_images,
+        overlayConfig: updated.overlay_config,
+        baseImageUrl: updated.base_image_url,
+        userPrompt: updated.user_prompt,
+        feedbackHistory: updated.feedback_history,
+        timestamp: updated.created_at ? new Date(updated.created_at).getTime() : Date.now()
+      };
+      setCurrentAsset(frontendAsset);
+      setEditingOverlay(false);
+      setOverlayEdit({});
+    } catch (err) {
+      alert('Overlay update failed: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+      setStatusText('');
     }
   };
 
@@ -270,37 +312,35 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             <div className="relative group rounded-[4rem] overflow-hidden shadow-[0_48px_80px_-24px_rgba(0,0,0,0.3)] border-[20px] border-white ring-1 ring-slate-200">
               <img src={imageUrl} className="w-full aspect-square object-cover transition duration-700 group-hover:scale-105" />
               
-              {/* Overlay (Strategy Visualization) */}
-              <div className={`absolute inset-0 flex flex-col p-16 pointer-events-none
-                ${(displayAsset.strategy?.step_2_design_strategy?.text_overlay_instructions?.suggested_position || 
-                   displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_position || 'center-middle')
-                   .toLowerCase().includes('top') ? 'justify-start' : 
-                   (displayAsset.strategy?.step_2_design_strategy?.text_overlay_instructions?.suggested_position || 'center-middle')
-                   .toLowerCase().includes('bottom') ? 'justify-end' : 'justify-center'}
-                ${(displayAsset.strategy?.step_2_design_strategy?.text_overlay_instructions?.suggested_position || 
-                   displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_position || 'center-middle')
-                   .toLowerCase().includes('left') ? 'items-start text-left' : 
-                   (displayAsset.strategy?.step_2_design_strategy?.text_overlay_instructions?.suggested_position || 'center-middle')
-                   .toLowerCase().includes('right') ? 'items-end text-right' : 'items-center text-center'}
-              `}>
-                <h1 
-                  className="text-4xl md:text-5xl lg:text-6xl font-black leading-[1.05] drop-shadow-2xl"
-                  style={{
-                    color: displayAsset.strategy?.step_2_design_strategy?.text_overlay_instructions?.text_color_hex || 
-                           displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_text_color || 'white',
-                    textTransform: displayAsset.strategy?.step_2_design_strategy?.font_css_instructions?.transform || 'none',
-                    maxWidth: displayAsset.strategy?.step_2_design_strategy?.text_overlay_instructions?.max_width_percent || '90%'
-                  }}
-                >
-                  {displayAsset.strategy?.step_2_design_strategy?.headline_text || 
-                   displayAsset.strategy?.step_2_message_strategy?.headline_text}
-                </h1>
-                {displayAsset.strategy?.step_2_message_strategy?.body_caption_draft && (
-                   <p className="mt-6 text-xl font-bold opacity-90 drop-shadow-xl text-white max-w-md">
-                      {displayAsset.strategy?.step_2_message_strategy?.body_caption_draft}
-                   </p>
-                )}
-              </div>
+              {/* Overlay is now baked into the image for product assets */}
+              {/* For non-product assets, show CSS overlay if needed */}
+              {displayAsset.type !== 'product' && (
+                <div className={`absolute inset-0 flex flex-col p-16 pointer-events-none
+                  ${(displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_position || 'center-middle')
+                     .toLowerCase().includes('top') ? 'justify-start' : 
+                     (displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_position || 'center-middle')
+                     .toLowerCase().includes('bottom') ? 'justify-end' : 'justify-center'}
+                  ${(displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_position || 'center-middle')
+                     .toLowerCase().includes('left') ? 'items-start text-left' : 
+                     (displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_position || 'center-middle')
+                     .toLowerCase().includes('right') ? 'items-end text-right' : 'items-center text-center'}
+                `}>
+                  <h1 
+                    className="text-4xl md:text-5xl lg:text-6xl font-black leading-[1.05] drop-shadow-2xl"
+                    style={{
+                      color: displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_text_color || 'white',
+                      maxWidth: '90%'
+                    }}
+                  >
+                    {displayAsset.strategy?.step_2_message_strategy?.headline_text}
+                  </h1>
+                  {displayAsset.strategy?.step_2_message_strategy?.body_caption_draft && (
+                     <p className="mt-6 text-xl font-bold opacity-90 drop-shadow-xl text-white max-w-md">
+                        {displayAsset.strategy?.step_2_message_strategy?.body_caption_draft}
+                     </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {displayAsset.type === 'campaign' && campaignImages.length > 0 && (
@@ -316,6 +356,148 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 ))}
               </div>
             )}
+
+            {/* Overlay Editing UI for Product Assets */}
+            {displayAsset.type === 'product' && displayAsset.overlayConfig && (
+              <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Text Overlay</h3>
+                  <button
+                    onClick={() => {
+                      if (editingOverlay) {
+                        setEditingOverlay(false);
+                        setOverlayEdit({});
+                      } else {
+                        setEditingOverlay(true);
+                        setOverlayEdit({
+                          text: displayAsset.overlayConfig?.text,
+                          font_family: displayAsset.overlayConfig?.font_family,
+                          font_weight: displayAsset.overlayConfig?.font_weight,
+                          font_transform: displayAsset.overlayConfig?.font_transform,
+                          text_color_hex: displayAsset.overlayConfig?.text_color_hex,
+                          position: displayAsset.overlayConfig?.position,
+                          max_width_percent: displayAsset.overlayConfig?.max_width_percent
+                        });
+                      }
+                    }}
+                    className="text-xs font-black text-indigo-600 hover:text-indigo-700"
+                  >
+                    {editingOverlay ? 'Cancel' : 'Edit'}
+                  </button>
+                </div>
+
+                {!editingOverlay ? (
+                  <div className="space-y-3">
+                    <p className="text-lg font-bold text-slate-800">{displayAsset.overlayConfig.text}</p>
+                    <div className="flex gap-4 text-xs text-slate-500">
+                      <span>{displayAsset.overlayConfig.font_family}</span>
+                      <span>•</span>
+                      <span>{displayAsset.overlayConfig.font_weight}</span>
+                      <span>•</span>
+                      <span>{displayAsset.overlayConfig.position}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Text</label>
+                      <input
+                        type="text"
+                        value={overlayEdit.text || ''}
+                        onChange={e => setOverlayEdit({...overlayEdit, text: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font</label>
+                        <select
+                          value={overlayEdit.font_family || 'sans-serif'}
+                          onChange={e => setOverlayEdit({...overlayEdit, font_family: e.target.value as any})}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                        >
+                          <option value="sans-serif">Sans-serif</option>
+                          <option value="serif">Serif</option>
+                          <option value="cursive">Cursive</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Weight</label>
+                        <select
+                          value={overlayEdit.font_weight || 'bold'}
+                          onChange={e => setOverlayEdit({...overlayEdit, font_weight: e.target.value as any})}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                        >
+                          <option value="bold">Bold</option>
+                          <option value="normal">Normal</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Color</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="color"
+                          value={overlayEdit.text_color_hex || '#FFFFFF'}
+                          onChange={e => setOverlayEdit({...overlayEdit, text_color_hex: e.target.value})}
+                          className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={overlayEdit.text_color_hex || '#FFFFFF'}
+                          onChange={e => setOverlayEdit({...overlayEdit, text_color_hex: e.target.value})}
+                          className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                          placeholder="#FFFFFF"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Position</label>
+                      <select
+                        value={overlayEdit.position || 'bottom-center'}
+                        onChange={e => setOverlayEdit({...overlayEdit, position: e.target.value as any})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                      >
+                        <option value="top-left">Top Left</option>
+                        <option value="top-center">Top Center</option>
+                        <option value="top-right">Top Right</option>
+                        <option value="center-left">Center Left</option>
+                        <option value="center-middle">Center Middle</option>
+                        <option value="center-right">Center Right</option>
+                        <option value="bottom-left">Bottom Left</option>
+                        <option value="bottom-right">Bottom Right</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                        Max Width: {overlayEdit.max_width_percent || 80}%
+                      </label>
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        value={overlayEdit.max_width_percent || 80}
+                        onChange={e => setOverlayEdit({...overlayEdit, max_width_percent: parseInt(e.target.value)})}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleUpdateOverlay}
+                      disabled={loading}
+                      className="w-full bg-indigo-600 text-white py-4 rounded-xl font-black hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      {loading ? 'Updating...' : 'Apply Changes'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Strategy & Feedback Chat */}
@@ -327,10 +509,17 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               </div>
               <div className="space-y-8">
                 <p className="text-slate-700 italic leading-relaxed text-2xl font-semibold">
-                  "{displayAsset.strategy?.step_1_visual_strategy?.reasoning || 
+                  "{displayAsset.strategy?.step_1_image_generation?.reasoning || 
+                    displayAsset.strategy?.step_1_visual_strategy?.reasoning || 
                     displayAsset.strategy?.step_1_visual_concept?.visual_metaphor_reasoning || 
                     "Campaign coordinated sequence focusing on multi-touch narrative."}"
                 </p>
+                {displayAsset.type === 'product' && displayAsset.strategy?.step_2_tagline && (
+                  <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Tagline</p>
+                    <p className="text-lg font-black text-indigo-900">{displayAsset.strategy.step_2_tagline.tagline}</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visual Tone</p>
@@ -338,7 +527,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   </div>
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Composition</p>
-                    <p className="text-sm font-black text-slate-800">{displayAsset.strategy?.step_1_visual_strategy?.composition_notes || 'Metaphorical'}</p>
+                    <p className="text-sm font-black text-slate-800">{displayAsset.strategy?.step_1_image_generation?.composition_notes || displayAsset.strategy?.step_1_visual_strategy?.composition_notes || 'Metaphorical'}</p>
                   </div>
                 </div>
               </div>

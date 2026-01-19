@@ -280,32 +280,32 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
   return dna;
 };
 
-export const generateProductStrategy = async (brandDNA: BrandDNA, productFocus: string, referenceImageBase64?: string) => {
+/**
+ * Step 1: Generate image prompt for product in use
+ */
+export const generateProductImagePrompt = async (
+  brandDNA: BrandDNA,
+  productFocus: string,
+  referenceImageBase64?: string
+): Promise<{ imagen_prompt_final: string; reasoning: string; includes_person: boolean; composition_notes: string }> => {
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
 
   const prompt = `
-    You are an elite Creative Director and Lead Copywriter.
-    Goal: Design a single social media product post aligning with the provided Brand DNA.
+    You are an elite Creative Director specializing in product photography.
+    Goal: Create a detailed image generation prompt for a product shown in use, aligned with the Brand DNA.
 
     ### INPUT DATA
     Brand DNA JSON: ${JSON.stringify(brandDNA)}
     Product Focus: ${productFocus}
 
-    ### FINAL OUTPUT FORMAT (JSON)
+    ### OUTPUT FORMAT (JSON)
     Return ONLY:
     {
-      "step_1_visual_strategy": {
-        "reasoning": "Strategy explanation",
-        "includes_person": boolean,
-        "composition_notes": "Placement notes",
-        "imagen_prompt_final": "Detailed prompt for Imagen 3 using DNA prefix. No text requests."
-      },
-      "step_2_design_strategy": {
-        "headline_text": "Punchy line (max 10 words)",
-        "font_css_instructions": { "family_type": "sans-serif"|"serif"|"cursive", "weight": "bold"|"normal", "transform": "uppercase"|"none" },
-        "text_overlay_instructions": { "text_color_hex": "DNA color or contrast", "suggested_position": "top-center"|"bottom-left"|"center-right", "max_width_percent": "e.g. 80%" }
-      }
+      "reasoning": "Brief explanation of the visual strategy",
+      "includes_person": boolean,
+      "composition_notes": "Notes about composition and placement",
+      "imagen_prompt_final": "Detailed, vivid prompt for Imagen 3. Include brand colors, style, and mood. Show the product being used naturally. NO text in the image."
     }
   `;
 
@@ -323,7 +323,151 @@ export const generateProductStrategy = async (brandDNA: BrandDNA, productFocus: 
     config: { responseMimeType: "application/json" }
   });
 
-  return safeJsonParse(response.text || '{}');
+  const result = safeJsonParse(response.text || '{}');
+  return {
+    imagen_prompt_final: result.imagen_prompt_final || '',
+    reasoning: result.reasoning || '',
+    includes_person: result.includes_person || false,
+    composition_notes: result.composition_notes || ''
+  };
+};
+
+/**
+ * Step 2: Generate tagline for the marketing post (with streaming support)
+ */
+export const generateProductTagline = async (
+  brandDNA: BrandDNA,
+  productFocus: string,
+  productImageBase64: string,
+  onChunk?: (chunk: string) => void
+): Promise<string> => {
+  const ai = getAIClient();
+  const model = 'gemini-3-pro-preview';
+
+  const prompt = `
+    You are an elite Copywriter and Lead Creative Director.
+    Goal: Create a punchy, memorable tagline (max 10 words) for a social media product post.
+
+    ### INPUT DATA
+    Brand DNA JSON: ${JSON.stringify(brandDNA)}
+    Product Focus: ${productFocus}
+    
+    ### BRAND VOICE GUIDELINES
+    Tone: ${brandDNA.brand_voice.tone_adjectives.join(', ')}
+    Writing Style: ${brandDNA.brand_voice.writing_style}
+    Keywords to use: ${brandDNA.brand_voice.keywords_to_use.join(', ')}
+    Taboo words (avoid): ${brandDNA.brand_voice.taboo_words.join(', ')}
+
+    ### OUTPUT
+    Return ONLY the tagline text (no quotes, no JSON, just the tagline). Maximum 10 words. Make it punchy, memorable, and aligned with the brand voice.
+  `;
+
+  const base64Data = productImageBase64.includes(',') 
+    ? productImageBase64.split(',')[1] 
+    : productImageBase64;
+
+  const parts = [
+    { text: prompt },
+    { inlineData: { mimeType: "image/png", data: base64Data } }
+  ];
+
+  if (onChunk) {
+    // Streaming mode
+    const stream = await ai.models.generateContentStream({
+      model,
+      contents: { parts }
+    });
+
+    let fullText = '';
+    for await (const chunk of stream) {
+      const text = chunk.text || '';
+      if (text) {
+        fullText += text;
+        onChunk(text);
+      }
+    }
+    return fullText.trim();
+  } else {
+    // Non-streaming mode
+    const response = await ai.models.generateContent({
+      model,
+      contents: { parts }
+    });
+    return (response.text || '').trim();
+  }
+};
+
+/**
+ * Step 3: Design text overlay strategy based on brand DNA
+ */
+export const designTextOverlay = async (
+  brandDNA: BrandDNA,
+  tagline: string,
+  productImageBase64: string
+): Promise<{
+  font_family: 'sans-serif' | 'serif' | 'cursive';
+  font_weight: 'bold' | 'normal';
+  font_transform: 'uppercase' | 'none';
+  text_color_hex: string;
+  position: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right';
+  max_width_percent: number;
+  reasoning: string;
+}> => {
+  const ai = getAIClient();
+  const model = 'gemini-3-pro-preview';
+
+  const prompt = `
+    You are an expert Graphic Designer and Typography Specialist.
+    Goal: Design the perfect text overlay for a social media product post that follows the Brand DNA.
+
+    ### INPUT DATA
+    Brand DNA JSON: ${JSON.stringify(brandDNA)}
+    Tagline: "${tagline}"
+    
+    ### BRAND VISUAL IDENTITY
+    Primary Color: ${brandDNA.visual_identity.primary_color_hex}
+    Accent Color: ${brandDNA.visual_identity.accent_color_hex}
+    Typography Vibe: ${brandDNA.visual_identity.font_vibe}
+    Background Style: ${brandDNA.visual_identity.background_style}
+
+    ### OUTPUT FORMAT (JSON)
+    Return ONLY:
+    {
+      "font_family": "sans-serif" | "serif" | "cursive",
+      "font_weight": "bold" | "normal",
+      "font_transform": "uppercase" | "none",
+      "text_color_hex": "#HEXCODE (use brand color or high-contrast color for readability)",
+      "position": "top-center" | "bottom-left" | "bottom-right" | "center-middle" | "top-left" | "top-right" | "center-left" | "center-right",
+      "max_width_percent": 80,
+      "reasoning": "Brief explanation of design choices"
+    }
+  `;
+
+  const base64Data = productImageBase64.includes(',') 
+    ? productImageBase64.split(',')[1] 
+    : productImageBase64;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: {
+      parts: [
+        { text: prompt },
+        { inlineData: { mimeType: "image/png", data: base64Data } }
+      ]
+    },
+    config: { responseMimeType: "application/json" }
+  });
+
+  const result = safeJsonParse(response.text || '{}');
+  return {
+    font_family: result.font_family || 'sans-serif',
+    font_weight: result.font_weight || 'bold',
+    font_transform: result.font_transform || 'none',
+    text_color_hex: result.text_color_hex || brandDNA.visual_identity.primary_color_hex,
+    position: result.position || 'bottom-center',
+    max_width_percent: result.max_width_percent || 80,
+    reasoning: result.reasoning || ''
+  };
 };
 
 export const generateNonProductStrategy = async (brandDNA: BrandDNA, userPurpose: string) => {
