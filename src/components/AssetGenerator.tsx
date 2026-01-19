@@ -59,9 +59,35 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   }>({});
   
   const [eyedropperActive, setEyedropperActive] = useState<'title' | 'subtitle' | null>(null);
+  const [dragModeActive, setDragModeActive] = useState(false);
+  const [editingText, setEditingText] = useState<'title' | 'subtitle' | null>(null);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  
+  // Get actual image dimensions for accurate font scaling
+  useEffect(() => {
+    if (imageUrl && displayAsset?.type === 'product') {
+      const img = new Image();
+      img.onload = () => {
+        setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.src = imageUrl;
+    }
+  }, [imageUrl, displayAsset?.type]);
+  
+  // Calculate scale factor for font sizes to match preview with actual rendering
+  const getFontScale = () => {
+    if (!imageDimensions) return 1;
+    const container = document.querySelector('.relative.group.rounded-\\[4rem\\] .relative.w-full.aspect-square');
+    if (!container) return 1;
+    const rect = container.getBoundingClientRect();
+    // Scale factor = preview container size / actual image size
+    const scaleX = rect.width / imageDimensions.width;
+    const scaleY = rect.height / imageDimensions.height;
+    return Math.min(scaleX, scaleY); // Use smaller to ensure text fits
+  };
   
   // Function to pick color from image using canvas
   const pickColorFromImage = async (e: React.MouseEvent<HTMLImageElement>, target: 'title' | 'subtitle') => {
@@ -264,8 +290,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     </div>
   );
 
-  const displayAsset = currentAsset || null;
-  const imageUrl = displayAsset?.imageUrl || displayAsset?.image_url || '';
   const campaignImages = displayAsset?.campaignImages || displayAsset?.campaign_images || [];
 
   return (
@@ -660,36 +684,22 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Size</label>
-                          <div className="flex gap-2 items-center">
-                            <input
-                              type="number"
-                              min="12"
-                              max="200"
-                              value={overlayEdit.title_font_size || ''}
-                              onChange={e => {
-                                const val = e.target.value;
-                                setOverlayEdit({...overlayEdit, title_font_size: val ? parseInt(val) : undefined});
-                              }}
-                              className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                              placeholder="Auto"
-                            />
-                            <span className="text-sm font-bold text-slate-500">px</span>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Max Lines</label>
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Size</label>
+                        <div className="flex gap-2 items-center">
                           <input
                             type="number"
-                            min="1"
-                            max="10"
-                            value={overlayEdit.title_max_lines || 1}
-                            onChange={e => setOverlayEdit({...overlayEdit, title_max_lines: parseInt(e.target.value) || 1})}
-                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                            min="12"
+                            max="200"
+                            value={overlayEdit.title_font_size || ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setOverlayEdit({...overlayEdit, title_font_size: val ? parseInt(val) : undefined});
+                            }}
+                            className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                            placeholder="Auto"
                           />
+                          <span className="text-sm font-bold text-slate-500">px</span>
                         </div>
                       </div>
                     </div>
@@ -873,33 +883,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Letter Spacing</label>
-                          <select
-                            value={overlayEdit.letter_spacing || 'normal'}
-                            onChange={e => setOverlayEdit({...overlayEdit, letter_spacing: e.target.value as any})}
-                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                          >
-                            <option value="normal">Normal</option>
-                            <option value="wide">Wide</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                            Max Width: {overlayEdit.max_width_percent || 80}%
-                          </label>
-                          <input
-                            type="range"
-                            min="50"
-                            max="100"
-                            value={overlayEdit.max_width_percent || 80}
-                            onChange={e => setOverlayEdit({...overlayEdit, max_width_percent: parseInt(e.target.value)})}
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
                     </div>
 
                     <button
