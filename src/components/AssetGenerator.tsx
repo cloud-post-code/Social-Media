@@ -100,7 +100,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   // Handle mouse move and up events globally when dragging
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging && dragStart && displayAsset && editingOverlay) {
+      if (isDragging && dragStart && currentAsset && editingOverlay) {
         const imageContainer = document.querySelector('.relative.group.rounded-\\[4rem\\] .relative.w-full.aspect-square');
         if (imageContainer) {
           const rect = imageContainer.getBoundingClientRect();
