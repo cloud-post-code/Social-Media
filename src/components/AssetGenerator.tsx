@@ -107,9 +107,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           const x = ((e.clientX - rect.left) / rect.width) * 100;
           const y = ((e.clientY - rect.top) / rect.height) * 100;
           
-          // Boundary validation: keep within 5% to 95% to ensure text stays visible
-          const clampedX = Math.max(5, Math.min(95, x));
-          const clampedY = Math.max(5, Math.min(95, y));
+          // Better boundary validation: account for text dimensions
+          // Use more conservative bounds (15% to 85%) to ensure text never overlaps edges
+          // This matches the grid preset positions
+          const clampedX = Math.max(15, Math.min(85, x));
+          const clampedY = Math.max(15, Math.min(85, y));
           
           setOverlayEdit(prev => ({
             ...prev,
