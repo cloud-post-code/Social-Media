@@ -18,9 +18,10 @@ const stripMarkdown = (text: string): string => {
 interface AssetGeneratorProps {
   activeBrand: BrandDNA | null;
   onAssetCreated: (asset: GeneratedAsset) => void;
+  initialAsset?: GeneratedAsset | null;
 }
 
-const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCreated }) => {
+const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCreated, initialAsset }) => {
   const [option, setOption] = useState<GenerationOption>('product');
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
@@ -77,6 +78,31 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const displayAsset = currentAsset;
   const imageUrl = currentAsset?.imageUrl || currentAsset?.image_url || '';
   
+  // Load initial asset when provided
+  useEffect(() => {
+    if (initialAsset) {
+      // Convert backend format to frontend format
+      const frontendAsset: GeneratedAsset = {
+        ...initialAsset,
+        imageUrl: initialAsset.image_url || initialAsset.imageUrl,
+        brandId: initialAsset.brand_id || initialAsset.brandId,
+        campaignImages: initialAsset.campaign_images || initialAsset.campaignImages,
+        overlayConfig: initialAsset.overlay_config || initialAsset.overlayConfig,
+        baseImageUrl: initialAsset.base_image_url || initialAsset.baseImageUrl,
+        userPrompt: initialAsset.user_prompt || initialAsset.userPrompt,
+        feedbackHistory: initialAsset.feedback_history || initialAsset.feedbackHistory,
+        timestamp: initialAsset.created_at ? new Date(initialAsset.created_at).getTime() : initialAsset.timestamp || Date.now()
+      };
+      setCurrentAsset(frontendAsset);
+      
+      // Set the appropriate option based on asset type
+      setOption(initialAsset.type || 'product');
+    } else if (initialAsset === null) {
+      // Reset when explicitly set to null
+      setCurrentAsset(null);
+    }
+  }, [initialAsset]);
+
   // Get actual image dimensions for accurate font scaling
   useEffect(() => {
     if (imageUrl && currentAsset?.type === 'product') {

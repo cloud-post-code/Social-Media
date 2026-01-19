@@ -14,8 +14,10 @@ const App: React.FC = () => {
   const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
   const [view, setView] = useState<'home' | 'dna' | 'studio'>('home');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
 
   const activeBrand = brands.find(b => b.id === activeBrandId) || null;
+  const editingAsset = editingAssetId ? assets.find(a => a.id === editingAssetId) : null;
 
   useEffect(() => {
     if (brands.length > 0 && !activeBrandId) {
@@ -39,6 +41,47 @@ const App: React.FC = () => {
 
   const handleAssetCreated = async (asset: GeneratedAsset) => {
     await createAsset(asset);
+    setEditingAssetId(null); // Clear editing state after creation
+  };
+
+  // Handle editing an asset
+  const handleEditAsset = async (assetId: string) => {
+    const asset = assets.find(a => a.id === assetId);
+    if (!asset) return;
+    
+    // Set the brand as active if it's not already
+    if (asset.brand_id || asset.brandId) {
+      const brandId = asset.brand_id || asset.brandId;
+      setActiveBrandId(brandId);
+    }
+    
+    setEditingAssetId(assetId);
+    setView('studio');
+  };
+
+  // Handle downloading an asset
+  const handleDownloadAsset = async (asset: GeneratedAsset) => {
+    const imageUrl = asset.imageUrl || asset.image_url;
+    if (!imageUrl) return;
+
+    try {
+      // Fetch the image as a blob
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      // Create a temporary URL and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `asset-${asset.id}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download asset:', error);
+      alert('Failed to download asset. Please try again.');
+    }
   };
 
   if (brandsLoading) {
@@ -103,9 +146,37 @@ const App: React.FC = () => {
                   return (
                     <div 
                       key={asset.id} 
-                      className="aspect-square rounded-2xl overflow-hidden bg-slate-100 border-2 border-white shadow-sm cursor-pointer hover:ring-4 hover:ring-indigo-500/20 transition-all hover:scale-[1.05]"
+                      className="aspect-square rounded-2xl overflow-hidden bg-slate-100 border-2 border-white shadow-sm cursor-pointer hover:ring-4 hover:ring-indigo-500/20 transition-all hover:scale-[1.05] relative group"
                     >
                       {imageUrl && <img src={imageUrl} className="w-full h-full object-cover" />}
+                      
+                      {/* Action buttons overlay */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditAsset(asset.id);
+                          }}
+                          className="bg-indigo-600 text-white p-2.5 rounded-xl hover:bg-indigo-700 transition-all active:scale-95 shadow-lg"
+                          title="Edit Asset"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadAsset(asset);
+                          }}
+                          className="bg-white text-slate-900 p-2.5 rounded-xl hover:bg-slate-100 transition-all active:scale-95 shadow-lg"
+                          title="Download Asset"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -188,6 +259,8 @@ const App: React.FC = () => {
               activeBrandId={activeBrandId}
               onBrandSelect={(id) => { setActiveBrandId(id); setView('studio'); }}
               onNewBrand={() => { setActiveBrandId(null); setView('dna'); }}
+              onEditAsset={handleEditAsset}
+              onDownloadAsset={handleDownloadAsset}
             />
           )}
           {view === 'dna' && (
@@ -208,6 +281,7 @@ const App: React.FC = () => {
             <ContentStudioPage 
               activeBrand={activeBrand}
               onAssetCreated={handleAssetCreated}
+              initialAsset={editingAsset}
             />
           )}
         </div>
