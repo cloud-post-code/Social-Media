@@ -36,7 +36,9 @@ export interface OverlayConfig {
   font_weight: 'light' | 'regular' | 'bold';
   font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
   letter_spacing: 'normal' | 'wide';
-  text_color_hex: string;
+  text_color_hex: string; // Legacy: single color for both title and subtitle
+  title_color_hex?: string; // Separate color for title
+  subtitle_color_hex?: string; // Separate color for subtitle
   // New: Pixel-based positioning (percentages 0-100)
   x_percent?: number; // Horizontal position as percentage (0 = left, 100 = right)
   y_percent?: number; // Vertical position as percentage (0 = top, 100 = bottom)

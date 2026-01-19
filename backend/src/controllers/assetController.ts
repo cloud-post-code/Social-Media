@@ -181,7 +181,9 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
       font_weight: overlay_config.font_weight || asset.overlay_config?.font_weight || 'bold',
       font_transform: overlay_config.font_transform || asset.overlay_config?.font_transform || 'none',
       letter_spacing: overlay_config.letter_spacing || asset.overlay_config?.letter_spacing || 'normal',
-      text_color_hex: overlay_config.text_color_hex || asset.overlay_config?.text_color_hex || '#FFFFFF',
+      text_color_hex: overlay_config.text_color_hex || asset.overlay_config?.text_color_hex || '#FFFFFF', // Legacy
+      title_color_hex: overlay_config.title_color_hex !== undefined ? overlay_config.title_color_hex : (asset.overlay_config?.title_color_hex || overlay_config.text_color_hex || asset.overlay_config?.text_color_hex || '#FFFFFF'),
+      subtitle_color_hex: overlay_config.subtitle_color_hex !== undefined ? overlay_config.subtitle_color_hex : (asset.overlay_config?.subtitle_color_hex || overlay_config.text_color_hex || asset.overlay_config?.text_color_hex || '#FFFFFF'),
       max_width_percent: overlay_config.max_width_percent || asset.overlay_config?.max_width_percent || 80,
       opacity: overlay_config.opacity !== undefined ? overlay_config.opacity : (asset.overlay_config?.opacity !== undefined ? asset.overlay_config.opacity : 1.0),
       title_font_size: overlay_config.title_font_size !== undefined ? overlay_config.title_font_size : asset.overlay_config?.title_font_size,

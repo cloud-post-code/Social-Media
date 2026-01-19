@@ -41,7 +41,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     font_weight?: 'light' | 'regular' | 'bold';
     font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
     letter_spacing?: 'normal' | 'wide';
-    text_color_hex?: string;
+    text_color_hex?: string; // Legacy
+    title_color_hex?: string; // Separate color for title
+    subtitle_color_hex?: string; // Separate color for subtitle
     // New: Pixel-based positioning
     x_percent?: number;
     y_percent?: number;
@@ -55,6 +57,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     title_max_lines?: number;
     subtitle_max_lines?: number;
   }>({});
+  
+  const [colorPickerOpen, setColorPickerOpen] = useState<'title' | 'subtitle' | null>(null);
+  const [eyedropperActive, setEyedropperActive] = useState(false);
   
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
@@ -377,7 +382,24 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             {/* Visual Preview with Draggable Text Overlay */}
             <div className="relative group rounded-[4rem] overflow-hidden shadow-[0_48px_80px_-24px_rgba(0,0,0,0.3)] border-[20px] border-white ring-1 ring-slate-200">
               <div className="relative w-full aspect-square">
-                <img src={imageUrl} className="w-full h-full object-cover transition duration-700 group-hover:scale-105" />
+                <img 
+                  src={imageUrl} 
+                  className={`w-full h-full object-cover transition duration-700 group-hover:scale-105 ${eyedropperActive ? 'cursor-crosshair' : ''}`}
+                  onClick={(e) => {
+                    if (eyedropperActive) {
+                      e.stopPropagation();
+                      pickColorFromImage(e, eyedropperActive);
+                    }
+                  }}
+                  style={eyedropperActive ? { cursor: 'crosshair' } : {}}
+                />
+                {eyedropperActive && (
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none z-20">
+                    <div className="bg-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold text-slate-800">
+                      Click on the image to pick {eyedropperActive === 'title' ? 'title' : 'subtitle'} color
+                    </div>
+                  </div>
+                )}
                 
                 {/* Draggable Text Overlay Preview (only when editing product assets) */}
                 {editingOverlay && displayAsset.type === 'product' && displayAsset.overlayConfig && (
@@ -389,7 +411,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       transform: 'translate(-50%, -50%)',
                       textAlign: (overlayEdit.text_anchor || displayAsset.overlayConfig.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.text_anchor || displayAsset.overlayConfig.text_anchor || 'middle') === 'end' ? 'right' : 'center',
                       maxWidth: `${overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80}%`,
-                      color: overlayEdit.text_color_hex || displayAsset.overlayConfig.text_color_hex || '#FFFFFF',
+                      color: overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
                       opacity: overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1),
                       fontFamily: overlayEdit.font_family || displayAsset.overlayConfig.font_family || 'sans-serif',
                       fontWeight: overlayEdit.font_weight === 'bold' ? 'bold' : overlayEdit.font_weight === 'light' ? '300' : 'normal',
@@ -401,6 +423,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       zIndex: 10
                     }}
                     onMouseDown={(e) => {
+                      if (eyedropperActive) {
+                        e.stopPropagation();
+                        return;
+                      }
                       e.preventDefault();
                       setIsDragging(true);
                       const rect = e.currentTarget.parentElement?.getBoundingClientRect();
@@ -420,7 +446,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           fontSize: overlayEdit.subtitle_font_size ? `${Math.max(12, overlayEdit.subtitle_font_size * 0.6)}px` : 'clamp(1rem, 2.5vw, 2rem)',
                           marginTop: '0.5rem',
                           opacity: 0.9,
-                          pointerEvents: 'none'
+                          pointerEvents: 'none',
+                          color: overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'
                         }}
                       >
                         {overlayEdit.subtitle || displayAsset.overlayConfig.subtitle}
@@ -592,22 +619,101 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       </div>
                     </div>
 
+                    {/* Title Color */}
                     <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Color</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="color"
-                          value={overlayEdit.text_color_hex || '#FFFFFF'}
-                          onChange={e => setOverlayEdit({...overlayEdit, text_color_hex: e.target.value})}
-                          className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
-                        />
-                        <input
-                          type="text"
-                          value={overlayEdit.text_color_hex || '#FFFFFF'}
-                          onChange={e => setOverlayEdit({...overlayEdit, text_color_hex: e.target.value})}
-                          className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
-                          placeholder="#FFFFFF"
-                        />
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Title Color</label>
+                      <div className="space-y-2">
+                        {/* Brand Colors */}
+                        {activeBrand && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setOverlayEdit({...overlayEdit, title_color_hex: activeBrand.visual_identity.primary_color_hex})}
+                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
+                              style={{ backgroundColor: activeBrand.visual_identity.primary_color_hex }}
+                              title="Primary Brand Color"
+                            />
+                            <button
+                              onClick={() => setOverlayEdit({...overlayEdit, title_color_hex: activeBrand.visual_identity.accent_color_hex})}
+                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
+                              style={{ backgroundColor: activeBrand.visual_identity.accent_color_hex }}
+                              title="Accent Brand Color"
+                            />
+                            <button
+                              onClick={() => setEyedropperActive('title')}
+                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm bg-white flex items-center justify-center"
+                              title="Pick color from image"
+                            >
+                              <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                        {/* Custom Color Picker */}
+                        <div className="flex gap-2">
+                          <input
+                            type="color"
+                            value={overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                            onChange={e => setOverlayEdit({...overlayEdit, title_color_hex: e.target.value})}
+                            className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                            onChange={e => setOverlayEdit({...overlayEdit, title_color_hex: e.target.value})}
+                            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                            placeholder="#FFFFFF"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Subtitle Color */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Subtitle Color</label>
+                      <div className="space-y-2">
+                        {/* Brand Colors */}
+                        {activeBrand && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setOverlayEdit({...overlayEdit, subtitle_color_hex: activeBrand.visual_identity.primary_color_hex})}
+                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
+                              style={{ backgroundColor: activeBrand.visual_identity.primary_color_hex }}
+                              title="Primary Brand Color"
+                            />
+                            <button
+                              onClick={() => setOverlayEdit({...overlayEdit, subtitle_color_hex: activeBrand.visual_identity.accent_color_hex})}
+                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
+                              style={{ backgroundColor: activeBrand.visual_identity.accent_color_hex }}
+                              title="Accent Brand Color"
+                            />
+                            <button
+                              onClick={() => setEyedropperActive('subtitle')}
+                              className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm bg-white flex items-center justify-center"
+                              title="Pick color from image"
+                            >
+                              <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                        {/* Custom Color Picker */}
+                        <div className="flex gap-2">
+                          <input
+                            type="color"
+                            value={overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_color_hex: e.target.value})}
+                            className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_color_hex: e.target.value})}
+                            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                            placeholder="#FFFFFF"
+                          />
+                        </div>
                       </div>
                     </div>
 

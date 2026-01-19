@@ -112,7 +112,9 @@ export const applyTextOverlay = async (
     const fontFamily = getFontFamily(overlayConfig.font_family);
     const fontWeight = overlayConfig.font_weight === 'bold' ? '700' : 
                       overlayConfig.font_weight === 'light' ? '300' : '400';
-    const textColor = overlayConfig.text_color_hex;
+    // Use separate colors for title and subtitle, fallback to text_color_hex for backward compatibility
+    const titleColor = overlayConfig.title_color_hex || overlayConfig.text_color_hex;
+    const subtitleColor = overlayConfig.subtitle_color_hex || overlayConfig.text_color_hex;
     const opacity = overlayConfig.opacity !== undefined ? overlayConfig.opacity : 1.0;
     const letterSpacing = overlayConfig.letter_spacing === 'wide' ? '0.15em' : 'normal';
     
@@ -317,7 +319,7 @@ export const applyTextOverlay = async (
     const escapedSubtitleLines = subtitleLines.map(line => escapeXml(line));
     
     // Generate SVG text elements for each line
-    const generateTextElements = (lines: string[], startY: number, fontSize: number, lineHeight: number, fontWeight: string, opacity: number) => {
+    const generateTextElements = (lines: string[], startY: number, fontSize: number, lineHeight: number, fontWeight: string, opacity: number, color: string) => {
       return lines.map((line, index) => {
         const yPos = startY + (index * lineHeight);
         return `<text
@@ -326,7 +328,7 @@ export const applyTextOverlay = async (
     font-family="${fontFamily}"
     font-size="${fontSize}"
     font-weight="${fontWeight}"
-    fill="${textColor}"
+    fill="${color}"
     text-anchor="${textAnchor}"
     letter-spacing="${letterSpacing}"
     opacity="${opacity}"
@@ -350,8 +352,8 @@ export const applyTextOverlay = async (
       </feMerge>
     </filter>
   </defs>
-  ${generateTextElements(escapedTitleLines, titleStartY, titleFontSize, titleLineHeight, fontWeight, opacity)}
-  ${subtitleLines.length > 0 ? generateTextElements(escapedSubtitleLines, subtitleStartY, subtitleFontSize, subtitleLineHeight, fontWeight === '700' ? '400' : fontWeight, opacity * 0.9) : ''}
+  ${generateTextElements(escapedTitleLines, titleStartY, titleFontSize, titleLineHeight, fontWeight, opacity, titleColor)}
+  ${subtitleLines.length > 0 ? generateTextElements(escapedSubtitleLines, subtitleStartY, subtitleFontSize, subtitleLineHeight, fontWeight === '700' ? '400' : fontWeight, opacity * 0.9, subtitleColor) : ''}
 </svg>`;
     
     // Debug logging
