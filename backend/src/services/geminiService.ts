@@ -379,6 +379,11 @@ Return ONLY:
   "title": "Punchy title, max 5 words",
   "subtitle": "Supporting subtitle, max 15 words"
 }
+
+### CRITICAL: NO MARKDOWN
+- Do NOT use markdown formatting (no **bold**, no *italic*, no links)
+- Return plain text only
+- No special characters except standard punctuation
   `;
 
   const parts = [{ text: prompt }];
@@ -390,9 +395,22 @@ Return ONLY:
   });
 
   const result = safeJsonParse(response.text || '{}');
+  
+  // Strip markdown formatting from title and subtitle
+  const stripMarkdown = (text: string): string => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown **text**
+      .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown *text*
+      .replace(/_(.*?)_/g, '$1') // Remove underline markdown _text_
+      .replace(/`(.*?)`/g, '$1') // Remove code markdown `text`
+      .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Remove links [text](url) -> text
+      .replace(/#{1,6}\s/g, '') // Remove markdown headers
+      .trim();
+  };
+  
   return {
-    title: (result.title || '').trim(),
-    subtitle: (result.subtitle || '').trim()
+    title: stripMarkdown(result.title || ''),
+    subtitle: stripMarkdown(result.subtitle || '')
   };
 };
 

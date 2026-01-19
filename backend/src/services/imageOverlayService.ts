@@ -115,18 +115,33 @@ export const applyTextOverlay = async (
     const subtitleFontSize = Math.max(32, Math.min(width / 16, 64));
     const lineSpacing = subtitleFontSize * 0.3; // Space between title and subtitle
     
+    // Strip markdown formatting from text
+    const stripMarkdown = (text: string): string => {
+      return text
+        .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown **text**
+        .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown *text*
+        .replace(/_(.*?)_/g, '$1') // Remove underline markdown _text_
+        .replace(/`(.*?)`/g, '$1') // Remove code markdown `text`
+        .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Remove links [text](url) -> text
+        .replace(/#{1,6}\s/g, '') // Remove markdown headers
+        .trim();
+    };
+    
     // Handle text transform
     const transformText = (text: string) => {
+      // First strip markdown, then apply transform
+      let cleaned = stripMarkdown(text);
+      
       if (overlayConfig.font_transform === 'uppercase') {
-        return text.toUpperCase();
+        return cleaned.toUpperCase();
       } else if (overlayConfig.font_transform === 'lowercase') {
-        return text.toLowerCase();
+        return cleaned.toLowerCase();
       } else if (overlayConfig.font_transform === 'capitalize') {
-        return text.split(' ').map(word => 
+        return cleaned.split(' ').map(word => 
           word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
         ).join(' ');
       }
-      return text;
+      return cleaned;
     };
     
     const titleText = transformText(title);
