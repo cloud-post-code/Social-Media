@@ -20,21 +20,22 @@ const bufferToBase64 = (buffer: Buffer, mimeType: string = 'image/png'): string 
 
 /**
  * Get font family name for SVG
- * Using generic font families that librsvg (used by Sharp) can handle
- * Generic families work better than specific font names on Linux servers
+ * Using fonts that are installed on the Linux server via Dockerfile
+ * Installed fonts: DejaVu Sans, DejaVu Serif, Liberation Sans, Liberation Serif, Noto Sans, Noto Serif
  */
 const getFontFamily = (family: OverlayConfig['font_family']): string => {
-  // Use generic font families that SVG renderers understand
-  // These will use whatever default font is available on the system
   switch (family) {
     case 'serif':
-      return 'serif'; // Generic serif - librsvg will use default serif font
+      // Use DejaVu Serif or Liberation Serif (both installed)
+      return 'DejaVu Serif, Liberation Serif, serif';
     case 'cursive':
     case 'handwritten':
-      return 'serif'; // Use serif for cursive/handwritten (closest match)
+      // Use serif fonts for cursive/handwritten (closest match with installed fonts)
+      return 'DejaVu Serif, Liberation Serif, serif';
     case 'sans-serif':
     default:
-      return 'sans-serif'; // Generic sans-serif - librsvg will use default sans-serif font
+      // Use DejaVu Sans or Liberation Sans (both installed)
+      return 'DejaVu Sans, Liberation Sans, sans-serif';
   }
 };
 
@@ -231,16 +232,6 @@ export const applyTextOverlay = async (
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <style type="text/css">
-      <![CDATA[
-        text {
-          font-family: ${fontFamily};
-          font-weight: ${fontWeight};
-          text-rendering: geometricPrecision;
-          -webkit-font-smoothing: antialiased;
-        }
-      ]]>
-    </style>
   </defs>
   <text
     x="${x}"
@@ -253,7 +244,6 @@ export const applyTextOverlay = async (
     letter-spacing="${letterSpacing}"
     opacity="${opacity}"
     filter="url(#textShadow)"
-    style="font-family: ${fontFamily}; font-weight: ${fontWeight};"
   >${escapedTitle}</text>
   ${subtitleText ? `<text
     x="${x}"
@@ -266,7 +256,6 @@ export const applyTextOverlay = async (
     letter-spacing="${letterSpacing}"
     opacity="${opacity * 0.9}"
     filter="url(#textShadow)"
-    style="font-family: ${fontFamily}; font-weight: ${fontWeight === '700' ? '400' : fontWeight};"
   >${escapedSubtitle}</text>` : ''}
 </svg>`;
     
