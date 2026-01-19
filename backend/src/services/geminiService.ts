@@ -380,10 +380,7 @@ Return ONLY:
   "subtitle": "Supporting subtitle, max 15 words"
 }
 
-### CRITICAL: NO MARKDOWN
-- Do NOT use markdown formatting (no **bold**, no *italic*, no links)
-- Return plain text only
-- No special characters except standard punctuation
+CRITICAL: Return plain text only. Do NOT use markdown formatting (no **, no *, no _, no backticks). Just plain text strings.
   `;
 
   const parts = [{ text: prompt }];
@@ -396,21 +393,21 @@ Return ONLY:
 
   const result = safeJsonParse(response.text || '{}');
   
-  // Strip markdown formatting from title and subtitle
-  const stripMarkdown = (text: string): string => {
+  // Clean markdown from title and subtitle
+  const cleanMarkdown = (text: string): string => {
     return text
-      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown **text**
-      .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown *text*
-      .replace(/_(.*?)_/g, '$1') // Remove underline markdown _text_
-      .replace(/`(.*?)`/g, '$1') // Remove code markdown `text`
-      .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Remove links [text](url) -> text
-      .replace(/#{1,6}\s/g, '') // Remove markdown headers
+      .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
+      .replace(/\*(.*?)\*/g, '$1')       // Remove *italic*
+      .replace(/__(.*?)__/g, '$1')       // Remove __bold__
+      .replace(/_(.*?)_/g, '$1')         // Remove _italic_
+      .replace(/~~(.*?)~~/g, '$1')       // Remove ~~strikethrough~~
+      .replace(/`(.*?)`/g, '$1')         // Remove `code`
       .trim();
   };
   
   return {
-    title: stripMarkdown(result.title || ''),
-    subtitle: stripMarkdown(result.subtitle || '')
+    title: cleanMarkdown(result.title || ''),
+    subtitle: cleanMarkdown(result.subtitle || '')
   };
 };
 

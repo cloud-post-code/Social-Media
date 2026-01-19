@@ -115,23 +115,24 @@ export const applyTextOverlay = async (
     const subtitleFontSize = Math.max(32, Math.min(width / 16, 64));
     const lineSpacing = subtitleFontSize * 0.3; // Space between title and subtitle
     
-    // Strip markdown formatting from text
+    // Strip markdown syntax from text
     const stripMarkdown = (text: string): string => {
       return text
-        .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown **text**
-        .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown *text*
-        .replace(/_(.*?)_/g, '$1') // Remove underline markdown _text_
-        .replace(/`(.*?)`/g, '$1') // Remove code markdown `text`
-        .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Remove links [text](url) -> text
-        .replace(/#{1,6}\s/g, '') // Remove markdown headers
+        .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
+        .replace(/\*(.*?)\*/g, '$1')       // Remove *italic*
+        .replace(/__(.*?)__/g, '$1')       // Remove __bold__
+        .replace(/_(.*?)_/g, '$1')         // Remove _italic_
+        .replace(/~~(.*?)~~/g, '$1')       // Remove ~~strikethrough~~
+        .replace(/`(.*?)`/g, '$1')         // Remove `code`
         .trim();
     };
     
-    // Handle text transform
+    // Handle text transform and strip markdown
     const transformText = (text: string) => {
-      // First strip markdown, then apply transform
+      // First strip markdown syntax
       let cleaned = stripMarkdown(text);
       
+      // Then apply text transform
       if (overlayConfig.font_transform === 'uppercase') {
         return cleaned.toUpperCase();
       } else if (overlayConfig.font_transform === 'lowercase') {
