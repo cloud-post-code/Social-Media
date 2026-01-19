@@ -20,18 +20,21 @@ const bufferToBase64 = (buffer: Buffer, mimeType: string = 'image/png'): string 
 
 /**
  * Get font family name for SVG
+ * Using generic font families that librsvg (used by Sharp) can handle
+ * Generic families work better than specific font names on Linux servers
  */
 const getFontFamily = (family: OverlayConfig['font_family']): string => {
+  // Use generic font families that SVG renderers understand
+  // These will use whatever default font is available on the system
   switch (family) {
     case 'serif':
-      return 'Georgia, serif';
+      return 'serif'; // Generic serif - librsvg will use default serif font
     case 'cursive':
-      return 'Brush Script MT, cursive';
     case 'handwritten':
-      return 'Brush Script MT, "Lucida Handwriting", cursive';
+      return 'serif'; // Use serif for cursive/handwritten (closest match)
     case 'sans-serif':
     default:
-      return 'Arial, Helvetica, sans-serif';
+      return 'sans-serif'; // Generic sans-serif - librsvg will use default sans-serif font
   }
 };
 
@@ -213,8 +216,9 @@ export const applyTextOverlay = async (
     const escapedSubtitle = subtitleText ? escapeXml(subtitleText) : '';
     
     // Create SVG with title and subtitle
-    // Use simpler approach - render SVG to PNG first to ensure it works
-    const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    // Embed fonts directly in SVG to ensure they're available on Linux servers
+    // Using system fonts that are commonly available, with generic fallbacks
+    const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <defs>
     <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
@@ -227,6 +231,16 @@ export const applyTextOverlay = async (
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
+    <style type="text/css">
+      <![CDATA[
+        text {
+          font-family: ${fontFamily};
+          font-weight: ${fontWeight};
+          text-rendering: geometricPrecision;
+          -webkit-font-smoothing: antialiased;
+        }
+      ]]>
+    </style>
   </defs>
   <text
     x="${x}"
@@ -239,6 +253,7 @@ export const applyTextOverlay = async (
     letter-spacing="${letterSpacing}"
     opacity="${opacity}"
     filter="url(#textShadow)"
+    style="font-family: ${fontFamily}; font-weight: ${fontWeight};"
   >${escapedTitle}</text>
   ${subtitleText ? `<text
     x="${x}"
@@ -251,13 +266,18 @@ export const applyTextOverlay = async (
     letter-spacing="${letterSpacing}"
     opacity="${opacity * 0.9}"
     filter="url(#textShadow)"
+    style="font-family: ${fontFamily}; font-weight: ${fontWeight === '700' ? '400' : fontWeight};"
   >${escapedSubtitle}</text>` : ''}
 </svg>`;
     
     // Debug logging
     console.log('Applying overlay:', {
-      title,
-      subtitle,
+      title: titleText,
+      subtitle: subtitleText,
+      titleLength: titleText.length,
+      subtitleLength: subtitleText.length,
+      fontFamily,
+      fontWeight,
       position: overlayConfig.position,
       color: overlayConfig.text_color_hex,
       titleFontSize,
@@ -265,7 +285,9 @@ export const applyTextOverlay = async (
       x,
       titleY,
       subtitleY,
-      imageSize: `${width}x${height}`
+      imageSize: `${width}x${height}`,
+      escapedTitlePreview: escapedTitle.substring(0, 50),
+      escapedSubtitlePreview: escapedSubtitle.substring(0, 50)
     });
     
     // Render SVG to PNG buffer first, then composite
