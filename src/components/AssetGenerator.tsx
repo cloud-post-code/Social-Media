@@ -443,7 +443,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       top: `${overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : (displayAsset.overlayConfig.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80)}%`,
                       transform: 'translate(-50%, -50%)',
                       textAlign: (overlayEdit.text_anchor || displayAsset.overlayConfig.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.text_anchor || displayAsset.overlayConfig.text_anchor || 'middle') === 'end' ? 'right' : 'center',
-                      maxWidth: `${overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80}%`,
+                      maxWidth: `${Math.min(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80, 85)}%`,
+                      padding: '0.5rem',
                       color: overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
                       opacity: overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1),
                       fontFamily: overlayEdit.font_family || displayAsset.overlayConfig.font_family || 'sans-serif',
@@ -453,7 +454,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       textTransform: overlayEdit.font_transform || 'none',
                       filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
                       pointerEvents: 'all',
-                      zIndex: 10
+                      zIndex: 10,
+                      // Ensure preview stays within bounds
+                      minWidth: 'fit-content',
+                      wordWrap: 'break-word',
+                      overflowWrap: 'break-word'
                     }}
                     onMouseDown={(e) => {
                       if (eyedropperActive) {
@@ -823,17 +828,20 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           Position (Drag text on image or click a preset)
                         </label>
                         <div className="grid grid-cols-3 gap-2 mb-3">
-                          {[
-                            { label: 'TL', x: 10, y: 10, anchor: 'start' as const, name: 'Top Left' },
-                            { label: 'TC', x: 50, y: 10, anchor: 'middle' as const, name: 'Top Center' },
-                            { label: 'TR', x: 90, y: 10, anchor: 'end' as const, name: 'Top Right' },
-                            { label: 'CL', x: 10, y: 50, anchor: 'start' as const, name: 'Center Left' },
-                            { label: 'C', x: 50, y: 50, anchor: 'middle' as const, name: 'Center' },
-                            { label: 'CR', x: 90, y: 50, anchor: 'end' as const, name: 'Center Right' },
-                            { label: 'BL', x: 10, y: 90, anchor: 'start' as const, name: 'Bottom Left' },
-                            { label: 'BC', x: 50, y: 90, anchor: 'middle' as const, name: 'Bottom Center' },
-                            { label: 'BR', x: 90, y: 90, anchor: 'end' as const, name: 'Bottom Right' },
-                          ].map((preset) => {
+                        {[
+                          // Top row: y=15% to leave room for text height
+                          { label: 'TL', x: 15, y: 15, anchor: 'start' as const, name: 'Top Left' },
+                          { label: 'TC', x: 50, y: 15, anchor: 'middle' as const, name: 'Top Center' },
+                          { label: 'TR', x: 85, y: 15, anchor: 'end' as const, name: 'Top Right' },
+                          // Center row: y=50% (middle)
+                          { label: 'CL', x: 15, y: 50, anchor: 'start' as const, name: 'Center Left' },
+                          { label: 'C', x: 50, y: 50, anchor: 'middle' as const, name: 'Center' },
+                          { label: 'CR', x: 85, y: 50, anchor: 'end' as const, name: 'Center Right' },
+                          // Bottom row: y=85% to leave room for text height
+                          { label: 'BL', x: 15, y: 85, anchor: 'start' as const, name: 'Bottom Left' },
+                          { label: 'BC', x: 50, y: 85, anchor: 'middle' as const, name: 'Bottom Center' },
+                          { label: 'BR', x: 85, y: 85, anchor: 'end' as const, name: 'Bottom Right' },
+                        ].map((preset) => {
                             const isSelected = overlayEdit.x_percent === preset.x && 
                                              overlayEdit.y_percent === preset.y && 
                                              (overlayEdit.text_anchor || 'middle') === preset.anchor;

@@ -233,25 +233,33 @@ export const applyTextOverlay = async (
     
     if (overlayConfig.x_percent !== undefined && overlayConfig.y_percent !== undefined) {
       // Use pixel-based positioning (percentages)
-      x = (width * overlayConfig.x_percent) / 100;
-      y = (height * overlayConfig.y_percent) / 100;
+      const requestedX = (width * overlayConfig.x_percent) / 100;
+      const requestedY = (height * overlayConfig.y_percent) / 100;
       textAnchor = overlayConfig.text_anchor || 'middle';
       
       // Boundary validation: ensure text stays within image bounds
-      const padding = 20;
+      // Use larger padding to ensure text never overlaps edges
+      const padding = Math.max(30, Math.min(width, height) * 0.03); // At least 30px or 3% of smaller dimension
+      const halfTextWidth = actualMaxWidth / 2;
+      const halfTextHeight = totalTextHeight / 2;
       
       // Adjust X based on text anchor to keep text within bounds
       if (textAnchor === 'start') {
-        x = Math.max(padding, Math.min(x, width - actualMaxWidth - padding));
+        // Left-aligned: ensure left edge doesn't go past padding, right edge doesn't exceed width
+        x = Math.max(padding, Math.min(requestedX, width - actualMaxWidth - padding));
       } else if (textAnchor === 'end') {
-        x = Math.max(actualMaxWidth + padding, Math.min(x, width - padding));
+        // Right-aligned: ensure right edge doesn't go past width-padding, left edge doesn't go below padding
+        x = Math.max(actualMaxWidth + padding, Math.min(requestedX, width - padding));
       } else {
-        // middle
-        x = Math.max(actualMaxWidth / 2 + padding, Math.min(x, width - actualMaxWidth / 2 - padding));
+        // Center-aligned: ensure center ± half width stays within bounds
+        x = Math.max(halfTextWidth + padding, Math.min(requestedX, width - halfTextWidth - padding));
       }
       
-      // Adjust Y to keep text within bounds (y represents top of text block)
-      y = Math.max(totalTextHeight + padding, Math.min(y, height - padding));
+      // Adjust Y to keep text within bounds
+      // y represents the center anchor point of the text block
+      // Ensure top edge (y - halfTextHeight) >= padding
+      // Ensure bottom edge (y + halfTextHeight) <= height - padding
+      y = Math.max(halfTextHeight + padding, Math.min(requestedY, height - halfTextHeight - padding));
     } else {
       // Fall back to string-based positioning (legacy)
       const positionResult = calculatePosition(
