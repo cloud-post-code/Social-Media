@@ -25,17 +25,21 @@ const App: React.FC = () => {
     }
   }, [brands, activeBrandId]);
 
-  const handleSaveBrand = async (dna: BrandDNA) => {
+  const handleSaveBrand = async (dna: BrandDNA): Promise<BrandDNA> => {
     try {
       if (dna.id && brands.find(b => b.id === dna.id)) {
-        await updateBrand(dna.id, dna);
+        const updated = await updateBrand(dna.id, dna);
+        setView('studio');
+        return updated;
       } else {
         const newBrand = await createBrand(dna);
         setActiveBrandId(newBrand.id);
+        setView('studio');
+        return newBrand;
       }
-      setView('studio');
     } catch (err) {
       alert('Failed to save brand: ' + (err as Error).message);
+      throw err;
     }
   };
 

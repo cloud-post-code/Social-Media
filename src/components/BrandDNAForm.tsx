@@ -6,7 +6,7 @@ import ColorPicker from './ColorPicker.js';
 
 interface BrandDNAFormProps {
   dna: Partial<BrandDNA>;
-  onSave: (dna: BrandDNA) => void;
+  onSave: (dna: BrandDNA) => Promise<BrandDNA>;
   onCancel: () => void;
 }
 
@@ -28,9 +28,9 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dna]);
 
-  // Save extracted assets after brand is saved
+  // Save extracted assets when brandId becomes available (for existing brands being updated)
   useEffect(() => {
-    if (extractedAssets && brandId) {
+    if (extractedAssets && brandId && formData.id === brandId) {
       const saveExtractedAssets = async () => {
         try {
           if (extractedAssets.logoUrl) {
@@ -163,7 +163,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalData: BrandDNA = {
       id: formData.id || Date.now().toString(),
@@ -190,7 +190,53 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
         product_category: formData.strategic_profile?.product_category || 'General'
       }
     };
-    onSave(finalData);
+    
+    // Save brand first and get the saved brand (with confirmed ID)
+    const savedBrand = await onSave(finalData);
+    const savedBrandId = savedBrand.id;
+    
+    // After brand is saved, save extracted assets if they exist
+    if (extractedAssets && savedBrandId) {
+      try {
+        const { brandAssetApi } = await import('../services/brandAssetApi.js');
+        
+        // Save logo if extracted
+        if (extractedAssets.logoUrl) {
+          try {
+            await brandAssetApi.uploadAsset(savedBrandId, extractedAssets.logoUrl, 'logo');
+            console.log('Logo saved successfully');
+          } catch (err: any) {
+            // Logo might already exist, that's ok
+            if (!err.message?.includes('already has a logo')) {
+              console.error('Failed to save logo:', err);
+            }
+          }
+        }
+        
+        // Save brand images if extracted
+        if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
+          for (const imageUrl of extractedAssets.imageUrls.slice(0, 10)) {
+            try {
+              await brandAssetApi.uploadAsset(savedBrandId, imageUrl, 'brand_image');
+              console.log('Brand image saved successfully:', imageUrl);
+            } catch (err: any) {
+              if (err.message?.includes('Maximum')) {
+                console.log('Maximum images reached, stopping');
+                break; // Reached max limit
+              }
+              console.error('Failed to save image:', err);
+            }
+          }
+        }
+        
+        setExtractedAssets(null);
+        // Update formData with saved brand to trigger asset loading
+        setFormData({ ...savedBrand });
+      } catch (err) {
+        console.error('Failed to save extracted assets:', err);
+        alert('Brand saved but failed to save some extracted images. You can upload them manually.');
+      }
+    }
   };
 
   const canUploadMoreImages = assets.length < 10;
