@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrandDNA } from '../models/types.js';
 import { brandApi } from '../services/brandApi.js';
+import { brandAssetApi } from '../services/brandAssetApi.js';
 import { useBrandAssets } from '../hooks/useBrandAssets.js';
 import ColorPicker from './ColorPicker.js';
 
@@ -76,40 +77,205 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     }
     
     setIsExtracting(true);
+    const extractionSteps = [
+      { name: 'Basic Info', key: 'basicInfo' },
+      { name: 'Visual Identity', key: 'visualIdentity' },
+      { name: 'Brand Voice', key: 'brandVoice' },
+      { name: 'Strategic Profile', key: 'strategicProfile' },
+      { name: 'Brand Images', key: 'images' }
+    ];
+    
     try {
-      // Extract and auto-save: create brand immediately with assets
-      const extracted: any = await brandApi.extractDNA({ url, autoSave: true });
+      console.log('[Extraction] Starting multi-step extraction for:', url);
       
-      // Brand is already created and saved with assets
-      setFormData(extracted);
+      // Step 1: Extract Basic Info
+      console.log('[Extraction] Step 1/5: Extracting basic info...');
+      const basicInfo = await brandApi.extractBasicInfo({ url });
+      console.log('[Extraction] Step 1/5: Basic info extracted:', basicInfo.name);
+      
+      // Step 2: Extract Visual Identity
+      console.log('[Extraction] Step 2/5: Extracting visual identity...');
+      let visualIdentity;
+      try {
+        visualIdentity = await brandApi.extractVisualIdentity({ url });
+        console.log('[Extraction] Step 2/5: Visual identity extracted');
+      } catch (err: any) {
+        console.warn('[Extraction] Step 2/5: Visual identity extraction failed, using defaults:', err.message);
+        visualIdentity = {
+          primary_color_hex: '#4F46E5',
+          accent_color_hex: '#F59E0B',
+          background_style: '',
+          imagery_style: '',
+          font_vibe: '',
+          logo_style: ''
+        };
+      }
+      
+      // Step 3: Extract Brand Voice
+      console.log('[Extraction] Step 3/5: Extracting brand voice...');
+      let brandVoice;
+      try {
+        brandVoice = await brandApi.extractBrandVoice({ url });
+        console.log('[Extraction] Step 3/5: Brand voice extracted');
+      } catch (err: any) {
+        console.warn('[Extraction] Step 3/5: Brand voice extraction failed, using defaults:', err.message);
+        brandVoice = {
+          tone_adjectives: [],
+          writing_style: '',
+          keywords_to_use: [],
+          taboo_words: []
+        };
+      }
+      
+      // Step 4: Extract Strategic Profile
+      console.log('[Extraction] Step 4/5: Extracting strategic profile...');
+      let strategicProfile;
+      try {
+        strategicProfile = await brandApi.extractStrategicProfile({ url });
+        console.log('[Extraction] Step 4/5: Strategic profile extracted');
+      } catch (err: any) {
+        console.warn('[Extraction] Step 4/5: Strategic profile extraction failed, using defaults:', err.message);
+        strategicProfile = {
+          target_audience: '',
+          core_value_prop: '',
+          product_category: ''
+        };
+      }
+      
+      // Step 5: Extract Brand Images
+      console.log('[Extraction] Step 5/5: Extracting brand images from URL:', url);
+      let extractedAssets: { logoUrl?: string; imageUrls?: string[] } = {};
+      try {
+        const imagesResult = await brandApi.extractBrandImages(url);
+        console.log('[Extraction] Step 5/5: Raw images result:', imagesResult);
+        extractedAssets = imagesResult;
+        console.log('[Extraction] Step 5/5: Brand images extracted:', {
+          logo: imagesResult.logoUrl ? `found (${imagesResult.logoUrl.substring(0, 50)}...)` : 'not found',
+          images: imagesResult.imageUrls?.length || 0,
+          imageUrls: imagesResult.imageUrls?.slice(0, 3).map(u => u.substring(0, 50)) || []
+        });
+      } catch (err: any) {
+        console.error('[Extraction] Step 5/5: Brand images extraction failed:', err);
+        console.error('[Extraction] Step 5/5: Error details:', {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status
+        });
+        extractedAssets = {};
+      }
+      
+      // Combine all extracted data into BrandDNA format
+      const brandId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const extracted: BrandDNA = {
+        id: brandId,
+        name: basicInfo.name,
+        tagline: basicInfo.tagline,
+        overview: basicInfo.overview,
+        visual_identity: visualIdentity,
+        brand_voice: brandVoice,
+        strategic_profile: strategicProfile
+      };
+      
+      // Create brand with autoSave
+      console.log('[Extraction] Creating brand in database...');
+      const createdBrand = await brandApi.create(extracted);
+      
+      // Save extracted assets
+      console.log('[Extraction] Checking extracted assets to save:', {
+        hasLogo: !!extractedAssets.logoUrl,
+        logoUrl: extractedAssets.logoUrl?.substring(0, 50),
+        imageCount: extractedAssets.imageUrls?.length || 0,
+        imageUrls: extractedAssets.imageUrls?.slice(0, 3).map(u => u.substring(0, 50))
+      });
+      
+      if (extractedAssets.logoUrl || (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0)) {
+        console.log('[Extraction] Saving extracted assets to brand:', createdBrand.id);
+        let savedLogo = false;
+        let savedImages = 0;
+        
+        try {
+          if (extractedAssets.logoUrl) {
+            try {
+              console.log('[Extraction] Attempting to save logo:', extractedAssets.logoUrl.substring(0, 100));
+              await brandAssetApi.uploadAsset(createdBrand.id, extractedAssets.logoUrl, 'logo');
+              savedLogo = true;
+              console.log('[Extraction] ✓ Logo saved successfully');
+            } catch (err: any) {
+              console.error('[Extraction] ✗ Failed to save logo:', {
+                error: err.message,
+                response: err.response?.data,
+                logoUrl: extractedAssets.logoUrl?.substring(0, 100)
+              });
+            }
+          } else {
+            console.log('[Extraction] No logo URL to save');
+          }
+          
+          if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
+            console.log(`[Extraction] Attempting to save ${extractedAssets.imageUrls.length} brand images...`);
+            for (let i = 0; i < Math.min(extractedAssets.imageUrls.length, 10); i++) {
+              const imageUrl = extractedAssets.imageUrls[i];
+              try {
+                console.log(`[Extraction] Saving image ${i + 1}/${Math.min(extractedAssets.imageUrls.length, 10)}: ${imageUrl.substring(0, 100)}...`);
+                await brandAssetApi.uploadAsset(createdBrand.id, imageUrl, 'brand_image');
+                savedImages++;
+                console.log(`[Extraction] ✓ Image ${i + 1} saved successfully`);
+              } catch (err: any) {
+                if (err.message?.includes('Maximum')) {
+                  console.log(`[Extraction] Reached maximum image limit at image ${i + 1}`);
+                  break;
+                }
+                console.error(`[Extraction] ✗ Failed to save image ${i + 1}:`, {
+                  error: err.message,
+                  response: err.response?.data,
+                  imageUrl: imageUrl.substring(0, 100)
+                });
+              }
+            }
+            console.log(`[Extraction] Saved ${savedImages} out of ${extractedAssets.imageUrls.length} brand images`);
+          } else {
+            console.log('[Extraction] No brand image URLs to save');
+          }
+          
+          console.log('[Extraction] Asset saving summary:', {
+            logo: savedLogo ? 'saved' : 'not saved',
+            images: `${savedImages} saved`
+          });
+        } catch (err) {
+          console.error('[Extraction] Error saving assets:', err);
+        }
+      } else {
+        console.warn('[Extraction] No assets to save - extractedAssets is empty');
+      }
+      
+      // Update form data
+      setFormData(createdBrand);
       setUrlInput(''); // Clear input after successful extraction
       
       // Update local state by calling onSave to refresh brands list
       try {
-        await onSave(extracted);
+        await onSave(createdBrand);
       } catch (err) {
-        // Brand might already exist, that's ok
         console.log('Brand save note:', err);
       }
       
       // Wait a bit for database to commit, then reload assets
-      if (extracted.id) {
-        setTimeout(async () => {
-          try {
-            await loadAssets();
-            console.log('Assets reloaded after extraction');
-          } catch (err) {
-            console.error('Failed to reload assets:', err);
-          }
-        }, 1000); // Increased delay to ensure DB commit
-      }
+      setTimeout(async () => {
+        try {
+          await loadAssets();
+          console.log('[Extraction] Assets reloaded');
+        } catch (err) {
+          console.error('Failed to reload assets:', err);
+        }
+      }, 1000);
       
       // Show success message
       alert('Brand DNA extracted and saved successfully!');
+      console.log('[Extraction] Extraction completed successfully');
     } catch (err: any) {
       const errorMessage = err?.message || 'Extraction failed. Please ensure the URL is valid and accessible.';
       alert(`Extraction failed: ${errorMessage}`);
-      console.error('DNA extraction error:', err);
+      console.error('[Extraction] DNA extraction error:', err);
     } finally {
       setIsExtracting(false);
     }

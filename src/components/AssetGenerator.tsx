@@ -128,34 +128,75 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const pickColorFromImage = async (e: React.MouseEvent<HTMLImageElement>, target: 'title' | 'subtitle') => {
     if (!eyedropperActive || eyedropperActive !== target) return;
     
-    const img = e.currentTarget;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    e.preventDefault();
+    e.stopPropagation();
     
-    if (!ctx) return;
+    const img = e.currentTarget as HTMLImageElement;
     
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    ctx.drawImage(img, 0, 0);
-    
-    const rect = img.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) * (img.naturalWidth / rect.width));
-    const y = Math.floor((e.clientY - rect.top) * (img.naturalHeight / rect.height));
-    
-    const imageData = ctx.getImageData(x, y, 1, 1);
-    const [r, g, b] = imageData.data;
-    const hex = `#${[r, g, b].map(x => {
-      const hex = x.toString(16);
-      return hex.length === 1 ? '0' + hex : hex;
-    }).join('')}`;
-    
-    if (target === 'title') {
-      setOverlayEdit(prev => ({...prev, title_color_hex: hex}));
-    } else {
-      setOverlayEdit(prev => ({...prev, subtitle_color_hex: hex}));
+    // Ensure image is loaded
+    if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+      console.warn('[Eyedropper] Image not fully loaded yet');
+      alert('Please wait for the image to load completely before picking colors.');
+      setEyedropperActive(null);
+      return;
     }
     
-    setEyedropperActive(null);
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      
+      if (!ctx) {
+        console.error('[Eyedropper] Could not get canvas context');
+        alert('Unable to access image data. Please try again.');
+        setEyedropperActive(null);
+        return;
+      }
+      
+      // Set canvas dimensions to match image natural size
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      
+      // Draw image to canvas
+      // For base64 images, this should work without CORS issues
+      ctx.drawImage(img, 0, 0);
+      
+      // Calculate click position relative to image natural size
+      const rect = img.getBoundingClientRect();
+      const scaleX = img.naturalWidth / rect.width;
+      const scaleY = img.naturalHeight / rect.height;
+      
+      const x = Math.floor((e.clientX - rect.left) * scaleX);
+      const y = Math.floor((e.clientY - rect.top) * scaleY);
+      
+      // Ensure coordinates are within bounds
+      const clampedX = Math.max(0, Math.min(x, canvas.width - 1));
+      const clampedY = Math.max(0, Math.min(y, canvas.height - 1));
+      
+      // Get pixel data
+      const imageData = ctx.getImageData(clampedX, clampedY, 1, 1);
+      const [r, g, b, a] = imageData.data;
+      
+      // Convert to hex
+      const hex = `#${[r, g, b].map(x => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+      }).join('')}`;
+      
+      console.log(`[Eyedropper] Picked color ${hex} at (${clampedX}, ${clampedY}) from image`);
+      
+      // Update overlay edit state
+      if (target === 'title') {
+        setOverlayEdit(prev => ({...prev, title_color_hex: hex}));
+      } else {
+        setOverlayEdit(prev => ({...prev, subtitle_color_hex: hex}));
+      }
+      
+      setEyedropperActive(null);
+    } catch (error: any) {
+      console.error('[Eyedropper] Error picking color:', error);
+      alert(`Failed to pick color: ${error.message || 'Unknown error'}`);
+      setEyedropperActive(null);
+    }
   };
   
   // Handle mouse move and up events globally when dragging
@@ -522,11 +563,21 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   className={`w-full h-full object-cover transition duration-700 group-hover:scale-105 ${eyedropperActive ? 'cursor-crosshair' : ''}`}
                   onClick={(e) => {
                     if (eyedropperActive) {
-                      e.stopPropagation();
                       pickColorFromImage(e, eyedropperActive);
                     }
                   }}
-                  style={eyedropperActive ? { cursor: 'crosshair' } : {}}
+                  onLoad={() => {
+                    console.log('[Eyedropper] Image loaded, ready for color picking');
+                  }}
+                  onError={(e) => {
+                    console.error('[Eyedropper] Image failed to load:', imageUrl);
+                    if (eyedropperActive) {
+                      alert('Image failed to load. Cannot pick colors.');
+                      setEyedropperActive(null);
+                    }
+                  }}
+                  style={eyedropperActive ? { cursor: 'crosshair', pointerEvents: 'auto' } : {}}
+                  crossOrigin={imageUrl.startsWith('data:') ? undefined : 'anonymous'}
                 />
                 {eyedropperActive && (
                   <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none z-20">

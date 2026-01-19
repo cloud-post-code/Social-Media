@@ -4,6 +4,123 @@ import * as geminiService from '../services/geminiService.js';
 import * as brandAssetService from '../services/brandAssetService.js';
 import { BrandDNA } from '../types/index.js';
 
+// Individual extraction step controllers
+export const extractBasicInfo = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { url, imageBase64 } = req.body;
+    
+    if (!url && !imageBase64) {
+      return res.status(400).json({ 
+        error: { message: 'Either url or imageBase64 must be provided' } 
+      });
+    }
+
+    const result = await geminiService.extractBasicInfo({ url, imageBase64 });
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in extractBasicInfo:', error);
+    res.status(500).json({
+      error: { message: error?.message || 'Failed to extract basic info' }
+    });
+  }
+};
+
+export const extractVisualIdentity = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { url, imageBase64 } = req.body;
+    
+    if (!url && !imageBase64) {
+      return res.status(400).json({ 
+        error: { message: 'Either url or imageBase64 must be provided' } 
+      });
+    }
+
+    const result = await geminiService.extractVisualIdentity({ url, imageBase64 });
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in extractVisualIdentity:', error);
+    res.status(500).json({
+      error: { message: error?.message || 'Failed to extract visual identity' }
+    });
+  }
+};
+
+export const extractBrandVoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { url, imageBase64 } = req.body;
+    
+    if (!url && !imageBase64) {
+      return res.status(400).json({ 
+        error: { message: 'Either url or imageBase64 must be provided' } 
+      });
+    }
+
+    const result = await geminiService.extractBrandVoice({ url, imageBase64 });
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in extractBrandVoice:', error);
+    res.status(500).json({
+      error: { message: error?.message || 'Failed to extract brand voice' }
+    });
+  }
+};
+
+export const extractStrategicProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { url, imageBase64 } = req.body;
+    
+    if (!url && !imageBase64) {
+      return res.status(400).json({ 
+        error: { message: 'Either url or imageBase64 must be provided' } 
+      });
+    }
+
+    const result = await geminiService.extractStrategicProfile({ url, imageBase64 });
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in extractStrategicProfile:', error);
+    res.status(500).json({
+      error: { message: error?.message || 'Failed to extract strategic profile' }
+    });
+  }
+};
+
+export const extractBrandImages = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { url } = req.body;
+    
+    console.log('[Extract Images] Received request:', { url: url?.substring(0, 100) });
+    
+    if (!url) {
+      console.error('[Extract Images] Missing URL in request body');
+      return res.status(400).json({ 
+        error: { message: 'URL is required for image extraction' } 
+      });
+    }
+
+    console.log('[Extract Images] Calling geminiService.extractBrandImages...');
+    const result = await geminiService.extractBrandImages(url);
+    console.log('[Extract Images] Extraction result:', {
+      hasLogo: !!result.logoUrl,
+      logoUrl: result.logoUrl?.substring(0, 100),
+      imageCount: result.imageUrls?.length || 0,
+      imageUrls: result.imageUrls?.slice(0, 3).map((u: string) => u.substring(0, 100))
+    });
+    
+    res.json(result);
+  } catch (error: any) {
+    console.error('[Extract Images] Error:', error);
+    console.error('[Extract Images] Error details:', {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name
+    });
+    res.status(500).json({
+      error: { message: error?.message || 'Failed to extract brand images' }
+    });
+  }
+};
+
 export const getAllBrands = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const brands = await brandService.getAllBrands();

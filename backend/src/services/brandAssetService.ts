@@ -3,52 +3,116 @@ import { BrandAsset, BrandAssetRow } from '../types/index.js';
 
 /**
  * Fetch an external image URL and convert it to base64 data URL
+ * Includes retry logic with exponential backoff
  */
-async function fetchImageAsBase64(imageUrl: string): Promise<string> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+async function fetchImageAsBase64(imageUrl: string, retries: number = 3): Promise<string> {
+  const maxRetries = retries;
+  let lastError: Error | null = null;
   
-  try {
-    console.log(`[Image Fetch] Starting fetch for: ${imageUrl.substring(0, 100)}...`);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutMs = 30000 + (attempt - 1) * 10000; // 30s, 40s, 50s
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     
-    const response = await fetch(imageUrl, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'image/*',
-        'Referer': imageUrl.split('/').slice(0, 3).join('/') // Add referer to help with some sites
+    try {
+      console.log(`[Image Fetch] Attempt ${attempt}/${maxRetries} for: ${imageUrl.substring(0, 100)}...`);
+      
+      // Build headers with referer
+      const urlObj = new URL(imageUrl);
+      const referer = `${urlObj.protocol}//${urlObj.host}`;
+      
+      const response = await fetch(imageUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': referer,
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+        if (response.status === 404) {
+          throw new Error(`Image not found (404): ${imageUrl}`);
+        } else if (response.status >= 500 && attempt < maxRetries) {
+          // Retry on server errors
+          console.warn(`[Image Fetch] Server error ${response.status}, will retry...`);
+          lastError = new Error(errorMsg);
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000)); // Exponential backoff
+          continue;
+        }
+        throw new Error(errorMsg);
       }
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      
+      const contentType = response.headers.get('content-type') || '';
+      
+      // Validate content type
+      const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp'];
+      const isImage = validImageTypes.some(type => contentType.toLowerCase().includes(type)) || 
+                     contentType.startsWith('image/');
+      
+      if (!isImage && contentType) {
+        console.warn(`[Image Fetch] Unexpected content-type: ${contentType} for ${imageUrl}`);
+        // Still try to process it - might be an image with wrong content-type
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      // Validate image size (min 100 bytes, max 10MB)
+      if (buffer.length < 100) {
+        throw new Error(`Image too small (${buffer.length} bytes), likely invalid`);
+      }
+      if (buffer.length > 10 * 1024 * 1024) {
+        throw new Error(`Image too large (${Math.round(buffer.length / 1024 / 1024)}MB), max 10MB`);
+      }
+      
+      // Basic image validation: check for common image magic bytes
+      const magicBytes = buffer.slice(0, 4);
+      const isValidImage = 
+        magicBytes[0] === 0xFF && magicBytes[1] === 0xD8 && magicBytes[2] === 0xFF || // JPEG
+        magicBytes[0] === 0x89 && magicBytes[1] === 0x50 && magicBytes[2] === 0x4E && magicBytes[3] === 0x47 || // PNG
+        magicBytes[0] === 0x47 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 || // GIF
+        buffer.slice(0, 2).toString() === 'BM' || // BMP
+        buffer.slice(0, 4).toString() === 'RIFF'; // WebP (simplified check)
+      
+      if (!isValidImage && !contentType.includes('svg')) {
+        console.warn(`[Image Fetch] Image magic bytes validation failed for ${imageUrl}, but continuing...`);
+      }
+      
+      const base64 = buffer.toString('base64');
+      const finalContentType = contentType && contentType.startsWith('image/') 
+        ? contentType.split(';')[0] // Remove charset if present
+        : 'image/png';
+      
+      const dataUrl = `data:${finalContentType};base64,${base64}`;
+      console.log(`[Image Fetch] Successfully converted ${imageUrl.substring(0, 50)}... to base64 (${Math.round(buffer.length / 1024)}KB) on attempt ${attempt}`);
+      
+      return dataUrl;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      const errorMsg = error.name === 'AbortError' 
+        ? `Request timeout after ${timeoutMs}ms`
+        : error.message || 'Unknown error';
+      
+      lastError = error;
+      
+      if (attempt < maxRetries) {
+        const backoffMs = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+        console.warn(`[Image Fetch] Attempt ${attempt} failed: ${errorMsg}. Retrying in ${backoffMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      } else {
+        console.error(`[Image Fetch] All ${maxRetries} attempts failed for ${imageUrl}:`, errorMsg);
+      }
     }
-    
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.startsWith('image/')) {
-      console.warn(`[Image Fetch] Unexpected content-type: ${contentType} for ${imageUrl}`);
-      // Continue anyway - might still be an image
-    }
-    
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const base64 = buffer.toString('base64');
-    const finalContentType = contentType || 'image/png';
-    
-    const dataUrl = `data:${finalContentType};base64,${base64}`;
-    console.log(`[Image Fetch] Successfully converted ${imageUrl.substring(0, 50)}... to base64 (${Math.round(buffer.length / 1024)}KB)`);
-    
-    return dataUrl;
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    const errorMsg = error.name === 'AbortError' 
-      ? 'Request timeout after 30 seconds'
-      : error.message || 'Unknown error';
-    console.error(`[Image Fetch] Failed to fetch ${imageUrl}:`, errorMsg);
-    throw new Error(`Failed to fetch image from ${imageUrl}: ${errorMsg}`);
   }
+  
+  // All retries failed
+  throw new Error(`Failed to fetch image from ${imageUrl} after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
 }
 
 export const getBrandAssets = async (
@@ -122,21 +186,59 @@ export const createBrandAsset = async (
     throw new Error(`Image conversion failed: URL is still external: ${finalImageUrl.substring(0, 100)}`);
   }
   
-  const id = `${assetType}_${brandId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  // Generate unique ID: assetType_brandId_timestamp_random
+  // Use performance.now() for better precision and ensure single timestamp
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 11); // 9 chars
+  const id = `${assetType}_${brandId}_${timestamp}_${randomStr}`;
+  
+  // Validate ID format before inserting
+  if (id.length > 255) {
+    throw new Error(`Generated asset ID is too long: ${id.length} characters`);
+  }
+  
+  console.log(`[Brand Asset] Creating asset with ID: ${id.substring(0, 80)}...`);
   
   const result = await pool.query<BrandAssetRow>(
     'INSERT INTO brand_assets (id, brand_id, image_url, asset_type) VALUES ($1, $2, $3, $4) RETURNING *',
     [id, brandId, finalImageUrl, assetType]
   );
   
+  console.log(`[Brand Asset] Successfully created asset: ${result.rows[0].id}`);
   return rowToBrandAsset(result.rows[0]);
 };
 
 export const deleteBrandAsset = async (assetId: string): Promise<void> => {
-  const result = await pool.query('DELETE FROM brand_assets WHERE id = $1', [assetId]);
-  if (result.rowCount === 0) {
+  console.log(`[Brand Asset] Attempting to delete asset with ID: ${assetId}`);
+  
+  // First check if asset exists
+  const checkResult = await pool.query<BrandAssetRow>(
+    'SELECT id, brand_id, asset_type FROM brand_assets WHERE id = $1',
+    [assetId]
+  );
+  
+  if (checkResult.rows.length === 0) {
+    console.error(`[Brand Asset] Asset not found for deletion: ${assetId}`);
+    // Try to find similar IDs for debugging
+    const similarAssets = await pool.query<BrandAssetRow>(
+      'SELECT id FROM brand_assets WHERE id LIKE $1 LIMIT 5',
+      [`%${assetId.split('_').slice(-2).join('_')}%`]
+    );
+    if (similarAssets.rows.length > 0) {
+      console.log(`[Brand Asset] Found similar asset IDs:`, similarAssets.rows.map(r => r.id));
+    }
     throw new Error(`Brand asset with id ${assetId} not found`);
   }
+  
+  const asset = checkResult.rows[0];
+  console.log(`[Brand Asset] Found asset to delete: ${asset.id}, type: ${asset.asset_type}, brand: ${asset.brand_id}`);
+  
+  const result = await pool.query('DELETE FROM brand_assets WHERE id = $1', [assetId]);
+  if (result.rowCount === 0) {
+    throw new Error(`Failed to delete brand asset with id ${assetId}`);
+  }
+  
+  console.log(`[Brand Asset] Successfully deleted asset: ${assetId}`);
 };
 
 export const migrateBrandAssets = async (

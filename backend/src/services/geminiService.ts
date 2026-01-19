@@ -89,25 +89,37 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
     Analyze the ${source} to extract detailed visual identity information.
     ${urlContext}
     
+    CRITICAL: You must analyze the ACTUAL colors present on the website/screenshot, not generic brand colors.
+    
     Focus specifically on:
-    - Primary brand color (dominant color used throughout - return as hex code like #FF5733)
-    - Accent color (secondary color used for buttons, highlights - return as hex code)
-    - Background style (describe the typical background aesthetic)
+    - Primary brand color (the main brand color actually used on the website - look at headers, logos, navigation, primary buttons, and key UI elements. Extract the EXACT hex code from the visual design)
+    - Accent color (secondary color used for highlights, CTAs, links, or accent elements. Extract the EXACT hex code from buttons, links, or highlighted elements)
+    - Background style (describe the typical background aesthetic - include hex if solid color)
     - Imagery style (describe the photography/image style used)
-    - Typography vibe (describe the font personality and style)
-    - Logo style (describe the logo's visual characteristics)
+    - Typography vibe (describe the font personality and style - analyze the actual fonts used)
+    - Logo style (describe the logo's visual characteristics - analyze the actual logo if visible)
+    
+    IMPORTANT COLOR EXTRACTION INSTRUCTIONS:
+    1. Look at the website header/navigation bar - what color is it? Extract that hex code.
+    2. Look at primary buttons or CTAs - what color are they? Extract that hex code.
+    3. Look at links or highlighted text - what color are they? Extract that hex code.
+    4. Look at the overall color scheme - identify the 2-3 most dominant colors.
+    5. If analyzing a screenshot, use the actual pixel colors you see, not assumptions.
+    6. Return REAL hex codes from the website, not generic brand colors like "#000000" or "#FFFFFF" unless those are actually the dominant colors.
+    7. If the website uses gradients, identify the primary colors in the gradient.
+    8. Avoid default colors - look for the actual brand colors being used.
     
     Return ONLY a JSON object with this exact structure:
     {
-      "primary_color_hex": "#HEXCODE",
-      "accent_color_hex": "#HEXCODE",
-      "background_style": "Description of background style",
+      "primary_color_hex": "#HEXCODE (exact hex from website, e.g. #1a1a1a or #ff6b6b)",
+      "accent_color_hex": "#HEXCODE (exact hex from website, e.g. #4ecdc4 or #ffe66d)",
+      "background_style": "Description of background style (include hex if solid color)",
       "imagery_style": "Description of imagery/photography style",
       "font_vibe": "Description of typography personality",
       "logo_style": "Description of logo characteristics"
     }
     
-    Return ONLY JSON. No markdown, no explanations.
+    Return ONLY JSON. No markdown, no explanations. Ensure hex codes are valid (6 characters after #).
   `;
 
   let visualContents: any;
@@ -341,6 +353,400 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
         : undefined
     }
   } as BrandDNA & { _extractedAssets?: { logoUrl?: string; imageUrls?: string[] } };
+};
+
+/**
+ * Step 1: Extract Basic Brand Information (name, tagline, overview)
+ */
+export const extractBasicInfo = async (input: { url?: string; imageBase64?: string }): Promise<{ name: string; tagline: string; overview: string }> => {
+  const ai = getAIClient();
+  const model = 'gemini-3-flash-preview';
+  
+  const source = input.url ? `website URL: ${input.url}` : 'attached website screenshot';
+  const urlContext = input.url ? `\n\nIMPORTANT: Visit and analyze the website at ${input.url}. Extract information directly from the website content, design, and messaging.` : '';
+
+  const basicInfoPrompt = `
+    You are an expert Chief Marketing Officer and Creative Director.
+    Analyze the ${source} to extract the core brand identity information.
+    ${urlContext}
+    
+    Focus specifically on extracting:
+    - The company/brand name (exact name as it appears)
+    - The brand tagline or main slogan (if present)
+    - A comprehensive overview paragraph describing what the brand is about, its mission, and core values
+    
+    Return ONLY a JSON object with this exact structure:
+    {
+      "name": "Exact brand name",
+      "tagline": "Brand tagline or slogan",
+      "overview": "Detailed paragraph describing the brand's mission, values, and essence"
+    }
+    
+    Return ONLY JSON. No markdown, no explanations.
+  `;
+
+  let basicContents: any;
+  if (input.imageBase64) {
+    const base64Data = input.imageBase64.includes(',') 
+      ? input.imageBase64.split(',')[1] 
+      : input.imageBase64;
+    basicContents = {
+      parts: [
+        { text: basicInfoPrompt },
+        { inlineData: { mimeType: "image/png", data: base64Data } }
+      ]
+    };
+  } else {
+    basicContents = { parts: [{ text: basicInfoPrompt }] };
+  }
+
+  const basicResponse = await ai.models.generateContent({
+    model,
+    contents: basicContents,
+    config: { responseMimeType: "application/json" }
+  });
+  
+  if (!basicResponse.text) {
+    throw new Error('No response text from Gemini API');
+  }
+  
+  const basicInfo = safeJsonParse(basicResponse.text || '{}') || {};
+  
+  return {
+    name: basicInfo.name || 'Unknown Brand',
+    tagline: basicInfo.tagline || '',
+    overview: basicInfo.overview || ''
+  };
+};
+
+/**
+ * Step 2: Extract Visual Identity (colors, styles)
+ */
+export const extractVisualIdentity = async (input: { url?: string; imageBase64?: string }): Promise<{
+  primary_color_hex: string;
+  accent_color_hex: string;
+  background_style: string;
+  imagery_style: string;
+  font_vibe: string;
+  logo_style: string;
+}> => {
+  const ai = getAIClient();
+  const model = 'gemini-3-flash-preview';
+  
+  const source = input.url ? `website URL: ${input.url}` : 'attached website screenshot';
+  const urlContext = input.url ? `\n\nIMPORTANT: Visit and analyze the website at ${input.url}. Extract information directly from the website content, design, and messaging.` : '';
+
+  const visualPrompt = `
+    You are an expert Brand Designer and Visual Identity Specialist.
+    Analyze the ${source} to extract detailed visual identity information.
+    ${urlContext}
+    
+    CRITICAL: You must analyze the ACTUAL colors present on the website/screenshot, not generic brand colors.
+    
+    Focus specifically on:
+    - Primary brand color (the main brand color actually used on the website - look at headers, logos, navigation, primary buttons, and key UI elements. Extract the EXACT hex code from the visual design)
+    - Accent color (secondary color used for highlights, CTAs, links, or accent elements. Extract the EXACT hex code from buttons, links, or highlighted elements)
+    - Background style (describe the typical background aesthetic - include hex if solid color)
+    - Imagery style (describe the photography/image style used)
+    - Typography vibe (describe the font personality and style - analyze the actual fonts used)
+    - Logo style (describe the logo's visual characteristics - analyze the actual logo if visible)
+    
+    IMPORTANT COLOR EXTRACTION INSTRUCTIONS:
+    1. Look at the website header/navigation bar - what color is it? Extract that hex code.
+    2. Look at primary buttons or CTAs - what color are they? Extract that hex code.
+    3. Look at links or highlighted text - what color are they? Extract that hex code.
+    4. Look at the overall color scheme - identify the 2-3 most dominant colors.
+    5. If analyzing a screenshot, use the actual pixel colors you see, not assumptions.
+    6. Return REAL hex codes from the website, not generic brand colors like "#000000" or "#FFFFFF" unless those are actually the dominant colors.
+    7. If the website uses gradients, identify the primary colors in the gradient.
+    8. Avoid default colors - look for the actual brand colors being used.
+    
+    Return ONLY a JSON object with this exact structure:
+    {
+      "primary_color_hex": "#HEXCODE (exact hex from website, e.g. #1a1a1a or #ff6b6b)",
+      "accent_color_hex": "#HEXCODE (exact hex from website, e.g. #4ecdc4 or #ffe66d)",
+      "background_style": "Description of background style (include hex if solid color)",
+      "imagery_style": "Description of imagery/photography style",
+      "font_vibe": "Description of typography personality",
+      "logo_style": "Description of logo characteristics"
+    }
+    
+    Return ONLY JSON. No markdown, no explanations. Ensure hex codes are valid (6 characters after #).
+  `;
+
+  let visualContents: any;
+  if (input.imageBase64) {
+    const base64Data = input.imageBase64.includes(',') 
+      ? input.imageBase64.split(',')[1] 
+      : input.imageBase64;
+    visualContents = {
+      parts: [
+        { text: visualPrompt },
+        { inlineData: { mimeType: "image/png", data: base64Data } }
+      ]
+    };
+  } else {
+    visualContents = { parts: [{ text: visualPrompt }] };
+  }
+
+  const visualResponse = await ai.models.generateContent({
+    model,
+    contents: visualContents,
+    config: { responseMimeType: "application/json" }
+  });
+  
+  if (!visualResponse.text) {
+    throw new Error('No response text from Gemini API');
+  }
+  
+  const visualInfo = safeJsonParse(visualResponse.text || '{}') || {};
+  
+  return {
+    primary_color_hex: visualInfo.primary_color_hex || '#4F46E5',
+    accent_color_hex: visualInfo.accent_color_hex || '#F59E0B',
+    background_style: visualInfo.background_style || '',
+    imagery_style: visualInfo.imagery_style || '',
+    font_vibe: visualInfo.font_vibe || '',
+    logo_style: visualInfo.logo_style || ''
+  };
+};
+
+/**
+ * Step 3: Extract Brand Voice (tone, writing style, keywords)
+ */
+export const extractBrandVoice = async (input: { url?: string; imageBase64?: string }): Promise<{
+  tone_adjectives: string[];
+  writing_style: string;
+  keywords_to_use: string[];
+  taboo_words: string[];
+}> => {
+  const ai = getAIClient();
+  const model = 'gemini-3-flash-preview';
+  
+  const source = input.url ? `website URL: ${input.url}` : 'attached website screenshot';
+  const urlContext = input.url ? `\n\nIMPORTANT: Visit and analyze the website at ${input.url}. Extract information directly from the website content, design, and messaging.` : '';
+
+  const voicePrompt = `
+    You are an expert Copywriter and Brand Voice Strategist.
+    Analyze the ${source} to extract the brand's voice and messaging style.
+    ${urlContext}
+    
+    Focus specifically on:
+    - Tone adjectives (3-5 words that describe the brand's tone)
+    - Writing style (describe sentence structure, formality, length)
+    - Keywords to use (3-5 key terms/phrases the brand uses)
+    - Taboo words (words the brand avoids or would never use)
+    
+    Return ONLY a JSON object with this exact structure:
+    {
+      "tone_adjectives": ["adjective1", "adjective2", "adjective3"],
+      "writing_style": "Description of writing style",
+      "keywords_to_use": ["keyword1", "keyword2", "keyword3"],
+      "taboo_words": ["word1", "word2", "word3"]
+    }
+    
+    Return ONLY JSON. No markdown, no explanations.
+  `;
+
+  let voiceContents: any;
+  if (input.imageBase64) {
+    const base64Data = input.imageBase64.includes(',') 
+      ? input.imageBase64.split(',')[1] 
+      : input.imageBase64;
+    voiceContents = {
+      parts: [
+        { text: voicePrompt },
+        { inlineData: { mimeType: "image/png", data: base64Data } }
+      ]
+    };
+  } else {
+    voiceContents = { parts: [{ text: voicePrompt }] };
+  }
+
+  const voiceResponse = await ai.models.generateContent({
+    model,
+    contents: voiceContents,
+    config: { responseMimeType: "application/json" }
+  });
+  
+  if (!voiceResponse.text) {
+    throw new Error('No response text from Gemini API');
+  }
+  
+  const voiceInfo = safeJsonParse(voiceResponse.text || '{}') || {};
+  
+  return {
+    tone_adjectives: voiceInfo.tone_adjectives || [],
+    writing_style: voiceInfo.writing_style || '',
+    keywords_to_use: voiceInfo.keywords_to_use || [],
+    taboo_words: voiceInfo.taboo_words || []
+  };
+};
+
+/**
+ * Step 4: Extract Strategic Profile (target audience, value prop, category)
+ */
+export const extractStrategicProfile = async (input: { url?: string; imageBase64?: string }): Promise<{
+  target_audience: string;
+  core_value_prop: string;
+  product_category: string;
+}> => {
+  const ai = getAIClient();
+  const model = 'gemini-3-flash-preview';
+  
+  const source = input.url ? `website URL: ${input.url}` : 'attached website screenshot';
+  const urlContext = input.url ? `\n\nIMPORTANT: Visit and analyze the website at ${input.url}. Extract information directly from the website content, design, and messaging.` : '';
+
+  const strategicPrompt = `
+    You are an expert Marketing Strategist and Brand Analyst.
+    Analyze the ${source} to extract strategic positioning information.
+    ${urlContext}
+    
+    Focus specifically on:
+    - Target audience (specific demographic and psychographic description)
+    - Core value proposition (main benefit or promise the brand makes)
+    - Product category (industry niche or category)
+    
+    Return ONLY a JSON object with this exact structure:
+    {
+      "target_audience": "Specific audience description",
+      "core_value_prop": "Main benefit promised",
+      "product_category": "Industry niche"
+    }
+    
+    Return ONLY JSON. No markdown, no explanations.
+  `;
+
+  let strategicContents: any;
+  if (input.imageBase64) {
+    const base64Data = input.imageBase64.includes(',') 
+      ? input.imageBase64.split(',')[1] 
+      : input.imageBase64;
+    strategicContents = {
+      parts: [
+        { text: strategicPrompt },
+        { inlineData: { mimeType: "image/png", data: base64Data } }
+      ]
+    };
+  } else {
+    strategicContents = { parts: [{ text: strategicPrompt }] };
+  }
+
+  const strategicResponse = await ai.models.generateContent({
+    model,
+    contents: strategicContents,
+    config: { responseMimeType: "application/json" }
+  });
+  
+  if (!strategicResponse.text) {
+    throw new Error('No response text from Gemini API');
+  }
+  
+  const strategicInfo = safeJsonParse(strategicResponse.text || '{}') || {};
+  
+  return {
+    target_audience: strategicInfo.target_audience || '',
+    core_value_prop: strategicInfo.core_value_prop || '',
+    product_category: strategicInfo.product_category || ''
+  };
+};
+
+/**
+ * Step 5: Extract Brand Images (logo and key images) - Only works with URL
+ */
+export const extractBrandImages = async (url: string): Promise<{ logoUrl?: string; imageUrls?: string[] }> => {
+  if (!url) {
+    throw new Error('URL is required for image extraction');
+  }
+  
+  console.log(`[Gemini Service] extractBrandImages called with URL: ${url}`);
+  
+  const ai = getAIClient();
+  const model = 'gemini-3-flash-preview';
+  const urlContext = `\n\nIMPORTANT: Visit and analyze the website at ${url}. Extract information directly from the website content, design, and messaging.`;
+
+  const imagesPrompt = `
+    You are an expert Web Scraper and Brand Asset Analyst.
+    Analyze the website at ${url} to extract brand images.
+    ${urlContext}
+    
+    Your task:
+    1. Identify the logo image URL (the main brand logo, typically in header/navbar)
+    2. Extract 3-10 key brand images (hero images, product images, lifestyle images, etc.)
+       - Prioritize high-quality, representative images
+       - Avoid duplicates or very similar images
+       - Focus on images that represent the brand visually
+       - Look for images in the main content area, hero sections, and product galleries
+    
+    Return ONLY a JSON object with this exact structure:
+    {
+      "logo_url": "Full URL to the logo image (or empty string if not found)",
+      "image_urls": [
+        "Full URL to image 1",
+        "Full URL to image 2",
+        "Full URL to image 3",
+        ...
+      ]
+    }
+    
+    Important:
+    - Return absolute URLs (include https:// or http://)
+    - Return 3-10 images in image_urls array (minimum 3 if available)
+    - If logo is not found, return empty string for logo_url
+    - Ensure URLs are directly accessible (not relative paths)
+    - Return ONLY JSON. No markdown, no explanations.
+  `;
+
+  const imagesContents = { parts: [{ text: imagesPrompt }] };
+
+  console.log(`[Gemini Service] Calling Gemini API for image extraction...`);
+  
+  try {
+    const imagesResponse = await ai.models.generateContent({
+      model,
+      contents: imagesContents,
+      config: { responseMimeType: "application/json" }
+    });
+    
+    if (!imagesResponse.text) {
+      console.error('[Gemini Service] No response text from Gemini API');
+      throw new Error('No response text from Gemini API');
+    }
+    
+    console.log(`[Gemini Service] Received response from Gemini (length: ${imagesResponse.text.length})`);
+    console.log(`[Gemini Service] Raw response preview: ${imagesResponse.text.substring(0, 200)}...`);
+    
+    const imagesInfo = safeJsonParse(imagesResponse.text || '{}') || {};
+    
+    console.log(`[Gemini Service] Parsed images info:`, {
+      hasLogoUrl: !!imagesInfo.logo_url,
+      logoUrl: imagesInfo.logo_url?.substring(0, 100),
+      imageUrlsCount: imagesInfo.image_urls?.length || 0,
+      imageUrls: imagesInfo.image_urls?.slice(0, 3).map((u: string) => u.substring(0, 100))
+    });
+    
+    const result = {
+      logoUrl: imagesInfo.logo_url || undefined,
+      imageUrls: imagesInfo.image_urls && imagesInfo.image_urls.length > 0 
+        ? imagesInfo.image_urls.slice(0, 10) // Limit to max 10 images
+        : undefined
+    };
+    
+    console.log(`[Gemini Service] Returning result:`, {
+      hasLogo: !!result.logoUrl,
+      imageCount: result.imageUrls?.length || 0
+    });
+    
+    return result;
+  } catch (error: any) {
+    console.error(`[Gemini Service] Error in extractBrandImages:`, error);
+    console.error(`[Gemini Service] Error details:`, {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    throw error;
+  }
 };
 
 /**
@@ -629,19 +1035,37 @@ export const generateImage = async (prompt: string, width: number = 1080, height
   let aspectRatio: string;
   const ratio = width / height;
   
-  if (Math.abs(ratio - 1) < 0.1) {
-    aspectRatio = "1:1"; // Square
-  } else if (Math.abs(ratio - 9/16) < 0.1 || Math.abs(ratio - 1080/1920) < 0.1) {
-    aspectRatio = "9:16"; // Portrait/Story
-  } else if (Math.abs(ratio - 16/9) < 0.1 || Math.abs(ratio - 1920/1080) < 0.1) {
-    aspectRatio = "16:9"; // Landscape
-  } else if (Math.abs(ratio - 4/3) < 0.1) {
-    aspectRatio = "4:3";
-  } else if (Math.abs(ratio - 3/4) < 0.1) {
-    aspectRatio = "3:4";
+  // Define supported aspect ratios with their values
+  const supportedRatios = [
+    { name: "1:1", value: 1.0 },
+    { name: "9:16", value: 9/16 },      // Portrait/Story (0.5625)
+    { name: "16:9", value: 16/9 },      // Landscape (1.777...)
+    { name: "4:3", value: 4/3 },          // Landscape (1.333...)
+    { name: "3:4", value: 3/4 }           // Portrait (0.75)
+  ];
+  
+  // Find the closest matching aspect ratio
+  let closestRatio = supportedRatios[0]; // Default to 1:1
+  let minDifference = Math.abs(ratio - closestRatio.value);
+  
+  for (const supportedRatio of supportedRatios) {
+    const difference = Math.abs(ratio - supportedRatio.value);
+    if (difference < minDifference) {
+      minDifference = difference;
+      closestRatio = supportedRatio;
+    }
+  }
+  
+  // Use the closest ratio, but apply logic based on orientation
+  if (ratio < 0.7) {
+    // Very tall/portrait - prefer 9:16 or 3:4
+    aspectRatio = Math.abs(ratio - 9/16) < Math.abs(ratio - 3/4) ? "9:16" : "3:4";
+  } else if (ratio > 1.5) {
+    // Very wide/landscape - prefer 16:9 or 4:3
+    aspectRatio = Math.abs(ratio - 16/9) < Math.abs(ratio - 4/3) ? "16:9" : "4:3";
   } else {
-    // Default to square for unknown ratios
-    aspectRatio = "1:1";
+    // Square-ish or moderate ratios - use closest match
+    aspectRatio = closestRatio.name;
   }
   
   // Determine image size based on larger dimension
