@@ -84,11 +84,24 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
       setFormData(extracted);
       setUrlInput(''); // Clear input after successful extraction
       
-      // Trigger asset loading if brand ID exists
+      // Update local state by calling onSave to refresh brands list
+      try {
+        await onSave(extracted);
+      } catch (err) {
+        // Brand might already exist, that's ok
+        console.log('Brand save note:', err);
+      }
+      
+      // Wait a bit for database to commit, then reload assets
       if (extracted.id) {
-        setTimeout(() => {
-          loadAssets();
-        }, 500);
+        setTimeout(async () => {
+          try {
+            await loadAssets();
+            console.log('Assets reloaded after extraction');
+          } catch (err) {
+            console.error('Failed to reload assets:', err);
+          }
+        }, 1000); // Increased delay to ensure DB commit
       }
       
       // Show success message
@@ -385,7 +398,10 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
         {/* Brand Assets Section */}
         {brandId && (
           <section className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200">
-            <h3 className="text-lg font-black text-slate-900 mb-6">Brand Assets</h3>
+            <h3 className="text-lg font-black text-slate-900 mb-6">
+              Brand Assets
+              {assetsLoading && <span className="ml-2 text-sm text-slate-400 font-normal">(Loading...)</span>}
+            </h3>
             
             {/* Logo Section */}
             <div className="mb-8">
@@ -411,7 +427,20 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                       alt="Brand logo"
                       className="max-w-xs max-h-24 object-contain"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
+                        const img = e.target as HTMLImageElement;
+                        img.style.display = 'none';
+                        // Show error message
+                        const parent = img.parentElement;
+                        if (parent && !parent.querySelector('.error-message')) {
+                          const errorDiv = document.createElement('div');
+                          errorDiv.className = 'error-message text-red-500 text-xs mt-2 text-center';
+                          errorDiv.textContent = 'Failed to load image';
+                          parent.appendChild(errorDiv);
+                        }
+                        console.error('Failed to load logo image:', logo.image_url);
+                      }}
+                      onLoad={() => {
+                        console.log('Logo loaded successfully:', logo.image_url.substring(0, 50));
                       }}
                     />
                   </div>
@@ -457,7 +486,20 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                         alt={`Brand image ${asset.id}`}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
+                          const img = e.target as HTMLImageElement;
+                          img.style.display = 'none';
+                          // Show error indicator
+                          const parent = img.parentElement;
+                          if (parent && !parent.querySelector('.error-indicator')) {
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'error-indicator absolute inset-0 flex items-center justify-center bg-red-50';
+                            errorDiv.innerHTML = '<span class="text-red-500 text-xs">Failed to load</span>';
+                            parent.appendChild(errorDiv);
+                          }
+                          console.error('Failed to load brand image:', asset.image_url.substring(0, 50));
+                        }}
+                        onLoad={() => {
+                          console.log('Brand image loaded successfully:', asset.image_url.substring(0, 50));
                         }}
                       />
                       <button

@@ -26,15 +26,34 @@ export const useBrandAssets = (brandId?: string) => {
       setLoading(true);
       setError(null);
       
+      console.log('Loading assets for brand:', brandId);
+      
       const [allAssets, logoAsset] = await Promise.all([
-        brandAssetApi.getAssets(brandId, 'brand_image'),
-        brandAssetApi.getLogo(brandId).catch(() => null) // Logo might not exist
+        brandAssetApi.getAssets(brandId, 'brand_image').catch((err) => {
+          console.error('Error loading brand images:', err);
+          return [];
+        }),
+        brandAssetApi.getLogo(brandId).catch((err) => {
+          // Logo might not exist - that's ok
+          if (err.message?.includes('404') || err.message?.includes('not found')) {
+            return null;
+          }
+          console.error('Error loading logo:', err);
+          return null;
+        })
       ]);
       
-      setAssets(allAssets);
+      console.log('Loaded assets:', { 
+        logo: logoAsset ? 'present' : 'none', 
+        images: allAssets.length 
+      });
+      
+      setAssets(allAssets || []);
       setLogo(logoAsset);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load assets');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load assets';
+      setError(errorMessage);
+      console.error('Error in loadAssets:', err);
     } finally {
       setLoading(false);
     }

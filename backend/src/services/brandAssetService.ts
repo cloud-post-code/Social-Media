@@ -1,6 +1,34 @@
 import pool from '../config/database.js';
 import { BrandAsset, BrandAssetRow } from '../types/index.js';
 
+/**
+ * Fetch an external image URL and convert it to base64 data URL
+ */
+async function fetchImageAsBase64(imageUrl: string): Promise<string> {
+  try {
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'image/*'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString('base64');
+    const contentType = response.headers.get('content-type') || 'image/png';
+    
+    return `data:${contentType};base64,${base64}`;
+  } catch (error: any) {
+    console.error(`Error fetching image ${imageUrl}:`, error.message);
+    throw new Error(`Failed to fetch image from ${imageUrl}: ${error.message}`);
+  }
+}
+
 export const getBrandAssets = async (
   brandId: string,
   assetType?: 'logo' | 'brand_image'
@@ -47,11 +75,25 @@ export const createBrandAsset = async (
     }
   }
   
+  // If imageUrl is an external URL (starts with http), fetch and convert to base64
+  let finalImageUrl = imageUrl;
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    try {
+      console.log(`Fetching external image: ${imageUrl}`);
+      finalImageUrl = await fetchImageAsBase64(imageUrl);
+      console.log(`Successfully converted external image to base64`);
+    } catch (error: any) {
+      console.error(`Failed to fetch image ${imageUrl}, using URL as-is:`, error.message);
+      // Fallback: use URL as-is (might fail due to CORS, but at least we tried)
+      // In production, you might want to throw here instead
+    }
+  }
+  
   const id = `${assetType}_${brandId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
   const result = await pool.query<BrandAssetRow>(
     'INSERT INTO brand_assets (id, brand_id, image_url, asset_type) VALUES ($1, $2, $3, $4) RETURNING *',
-    [id, brandId, imageUrl, assetType]
+    [id, brandId, finalImageUrl, assetType]
   );
   
   return rowToBrandAsset(result.rows[0]);
