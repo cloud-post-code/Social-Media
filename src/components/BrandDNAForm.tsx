@@ -359,6 +359,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
       visual_identity: {
         primary_color_hex: formData.visual_identity?.primary_color_hex || '#4F46E5',
         accent_color_hex: formData.visual_identity?.accent_color_hex || '#F59E0B',
+        colors: formData.visual_identity?.colors,
         background_style: formData.visual_identity?.background_style || 'Clean white',
         imagery_style: formData.visual_identity?.imagery_style || 'Professional photography',
         font_vibe: formData.visual_identity?.font_vibe || 'Sans-serif modern',
@@ -544,6 +545,37 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                     onChange={(hex) => updateNested('visual_identity.accent_color_hex', hex)}
                   />
                 </div>
+                {(formData.visual_identity?.colors && formData.visual_identity.colors.length > 0) && (
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                      All Brand Colors ({formData.visual_identity.colors.length})
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.visual_identity.colors.map((color, index) => (
+                        <div
+                          key={index}
+                          className="relative group"
+                          title={color}
+                        >
+                          <div
+                            className="w-12 h-12 rounded-lg border-2 border-slate-200 shadow-sm cursor-pointer hover:scale-110 transition-transform"
+                            style={{ backgroundColor: color }}
+                            onClick={() => {
+                              const newColors = [...formData.visual_identity.colors!];
+                              newColors.splice(index, 1);
+                              updateNested('visual_identity.colors', newColors.length > 0 ? newColors : undefined);
+                            }}
+                          />
+                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                            {color}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">Click a color to remove it</p>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Background Style</label>
                   <input value={formData.visual_identity?.background_style || ''} onChange={e => updateNested('visual_identity.background_style', e.target.value)} className="w-full p-4 bg-white border border-slate-200 rounded-xl" />

@@ -8,6 +8,7 @@ export interface BrandDNA {
   visual_identity: {
     primary_color_hex: string;
     accent_color_hex: string;
+    colors?: string[];
     background_style: string;
     imagery_style: string;
     font_vibe: string;

@@ -103,16 +103,19 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
     1. Look at the website header/navigation bar - what color is it? Extract that hex code.
     2. Look at primary buttons or CTAs - what color are they? Extract that hex code.
     3. Look at links or highlighted text - what color are they? Extract that hex code.
-    4. Look at the overall color scheme - identify the 2-3 most dominant colors.
-    5. If analyzing a screenshot, use the actual pixel colors you see, not assumptions.
-    6. Return REAL hex codes from the website, not generic brand colors like "#000000" or "#FFFFFF" unless those are actually the dominant colors.
-    7. If the website uses gradients, identify the primary colors in the gradient.
-    8. Avoid default colors - look for the actual brand colors being used.
+    4. Look at the overall color scheme - identify ALL distinct colors used on the website (not just 2-3).
+    5. Extract ALL colors found: primary colors, accent colors, background colors, text colors, border colors, etc.
+    6. If analyzing a screenshot, use the actual pixel colors you see, not assumptions.
+    7. Return REAL hex codes from the website, not generic brand colors like "#000000" or "#FFFFFF" unless those are actually used.
+    8. If the website uses gradients, identify all the colors in the gradient.
+    9. Avoid default colors - look for the actual brand colors being used.
+    10. Include ALL colors found, even if there are many - do not limit to just 2-3 colors.
     
     Return ONLY a JSON object with this exact structure:
     {
-      "primary_color_hex": "#HEXCODE (exact hex from website, e.g. #1a1a1a or #ff6b6b)",
-      "accent_color_hex": "#HEXCODE (exact hex from website, e.g. #4ecdc4 or #ffe66d)",
+      "primary_color_hex": "#HEXCODE (the most dominant/main brand color, e.g. #1a1a1a or #ff6b6b)",
+      "accent_color_hex": "#HEXCODE (the second most prominent color, e.g. #4ecdc4 or #ffe66d)",
+      "colors": ["#HEXCODE1", "#HEXCODE2", "#HEXCODE3", ...] (array of ALL distinct colors found on the website, including primary and accent),
       "background_style": "Description of background style (include hex if solid color)",
       "imagery_style": "Description of imagery/photography style",
       "font_vibe": "Description of typography personality",
@@ -325,6 +328,9 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
     visual_identity: {
       primary_color_hex: visualInfo.primary_color_hex || '#4F46E5',
       accent_color_hex: visualInfo.accent_color_hex || '#F59E0B',
+      colors: visualInfo.colors && Array.isArray(visualInfo.colors) && visualInfo.colors.length > 0 
+        ? visualInfo.colors 
+        : [visualInfo.primary_color_hex || '#4F46E5', visualInfo.accent_color_hex || '#F59E0B'].filter(Boolean),
       background_style: visualInfo.background_style || '',
       imagery_style: visualInfo.imagery_style || '',
       font_vibe: visualInfo.font_vibe || '',
@@ -425,6 +431,7 @@ export const extractBasicInfo = async (input: { url?: string; imageBase64?: stri
 export const extractVisualIdentity = async (input: { url?: string; imageBase64?: string }): Promise<{
   primary_color_hex: string;
   accent_color_hex: string;
+  colors: string[];
   background_style: string;
   imagery_style: string;
   font_vibe: string;
@@ -504,6 +511,9 @@ export const extractVisualIdentity = async (input: { url?: string; imageBase64?:
   return {
     primary_color_hex: visualInfo.primary_color_hex || '#4F46E5',
     accent_color_hex: visualInfo.accent_color_hex || '#F59E0B',
+    colors: visualInfo.colors && Array.isArray(visualInfo.colors) && visualInfo.colors.length > 0 
+      ? visualInfo.colors 
+      : [visualInfo.primary_color_hex || '#4F46E5', visualInfo.accent_color_hex || '#F59E0B'].filter(Boolean),
     background_style: visualInfo.background_style || '',
     imagery_style: visualInfo.imagery_style || '',
     font_vibe: visualInfo.font_vibe || '',
