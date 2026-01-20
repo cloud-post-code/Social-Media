@@ -221,7 +221,8 @@ export async function executeScrapingCode(
       ? result.logo_url.trim()
       : undefined;
     
-    // Ensure image_urls is an array and validate URLs
+
+      // Ensure image_urls is an array and validate URLs
     const image_urls = Array.isArray(result.image_urls) 
       ? result.image_urls
           .filter((url: any) => typeof url === 'string' && url.trim().length > 0)
