@@ -38,21 +38,28 @@ export async function getWebsiteStructure(url: string): Promise<string> {
     });
     
     // Wait a bit for any lazy-loaded content
-    await page.waitForTimeout(2000);
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Extract simplified DOM structure focusing on images and navigation
     const structure = await page.evaluate(() => {
+      // TypeScript doesn't know about browser globals inside evaluate
+      // These are available in the browser context where this code runs
+      // @ts-expect-error - window is available in browser context
+      const win = window;
+      // @ts-expect-error - document is available in browser context
+      const doc = document;
+      
       const result: any = {
-        url: window.location.href,
-        title: document.title,
+        url: win.location.href,
+        title: doc.title,
         images: [],
         navigation: [],
         headers: []
       };
       
       // Extract all images with their attributes
-      const images = document.querySelectorAll('img');
-      images.forEach((img, index) => {
+      const images = doc.querySelectorAll('img');
+      images.forEach((img: any, index: number) => {
         if (index < 50) { // Limit to first 50 images
           const rect = img.getBoundingClientRect();
           result.images.push({
@@ -69,16 +76,16 @@ export async function getWebsiteStructure(url: string): Promise<string> {
       });
       
       // Extract navigation structure
-      const navElements = document.querySelectorAll('nav, header, [role="navigation"]');
-      navElements.forEach((nav, index) => {
+      const navElements = doc.querySelectorAll('nav, header, [role="navigation"]');
+      navElements.forEach((nav: any, index: number) => {
         if (index < 5) {
-          const images = nav.querySelectorAll('img');
+          const navImages = nav.querySelectorAll('img');
           result.navigation.push({
             tag: nav.tagName,
             className: nav.className || '',
             id: nav.id || '',
-            imageCount: images.length,
-            images: Array.from(images).slice(0, 5).map(img => ({
+            imageCount: navImages.length,
+            images: Array.from(navImages).slice(0, 5).map((img: any) => ({
               src: img.src || img.getAttribute('src') || '',
               alt: img.alt || ''
             }))
@@ -87,8 +94,8 @@ export async function getWebsiteStructure(url: string): Promise<string> {
       });
       
       // Extract headers (h1-h6)
-      const headers = document.querySelectorAll('h1, h2, h3');
-      headers.forEach((header, index) => {
+      const headers = doc.querySelectorAll('h1, h2, h3');
+      headers.forEach((header: any, index: number) => {
         if (index < 10) {
           result.headers.push({
             tag: header.tagName,
@@ -155,7 +162,7 @@ export async function executeScrapingCode(
     });
     
     // Wait for content to load
-    await page.waitForTimeout(2000);
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Create sandboxed VM context
     const vmContext = vm.createContext({
@@ -194,7 +201,7 @@ export async function executeScrapingCode(
     
     const executePromise = (async () => {
       try {
-        const script = new vm.Script(wrappedCode, { timeout: 30000 });
+        const script = new vm.Script(wrappedCode);
         const result = script.runInContext(vmContext);
         // If result is a Promise, await it; otherwise return directly
         return result instanceof Promise ? await result : result;
