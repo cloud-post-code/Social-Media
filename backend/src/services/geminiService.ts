@@ -86,44 +86,67 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
 
   // Step 2: Extract Visual Identity
   const visualPrompt = `
-    You are an expert Brand Designer and Visual Identity Specialist.
-    Analyze the ${source} to extract detailed visual identity information.
+    You are an expert UI/UX Designer and Visual Identity Specialist.
+
+    Analyze the ${source} to extract a comprehensive and accurate visual identity system.
+
     ${urlContext}
-    
-    CRITICAL: You must analyze the ACTUAL colors present on the website/screenshot, not generic brand colors.
-    
-    Focus specifically on:
-    - Primary brand color (the main brand color actually used on the website - look at headers, logos, navigation, primary buttons, and key UI elements. Extract the EXACT hex code from the visual design)
-    - Accent color (secondary color used for highlights, CTAs, links, or accent elements. Extract the EXACT hex code from buttons, links, or highlighted elements)
-    - Background style (describe the typical background aesthetic - include hex if solid color)
-    - Imagery style (describe the photography/image style used)
-    - Typography vibe (describe the font personality and style - analyze the actual fonts used)
-    - Logo style (describe the logo's visual characteristics - analyze the actual logo if visible)
-    
-    IMPORTANT COLOR EXTRACTION INSTRUCTIONS:
-    1. Look at the website header/navigation bar - what color is it? Extract that hex code.
-    2. Look at primary buttons or CTAs - what color are they? Extract that hex code.
-    3. Look at links or highlighted text - what color are they? Extract that hex code.
-    4. Look at the overall color scheme - identify ALL distinct colors used on the website (not just 2-3).
-    5. Extract ALL colors found: primary colors, accent colors, background colors, text colors, border colors, etc.
-    6. If analyzing a screenshot, use the actual pixel colors you see, not assumptions.
-    7. Return REAL hex codes from the website, not generic brand colors like "#000000" or "#FFFFFF" unless those are actually used.
-    8. If the website uses gradients, identify all the colors in the gradient.
-    9. Avoid default colors - look for the actual brand colors being used.
-    10. Include ALL colors found, even if there are many - do not limit to just 2-3 colors.
-    
+
+    CRITICAL ANALYSIS RULES:
+
+    1. **UI Elements > Content Images:** Prioritize colors found in the User Interface (buttons, navigation bars, backgrounds, icons, typography) over colors found inside product photos or temporary banners.
+
+    2. **Contrast & Hierarchy:** Look for colors that establish hierarchy. The "Primary" color is usually the one used for the main Call-to-Action (like a "Search" or "Buy" button) or the active state in navigation.
+
+    3. **Neutral Foundation:** A valid design system always contains neutrals (backgrounds and text). You must identify these distinct from the brand colors.
+
+    SPECIFIC EXTRACTION TASKS:
+
+    1. **Identify Neutral Colors (Mandatory: Find at least 2):**
+
+       - **Page Background:** Look for the main background color (often #FFFFFF or a very light grey).
+
+       - **Typography/Text:** Look for the primary font color (often #000000 or a dark grey like #333333).
+
+       - **UI Structure:** Look for border colors or card background colors.
+
+    2. **Identify Primary Brand Color:**
+
+       - Look for the distinct "Action" color. Check the "Search" button, "Add to Cart" buttons, or the main logo element. 
+
+       - (Note: If there is a bright pop color for buttons, this is likely the Primary or High-Level Accent).
+
+    3. **Identify Secondary/Accent Color:**
+
+       - Look for supporting colors used in the logo, secondary links, or icons.
+
+    4. **Identify Recurring Colors:**
+
+       - List any other colors that appear consistently in the interface elements (not photos).
+
     Return ONLY a JSON object with this exact structure:
+
     {
-      "primary_color_hex": "#HEXCODE (the most dominant/main brand color, e.g. #1a1a1a or #ff6b6b)",
-      "accent_color_hex": "#HEXCODE (the second most prominent color, e.g. #4ecdc4 or #ffe66d)",
-      "colors": ["#HEXCODE1", "#HEXCODE2", "#HEXCODE3", ...] (array of ALL distinct colors found on the website, including primary and accent),
-      "background_style": "Description of background style (include hex if solid color)",
-      "imagery_style": "Description of imagery/photography style",
+
+      "primary_color_hex": "#HEXCODE (The main action/brand color)",
+
+      "secondary_color_hex": "#HEXCODE (Supporting accent color)",
+
+      "neutrals": ["#HEXCODE1", "#HEXCODE2", "#HEXCODE3"] (Array of background and text colors, e.g., white, dark grey),
+
+      "additional_brand_colors": ["#HEXCODE", ...] (Array of other distinct UI colors found),
+
+      "background_style": "Description of background (e.g., Clean white with soft shadows)",
+
+      "imagery_style": "Description of photography style",
+
       "font_vibe": "Description of typography personality",
+
       "logo_style": "Description of logo characteristics"
+
     }
-    
-    Return ONLY JSON. No markdown, no explanations. Ensure hex codes are valid (6 characters after #).
+
+    Return ONLY JSON. No markdown.
   `;
 
   let visualContents: any;
@@ -289,17 +312,46 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
     name: basicInfo.name || 'Unknown Brand',
     tagline: basicInfo.tagline || '',
     overview: basicInfo.overview || '',
-    visual_identity: {
-      primary_color_hex: visualInfo.primary_color_hex || '#4F46E5',
-      accent_color_hex: visualInfo.accent_color_hex || '#F59E0B',
-      colors: visualInfo.colors && Array.isArray(visualInfo.colors) && visualInfo.colors.length > 0 
-        ? visualInfo.colors 
-        : [visualInfo.primary_color_hex || '#4F46E5', visualInfo.accent_color_hex || '#F59E0B'].filter(Boolean),
-      background_style: visualInfo.background_style || '',
-      imagery_style: visualInfo.imagery_style || '',
-      font_vibe: visualInfo.font_vibe || '',
-      logo_style: visualInfo.logo_style || ''
-    },
+    visual_identity: (() => {
+      // Combine neutrals, primary, secondary, and additional brand colors
+      const neutrals = Array.isArray(visualInfo.neutrals) ? visualInfo.neutrals : [];
+      const additionalColors = Array.isArray(visualInfo.additional_brand_colors) ? visualInfo.additional_brand_colors : [];
+      const primaryColor = visualInfo.primary_color_hex || '#4F46E5';
+      const secondaryColor = visualInfo.secondary_color_hex || visualInfo.accent_color_hex || '#F59E0B';
+      
+      // Combine all colors, removing duplicates
+      const allColors = [
+        primaryColor,
+        secondaryColor,
+        ...neutrals,
+        ...additionalColors
+      ].filter((color, index, self) => 
+        color && typeof color === 'string' && self.indexOf(color) === index
+      );
+      
+      // Ensure minimum of 4 colors
+      while (allColors.length < 4) {
+        if (allColors.length === 0) {
+          allColors.push('#4F46E5', '#F59E0B', '#FFFFFF', '#000000');
+        } else if (allColors.length === 1) {
+          allColors.push('#F59E0B', '#FFFFFF', '#000000');
+        } else if (allColors.length === 2) {
+          allColors.push('#FFFFFF', '#000000');
+        } else if (allColors.length === 3) {
+          allColors.push('#808080');
+        }
+      }
+      
+      return {
+        primary_color_hex: primaryColor,
+        accent_color_hex: secondaryColor,
+        colors: allColors.slice(0, Math.max(4, allColors.length)), // Ensure at least 4 colors
+        background_style: visualInfo.background_style || '',
+        imagery_style: visualInfo.imagery_style || '',
+        font_vibe: visualInfo.font_vibe || '',
+        logo_style: visualInfo.logo_style || ''
+      };
+    })(),
     brand_voice: {
       tone_adjectives: voiceInfo.tone_adjectives || [],
       writing_style: voiceInfo.writing_style || '',
@@ -408,41 +460,67 @@ export const extractVisualIdentity = async (input: { url?: string; imageBase64?:
   const urlContext = input.url ? `\n\nIMPORTANT: Visit and analyze the website at ${input.url}. Extract information directly from the website content, design, and messaging.` : '';
 
   const visualPrompt = `
-    You are an expert Brand Designer and Visual Identity Specialist.
-    Analyze the ${source} to extract detailed visual identity information.
+    You are an expert UI/UX Designer and Visual Identity Specialist.
+
+    Analyze the ${source} to extract a comprehensive and accurate visual identity system.
+
     ${urlContext}
-    
-    CRITICAL: You must analyze the ACTUAL colors present on the website/screenshot, not generic brand colors.
-    
-    Focus specifically on:
-    - Primary brand color (the main brand color actually used on the website - look at headers, logos, navigation, primary buttons, and key UI elements. Extract the EXACT hex code from the visual design)
-    - Accent color (secondary color used for highlights, CTAs, links, or accent elements. Extract the EXACT hex code from buttons, links, or highlighted elements)
-    - Background style (describe the typical background aesthetic - include hex if solid color)
-    - Imagery style (describe the photography/image style used)
-    - Typography vibe (describe the font personality and style - analyze the actual fonts used)
-    - Logo style (describe the logo's visual characteristics - analyze the actual logo if visible)
-    
-    IMPORTANT COLOR EXTRACTION INSTRUCTIONS:
-    1. Look at the website header/navigation bar - what color is it? Extract that hex code.
-    2. Look at primary buttons or CTAs - what color are they? Extract that hex code.
-    3. Look at links or highlighted text - what color are they? Extract that hex code.
-    4. Look at the overall color scheme - identify the 2-3 most dominant colors.
-    5. If analyzing a screenshot, use the actual pixel colors you see, not assumptions.
-    6. Return REAL hex codes from the website, not generic brand colors like "#000000" or "#FFFFFF" unless those are actually the dominant colors.
-    7. If the website uses gradients, identify the primary colors in the gradient.
-    8. Avoid default colors - look for the actual brand colors being used.
-    
+
+    CRITICAL ANALYSIS RULES:
+
+    1. **UI Elements > Content Images:** Prioritize colors found in the User Interface (buttons, navigation bars, backgrounds, icons, typography) over colors found inside product photos or temporary banners.
+
+    2. **Contrast & Hierarchy:** Look for colors that establish hierarchy. The "Primary" color is usually the one used for the main Call-to-Action (like a "Search" or "Buy" button) or the active state in navigation.
+
+    3. **Neutral Foundation:** A valid design system always contains neutrals (backgrounds and text). You must identify these distinct from the brand colors.
+
+    SPECIFIC EXTRACTION TASKS:
+
+    1. **Identify Neutral Colors (Mandatory: Find at least 2):**
+
+       - **Page Background:** Look for the main background color (often #FFFFFF or a very light grey).
+
+       - **Typography/Text:** Look for the primary font color (often #000000 or a dark grey like #333333).
+
+       - **UI Structure:** Look for border colors or card background colors.
+
+    2. **Identify Primary Brand Color:**
+
+       - Look for the distinct "Action" color. Check the "Search" button, "Add to Cart" buttons, or the main logo element. 
+
+       - (Note: If there is a bright pop color for buttons, this is likely the Primary or High-Level Accent).
+
+    3. **Identify Secondary/Accent Color:**
+
+       - Look for supporting colors used in the logo, secondary links, or icons.
+
+    4. **Identify Recurring Colors:**
+
+       - List any other colors that appear consistently in the interface elements (not photos).
+
     Return ONLY a JSON object with this exact structure:
+
     {
-      "primary_color_hex": "#HEXCODE (exact hex from website, e.g. #1a1a1a or #ff6b6b)",
-      "accent_color_hex": "#HEXCODE (exact hex from website, e.g. #4ecdc4 or #ffe66d)",
-      "background_style": "Description of background style (include hex if solid color)",
-      "imagery_style": "Description of imagery/photography style",
+
+      "primary_color_hex": "#HEXCODE (The main action/brand color)",
+
+      "secondary_color_hex": "#HEXCODE (Supporting accent color)",
+
+      "neutrals": ["#HEXCODE1", "#HEXCODE2", "#HEXCODE3"] (Array of background and text colors, e.g., white, dark grey),
+
+      "additional_brand_colors": ["#HEXCODE", ...] (Array of other distinct UI colors found),
+
+      "background_style": "Description of background (e.g., Clean white with soft shadows)",
+
+      "imagery_style": "Description of photography style",
+
       "font_vibe": "Description of typography personality",
+
       "logo_style": "Description of logo characteristics"
+
     }
-    
-    Return ONLY JSON. No markdown, no explanations. Ensure hex codes are valid (6 characters after #).
+
+    Return ONLY JSON. No markdown.
   `;
 
   let visualContents: any;
@@ -472,12 +550,39 @@ export const extractVisualIdentity = async (input: { url?: string; imageBase64?:
   
   const visualInfo = safeJsonParse(visualResponse.text || '{}') || {};
   
+  // Combine neutrals, primary, secondary, and additional brand colors
+  const neutrals = Array.isArray(visualInfo.neutrals) ? visualInfo.neutrals : [];
+  const additionalColors = Array.isArray(visualInfo.additional_brand_colors) ? visualInfo.additional_brand_colors : [];
+  const primaryColor = visualInfo.primary_color_hex || '#4F46E5';
+  const secondaryColor = visualInfo.secondary_color_hex || visualInfo.accent_color_hex || '#F59E0B';
+  
+  // Combine all colors, removing duplicates
+  const allColors = [
+    primaryColor,
+    secondaryColor,
+    ...neutrals,
+    ...additionalColors
+  ].filter((color, index, self) => 
+    color && typeof color === 'string' && self.indexOf(color) === index
+  );
+  
+  // Ensure minimum of 4 colors
+  while (allColors.length < 4) {
+    if (allColors.length === 0) {
+      allColors.push('#4F46E5', '#F59E0B', '#FFFFFF', '#000000');
+    } else if (allColors.length === 1) {
+      allColors.push('#F59E0B', '#FFFFFF', '#000000');
+    } else if (allColors.length === 2) {
+      allColors.push('#FFFFFF', '#000000');
+    } else if (allColors.length === 3) {
+      allColors.push('#808080');
+    }
+  }
+  
   return {
-    primary_color_hex: visualInfo.primary_color_hex || '#4F46E5',
-    accent_color_hex: visualInfo.accent_color_hex || '#F59E0B',
-    colors: visualInfo.colors && Array.isArray(visualInfo.colors) && visualInfo.colors.length > 0 
-      ? visualInfo.colors 
-      : [visualInfo.primary_color_hex || '#4F46E5', visualInfo.accent_color_hex || '#F59E0B'].filter(Boolean),
+    primary_color_hex: primaryColor,
+    accent_color_hex: secondaryColor,
+    colors: allColors.slice(0, Math.max(4, allColors.length)), // Ensure at least 4 colors
     background_style: visualInfo.background_style || '',
     imagery_style: visualInfo.imagery_style || '',
     font_vibe: visualInfo.font_vibe || '',

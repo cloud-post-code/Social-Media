@@ -16,6 +16,8 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
   const [urlInput, setUrlInput] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractedAssets, setExtractedAssets] = useState<{ logoUrl?: string; imageUrls?: string[] } | null>(null);
+  const [editingColorIndex, setEditingColorIndex] = useState<number | null>(null);
+  const [isAddingColor, setIsAddingColor] = useState(false);
   
   const brandId = formData.id;
   const { assets, logo, loading: assetsLoading, uploadAsset, deleteAsset, loadAssets } = useBrandAssets(brandId);
@@ -28,6 +30,25 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dna]);
+
+  // Close color picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Close if clicking outside color picker elements
+      if (editingColorIndex !== null && !target.closest('.color-picker-container')) {
+        setEditingColorIndex(null);
+      }
+      if (isAddingColor && !target.closest('.color-picker-container')) {
+        setIsAddingColor(false);
+      }
+    };
+    
+    if (editingColorIndex !== null || isAddingColor) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [editingColorIndex, isAddingColor]);
 
   // Save extracted assets when brandId becomes available (for existing brands being updated)
   useEffect(() => {
@@ -351,6 +372,23 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Ensure colors array has at least 4 colors
+    let colors = formData.visual_identity?.colors || [];
+    if (colors.length < 4) {
+      while (colors.length < 4) {
+        if (colors.length === 0) {
+          colors = ['#4F46E5', '#F59E0B', '#FFFFFF', '#000000'];
+        } else if (colors.length === 1) {
+          colors.push('#F59E0B', '#FFFFFF', '#000000');
+        } else if (colors.length === 2) {
+          colors.push('#FFFFFF', '#000000');
+        } else if (colors.length === 3) {
+          colors.push('#808080');
+        }
+      }
+    }
+    
     const finalData: BrandDNA = {
       id: formData.id || Date.now().toString(),
       name: formData.name || 'Untitled Brand',
@@ -359,7 +397,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
       visual_identity: {
         primary_color_hex: formData.visual_identity?.primary_color_hex || '#4F46E5',
         accent_color_hex: formData.visual_identity?.accent_color_hex || '#F59E0B',
-        colors: formData.visual_identity?.colors,
+        colors: colors,
         background_style: formData.visual_identity?.background_style || 'Clean white',
         imagery_style: formData.visual_identity?.imagery_style || 'Professional photography',
         font_vibe: formData.visual_identity?.font_vibe || 'Sans-serif modern',
@@ -545,39 +583,118 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                     onChange={(hex) => updateNested('visual_identity.accent_color_hex', hex)}
                   />
                 </div>
-                {(formData.visual_identity?.colors && formData.visual_identity.colors.length > 0) && (
-                  <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                      All Brand Colors ({formData.visual_identity.colors.length})
-                    </label>
-                    <div className="flex flex-wrap gap-3">
-                      {formData.visual_identity.colors.map((color, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors group"
-                        >
-                          <div
-                            className="w-10 h-10 rounded-lg border-2 border-slate-200 shadow-sm flex-shrink-0"
-                            style={{ backgroundColor: color }}
-                          />
-                          <span className="text-xs font-mono text-slate-700 font-medium">{color}</span>
-                          <button
-                            onClick={() => {
-                              const newColors = [...formData.visual_identity.colors!];
-                              newColors.splice(index, 1);
-                              updateNested('visual_identity.colors', newColors.length > 0 ? newColors : undefined);
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-4">
+                    Colors
+                  </label>
+                  <div className="flex flex-wrap gap-6">
+                    {(() => {
+                      // Ensure at least 4 colors are displayed
+                      let colors = formData.visual_identity?.colors || [];
+                      if (colors.length < 4) {
+                        while (colors.length < 4) {
+                          if (colors.length === 0) {
+                            colors = ['#4F46E5', '#F59E0B', '#FFFFFF', '#000000'];
+                          } else if (colors.length === 1) {
+                            colors.push('#F59E0B', '#FFFFFF', '#000000');
+                          } else if (colors.length === 2) {
+                            colors.push('#FFFFFF', '#000000');
+                          } else if (colors.length === 3) {
+                            colors.push('#808080');
+                          }
+                        }
+                        // Update formData if we had to add default colors
+                        if (!formData.visual_identity?.colors || formData.visual_identity.colors.length < 4) {
+                          updateNested('visual_identity.colors', colors);
+                        }
+                      }
+                      return colors;
+                    })().map((color, index) => (
+                      <div
+                        key={index}
+                        className="flex flex-col items-center gap-2 group relative"
+                      >
+                        {editingColorIndex === index ? (
+                          <div className="absolute z-50 top-0 left-0 color-picker-container">
+                            <ColorPicker
+                              value={color}
+                              onChange={(newColor) => {
+                                const newColors = [...(formData.visual_identity?.colors || [])];
+                                newColors[index] = newColor.toUpperCase();
+                                updateNested('visual_identity.colors', newColors);
+                                setEditingColorIndex(null);
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <div
+                              className="w-16 h-16 rounded-full border-2 border-slate-200 shadow-sm transition-all hover:scale-110 hover:shadow-md cursor-pointer"
+                              style={{ backgroundColor: color }}
+                              onClick={() => setEditingColorIndex(index)}
+                              title={`Click to edit ${color}`}
+                            />
+                            <span className="text-xs font-mono text-slate-400 font-medium">{color}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newColors = [...(formData.visual_identity?.colors || [])];
+                                newColors.splice(index, 1);
+                                // Ensure minimum 4 colors
+                                if (newColors.length < 4) {
+                                  while (newColors.length < 4) {
+                                    if (newColors.length === 0) {
+                                      newColors.push('#4F46E5', '#F59E0B', '#FFFFFF', '#000000');
+                                    } else if (newColors.length === 1) {
+                                      newColors.push('#F59E0B', '#FFFFFF', '#000000');
+                                    } else if (newColors.length === 2) {
+                                      newColors.push('#FFFFFF', '#000000');
+                                    } else if (newColors.length === 3) {
+                                      newColors.push('#808080');
+                                    }
+                                  }
+                                }
+                                updateNested('visual_identity.colors', newColors.length > 0 ? newColors : undefined);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-600 text-xs font-bold -mt-1"
+                              title="Remove color"
+                            >
+                              ×
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                    {/* Add Color Button */}
+                    {isAddingColor ? (
+                      <div className="flex flex-col items-center gap-2 relative color-picker-container">
+                        <div className="absolute z-50 top-0 left-0">
+                          <ColorPicker
+                            value="#000000"
+                            onChange={(newColor) => {
+                              const currentColors = formData.visual_identity?.colors || [];
+                              const newColors = [...currentColors, newColor.toUpperCase()];
+                              updateNested('visual_identity.colors', newColors);
+                              setIsAddingColor(false);
                             }}
-                            className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-600 text-xs font-bold"
-                            title="Remove color"
-                          >
-                            ×
-                          </button>
+                          />
                         </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-2">Hover over a color to remove it</p>
+                      </div>
+                    ) : (
+                      <div
+                        className="flex flex-col items-center gap-2 cursor-pointer"
+                        onClick={() => setIsAddingColor(true)}
+                      >
+                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center hover:bg-slate-100 hover:border-slate-400 transition-all hover:scale-110">
+                          <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                        </div>
+                        <span className="text-xs font-mono text-slate-400 font-medium">Add Color</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Background Style</label>
                   <input value={formData.visual_identity?.background_style || ''} onChange={e => updateNested('visual_identity.background_style', e.target.value)} className="w-full p-4 bg-white border border-slate-200 rounded-xl" />
