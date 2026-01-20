@@ -144,42 +144,31 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   
   // Calculate font size based on actual image dimensions (matching backend logic)
   const getFontSize = (baseFontSize: number | undefined, isTitle: boolean) => {
-    if (!imageDimensions || !imageContainerRef.current) {
+    const dims = getDisplayedImageDimensions();
+    if (!dims || !imageDimensions) {
       return isTitle ? 'clamp(1.5rem, 4vw, 3rem)' : 'clamp(1rem, 2.5vw, 2rem)';
     }
     
-    const container = imageContainerRef.current;
-    const rect = container.getBoundingClientRect();
-    const containerAspect = rect.width / rect.height;
-    const imageAspect = imageDimensions.width / imageDimensions.height;
-    let displayWidth: number;
-    
-    // Calculate actual displayed image width (accounting for object-contain)
-    if (imageAspect > containerAspect) {
-      // Image is wider - fit to width
-      displayWidth = rect.width;
-    } else {
-      // Image is taller - fit to height
-      displayWidth = rect.height * imageAspect;
-    }
-    
-    // If custom font size is provided, scale it based on the ratio of displayed width to original width
+    // Calculate font size using the ACTUAL image width (not displayed width) to match backend
+    // Backend uses: Math.max(56, Math.min(width / 10, 120)) for title
+    // Backend uses: Math.max(32, Math.min(width / 16, 64)) for subtitle
+    let calculatedFontSize: number;
     if (baseFontSize) {
-      const scale = displayWidth / imageDimensions.width;
-      return `${baseFontSize * scale}px`;
+      // If custom font size is provided, use it directly (it's already calculated for actual image width)
+      calculatedFontSize = baseFontSize;
+    } else {
+      // Calculate using actual image width (matching backend exactly)
+      if (isTitle) {
+        calculatedFontSize = Math.max(56, Math.min(imageDimensions.width / 10, 120));
+      } else {
+        calculatedFontSize = Math.max(32, Math.min(imageDimensions.width / 16, 64));
+      }
     }
     
-    // Otherwise, calculate based on displayed image width (matching backend logic)
-    // Match backend calculation: Math.max(56, Math.min(width / 10, 120)) for title
-    // Math.max(32, Math.min(width / 16, 64)) for subtitle
-    // But scale to displayed size
-    if (isTitle) {
-      const calculatedSize = Math.max(56, Math.min(displayWidth / 10, 120));
-      return `${calculatedSize}px`;
-    } else {
-      const calculatedSize = Math.max(32, Math.min(displayWidth / 16, 64));
-      return `${calculatedSize}px`;
-    }
+    // Now scale the font size to match the displayed image size
+    // This ensures the preview matches what will be rendered
+    const scale = dims.displayWidth / imageDimensions.width;
+    return `${calculatedFontSize * scale}px`;
   };
   
   // Calculate aspect ratio for the image container
@@ -190,10 +179,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     return { aspectRatio: `${imageDimensions.width} / ${imageDimensions.height}` };
   };
   
-  // Calculate overlay position accounting for actual image display area (letterboxing)
-  const getOverlayPosition = (xPercent: number, yPercent: number): React.CSSProperties => {
+  // Get displayed image dimensions (accounting for object-contain letterboxing)
+  const getDisplayedImageDimensions = () => {
     if (!imageDimensions || !imageContainerRef.current) {
-      return { left: `${xPercent}%`, top: `${yPercent}%`, transform: 'translate(-50%, -50%)' };
+      return null;
     }
     
     const container = imageContainerRef.current;
@@ -220,15 +209,35 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       offsetY = 0;
     }
     
+    return { displayWidth, displayHeight, offsetX, offsetY };
+  };
+
+  // Calculate overlay position accounting for actual image display area (letterboxing)
+  const getOverlayPosition = (xPercent: number, yPercent: number): React.CSSProperties => {
+    const dims = getDisplayedImageDimensions();
+    if (!dims) {
+      return { left: `${xPercent}%`, top: `${yPercent}%`, transform: 'translate(-50%, -50%)' };
+    }
+    
     // Calculate position relative to container, accounting for letterboxing
-    const left = offsetX + (displayWidth * xPercent / 100);
-    const top = offsetY + (displayHeight * yPercent / 100);
+    const left = dims.offsetX + (dims.displayWidth * xPercent / 100);
+    const top = dims.offsetY + (dims.displayHeight * yPercent / 100);
     
     return {
       left: `${left}px`,
       top: `${top}px`,
       transform: 'translate(-50%, -50%)'
     };
+  };
+
+  // Calculate max width in pixels based on displayed image width
+  const getMaxWidthPixels = (maxWidthPercent: number | undefined) => {
+    const dims = getDisplayedImageDimensions();
+    if (!dims) {
+      return '80%'; // Fallback to percentage if dimensions not available
+    }
+    const percent = Math.min(maxWidthPercent || 80, 85);
+    return `${(dims.displayWidth * percent) / 100}px`;
   };
   
   // Function to pick color from image using canvas
@@ -806,7 +815,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           style={{
                             ...getOverlayPosition(titleXPercent, titleYPercent),
                             textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
-                            maxWidth: `${Math.min(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80, 85)}%`,
+                            maxWidth: getMaxWidthPixels(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent),
                             padding: '0.5rem',
                             color: overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
                             opacity: overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1),
@@ -820,7 +829,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             zIndex: draggingElement === 'title' ? 20 : 10,
                             minWidth: 'fit-content',
                             wordWrap: 'break-word',
-                            overflowWrap: 'break-word'
+                            overflowWrap: 'break-word',
+                            wordBreak: 'normal'
                           }}
                           onMouseDown={(e) => {
                             if (eyedropperActive) {
@@ -848,7 +858,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             }
                           }}
                         >
-                          <div style={{ whiteSpace: 'pre-line', pointerEvents: 'none' }}>
+                          <div style={{ whiteSpace: 'pre-wrap', pointerEvents: 'none', wordBreak: 'normal', overflowWrap: 'break-word' }}>
                             {overlayEdit.title || displayAsset.overlayConfig.title || ''}
                           </div>
                         </div>
@@ -884,7 +894,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           style={{
                             ...getOverlayPosition(subtitleXPercent, subtitleYPercent),
                             textAlign: (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
-                            maxWidth: `${Math.min(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80, 85)}%`,
+                            maxWidth: getMaxWidthPixels(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent),
                             padding: '0.5rem',
                             color: overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
                             opacity: (overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1)) * 0.9,
@@ -898,7 +908,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             zIndex: draggingElement === 'subtitle' ? 20 : 10,
                             minWidth: 'fit-content',
                             wordWrap: 'break-word',
-                            overflowWrap: 'break-word'
+                            overflowWrap: 'break-word',
+                            wordBreak: 'normal'
                           }}
                           onMouseDown={(e) => {
                             if (eyedropperActive) {
@@ -926,7 +937,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             }
                           }}
                         >
-                          <div style={{ whiteSpace: 'pre-line', pointerEvents: 'none' }}>
+                          <div style={{ whiteSpace: 'pre-wrap', pointerEvents: 'none', wordBreak: 'normal', overflowWrap: 'break-word' }}>
                             {overlayEdit.subtitle || displayAsset.overlayConfig.subtitle}
                           </div>
                         </div>
