@@ -282,17 +282,6 @@ const App: React.FC = () => {
             </section>
           )}
         </div>
-
-        <div className="p-8 bg-slate-50 border-t border-slate-100 shrink-0">
-          <div className="bg-indigo-600 p-6 rounded-[2rem] text-white shadow-xl shadow-indigo-100 relative overflow-hidden group">
-            <div className="relative z-10">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Status</p>
-              <p className="text-sm font-black mb-4">Enterprise Mode</p>
-              <button className="w-full py-3 bg-white text-indigo-600 rounded-xl font-black text-xs hover:bg-indigo-50 transition active:scale-95">Manage Plan</button>
-            </div>
-            <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 blur-2xl rounded-full group-hover:scale-150 transition-all duration-700"></div>
-          </div>
-        </div>
       </aside>
 
       {/* Content Area */}

@@ -570,20 +570,6 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
               <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Visual Identity</h3>
               <div className="bg-slate-50 p-6 rounded-3xl space-y-6">
                 <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Primary Color</label>
-                  <ColorPicker
-                    value={formData.visual_identity?.primary_color_hex || '#4F46E5'}
-                    onChange={(hex) => updateNested('visual_identity.primary_color_hex', hex)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Accent Color</label>
-                  <ColorPicker
-                    value={formData.visual_identity?.accent_color_hex || '#F59E0B'}
-                    onChange={(hex) => updateNested('visual_identity.accent_color_hex', hex)}
-                  />
-                </div>
-                <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-4">
                     Colors
                   </label>
