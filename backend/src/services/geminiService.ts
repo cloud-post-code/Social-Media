@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { BrandDNA, ScrapingCodeResponse } from "../types/index.js";
 import { getWebsiteStructure, executeScrapingCode, extractBrandColors } from "./imageScrapingService.js";
+import sharp from 'sharp';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -1379,6 +1380,57 @@ export const editImage = async (originalImageBase64: string, feedback: string): 
     ? originalImageBase64.split(',')[1] 
     : originalImageBase64;
   
+  // Extract image dimensions to preserve aspect ratio
+  let aspectRatio: string = "1:1"; // Default to square
+  let imageSize: "2K" | "4K" = "2K"; // Default size
+  
+  try {
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    const metadata = await sharp(imageBuffer).metadata();
+    const width = metadata.width || 1080;
+    const height = metadata.height || 1080;
+    
+    // Calculate aspect ratio
+    const ratio = width / height;
+    
+    // Map to supported aspect ratios (same logic as generateImage)
+    if (ratio < 0.7) {
+      // Very tall/portrait - prefer 9:16 or 3:4
+      aspectRatio = Math.abs(ratio - 9/16) < Math.abs(ratio - 3/4) ? "9:16" : "3:4";
+    } else if (ratio > 1.5) {
+      // Very wide/landscape - prefer 16:9 or 4:3
+      aspectRatio = Math.abs(ratio - 16/9) < Math.abs(ratio - 4/3) ? "16:9" : "4:3";
+    } else {
+      // Square-ish or moderate ratios
+      const supportedRatios = [
+        { name: "1:1", value: 1.0 },
+        { name: "9:16", value: 9/16 },
+        { name: "16:9", value: 16/9 },
+        { name: "4:3", value: 4/3 },
+        { name: "3:4", value: 3/4 }
+      ];
+      
+      let closestRatio = supportedRatios[0];
+      let minDifference = Math.abs(ratio - closestRatio.value);
+      
+      for (const supportedRatio of supportedRatios) {
+        const difference = Math.abs(ratio - supportedRatio.value);
+        if (difference < minDifference) {
+          minDifference = difference;
+          closestRatio = supportedRatio;
+        }
+      }
+      
+      aspectRatio = closestRatio.name;
+    }
+    
+    // Determine image size based on larger dimension
+    imageSize = Math.max(width, height) >= 2048 ? "4K" : "2K";
+  } catch (error) {
+    console.warn('[editImage] Failed to extract image dimensions, using defaults:', error);
+    // Continue with defaults
+  }
+  
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview', // Nano Banana Pro - higher fidelity, up to 4K output
     contents: {
@@ -1387,7 +1439,7 @@ export const editImage = async (originalImageBase64: string, feedback: string): 
         { text: `Edit this image based on feedback: ${feedback}. Ensure NO watermark, NO branding sections, NO logos, and NO text overlays remain in the image. Clean image only.` }
       ]
     },
-    config: { imageConfig: { aspectRatio: "1:1", imageSize: "2K" } }
+    config: { imageConfig: { aspectRatio: aspectRatio as any, imageSize: imageSize as any } }
   });
 
   for (const part of response.candidates?.[0]?.content?.parts || []) {

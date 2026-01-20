@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrandDNA, GenerationOption, GeneratedAsset } from '../models/types.js';
 import { assetApi } from '../services/assetApi.js';
 
@@ -71,6 +71,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   
   // Compute display asset and image URL from current asset
   const displayAsset = currentAsset;
@@ -101,27 +102,92 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     }
   }, [initialAsset]);
 
-  // Get actual image dimensions for accurate font scaling
+  // Get actual image dimensions for accurate font scaling and aspect ratio
   useEffect(() => {
-    if (imageUrl && currentAsset?.type === 'product') {
+    if (imageUrl) {
       const img = new Image();
       img.onload = () => {
         setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
       };
       img.src = imageUrl;
     }
-  }, [imageUrl, currentAsset?.type]);
+  }, [imageUrl]);
   
   // Calculate scale factor for font sizes to match preview with actual rendering
   const getFontScale = () => {
     if (!imageDimensions) return 1;
-    const container = document.querySelector('.relative.group.rounded-\\[4rem\\] .relative.w-full.aspect-square');
+    const container = document.querySelector('.image-preview-container');
     if (!container) return 1;
     const rect = container.getBoundingClientRect();
-    // Scale factor = preview container size / actual image size
-    const scaleX = rect.width / imageDimensions.width;
-    const scaleY = rect.height / imageDimensions.height;
+    // Calculate actual displayed image size (accounting for object-contain)
+    const containerAspect = rect.width / rect.height;
+    const imageAspect = imageDimensions.width / imageDimensions.height;
+    let displayWidth: number;
+    let displayHeight: number;
+    
+    if (imageAspect > containerAspect) {
+      // Image is wider - fit to width
+      displayWidth = rect.width;
+      displayHeight = rect.width / imageAspect;
+    } else {
+      // Image is taller - fit to height
+      displayHeight = rect.height;
+      displayWidth = rect.height * imageAspect;
+    }
+    
+    // Scale factor = displayed image size / actual image size
+    const scaleX = displayWidth / imageDimensions.width;
+    const scaleY = displayHeight / imageDimensions.height;
     return Math.min(scaleX, scaleY); // Use smaller to ensure text fits
+  };
+  
+  // Calculate aspect ratio for the image container
+  const getAspectRatioStyle = () => {
+    if (!imageDimensions) {
+      return { aspectRatio: '1 / 1' }; // Default to square if dimensions not loaded yet
+    }
+    return { aspectRatio: `${imageDimensions.width} / ${imageDimensions.height}` };
+  };
+  
+  // Calculate overlay position accounting for actual image display area (letterboxing)
+  const getOverlayPosition = (xPercent: number, yPercent: number): React.CSSProperties => {
+    if (!imageDimensions || !imageContainerRef.current) {
+      return { left: `${xPercent}%`, top: `${yPercent}%`, transform: 'translate(-50%, -50%)' };
+    }
+    
+    const container = imageContainerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const containerAspect = containerRect.width / containerRect.height;
+    const imageAspect = imageDimensions.width / imageDimensions.height;
+    
+    let displayWidth: number;
+    let displayHeight: number;
+    let offsetX: number;
+    let offsetY: number;
+    
+    if (imageAspect > containerAspect) {
+      // Image is wider - fit to width, letterbox top/bottom
+      displayWidth = containerRect.width;
+      displayHeight = containerRect.width / imageAspect;
+      offsetX = 0;
+      offsetY = (containerRect.height - displayHeight) / 2;
+    } else {
+      // Image is taller - fit to height, letterbox left/right
+      displayHeight = containerRect.height;
+      displayWidth = containerRect.height * imageAspect;
+      offsetX = (containerRect.width - displayWidth) / 2;
+      offsetY = 0;
+    }
+    
+    // Calculate position relative to container, accounting for letterboxing
+    const left = offsetX + (displayWidth * xPercent / 100);
+    const top = offsetY + (displayHeight * yPercent / 100);
+    
+    return {
+      left: `${left}px`,
+      top: `${top}px`,
+      transform: 'translate(-50%, -50%)'
+    };
   };
   
   // Function to pick color from image using canvas
@@ -199,27 +265,81 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     }
   };
   
+  // Calculate the actual displayed image bounds within the container (accounting for object-contain)
+  const getImageDisplayBounds = (container: Element) => {
+    if (!imageDimensions) return null;
+    
+    const containerRect = container.getBoundingClientRect();
+    const containerAspect = containerRect.width / containerRect.height;
+    const imageAspect = imageDimensions.width / imageDimensions.height;
+    
+    let displayWidth: number;
+    let displayHeight: number;
+    let offsetX: number;
+    let offsetY: number;
+    
+    if (imageAspect > containerAspect) {
+      // Image is wider - fit to width, letterbox top/bottom
+      displayWidth = containerRect.width;
+      displayHeight = containerRect.width / imageAspect;
+      offsetX = 0;
+      offsetY = (containerRect.height - displayHeight) / 2;
+    } else {
+      // Image is taller - fit to height, letterbox left/right
+      displayHeight = containerRect.height;
+      displayWidth = containerRect.height * imageAspect;
+      offsetX = (containerRect.width - displayWidth) / 2;
+      offsetY = 0;
+    }
+    
+    return {
+      x: containerRect.left + offsetX,
+      y: containerRect.top + offsetY,
+      width: displayWidth,
+      height: displayHeight
+    };
+  };
+  
   // Handle mouse move and up events globally when dragging
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging && dragStart && currentAsset && editingOverlay) {
-        const imageContainer = document.querySelector('.relative.group.rounded-\\[4rem\\] .relative.w-full.aspect-square');
-        if (imageContainer) {
-          const rect = imageContainer.getBoundingClientRect();
-          const x = ((e.clientX - rect.left) / rect.width) * 100;
-          const y = ((e.clientY - rect.top) / rect.height) * 100;
-          
-          // Better boundary validation: account for text dimensions
-          // Use more conservative bounds (15% to 85%) to ensure text never overlaps edges
-          // This matches the grid preset positions
-          const clampedX = Math.max(15, Math.min(85, x));
-          const clampedY = Math.max(15, Math.min(85, y));
-          
-          setOverlayEdit(prev => ({
-            ...prev,
-            x_percent: clampedX,
-            y_percent: clampedY
-          }));
+        const imageContainer = document.querySelector('.image-preview-container');
+        if (imageContainer && imageDimensions) {
+          const imageBounds = getImageDisplayBounds(imageContainer);
+          if (imageBounds) {
+            // Calculate position relative to the actual displayed image area
+            const relativeX = e.clientX - imageBounds.x;
+            const relativeY = e.clientY - imageBounds.y;
+            
+            // Convert to percentage based on actual image dimensions
+            const x = (relativeX / imageBounds.width) * 100;
+            const y = (relativeY / imageBounds.height) * 100;
+            
+            // Better boundary validation: account for text dimensions
+            // Use more conservative bounds (15% to 85%) to ensure text never overlaps edges
+            // This matches the grid preset positions
+            const clampedX = Math.max(15, Math.min(85, x));
+            const clampedY = Math.max(15, Math.min(85, y));
+            
+            setOverlayEdit(prev => ({
+              ...prev,
+              x_percent: clampedX,
+              y_percent: clampedY
+            }));
+          } else {
+            // Fallback to container-based calculation if image bounds can't be determined
+            const rect = imageContainer.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            const clampedX = Math.max(15, Math.min(85, x));
+            const clampedY = Math.max(15, Math.min(85, y));
+            setOverlayEdit(prev => ({
+              ...prev,
+              x_percent: clampedX,
+              y_percent: clampedY
+            }));
+          }
         }
       }
     };
@@ -557,10 +677,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           <div className="lg:col-span-6 space-y-8">
             {/* Visual Preview with Draggable Text Overlay */}
             <div className="relative group rounded-[4rem] overflow-hidden shadow-[0_48px_80px_-24px_rgba(0,0,0,0.3)] border-[20px] border-white ring-1 ring-slate-200">
-              <div className="relative w-full aspect-square">
+              <div ref={imageContainerRef} className="image-preview-container relative w-full" style={getAspectRatioStyle()}>
                 <img 
                   src={imageUrl} 
-                  className={`w-full h-full object-cover transition duration-700 group-hover:scale-105 ${eyedropperActive ? 'cursor-crosshair' : ''}`}
+                  className={`w-full h-full object-contain transition duration-700 group-hover:scale-105 ${eyedropperActive ? 'cursor-crosshair' : ''}`}
                   onClick={(e) => {
                     if (eyedropperActive) {
                       pickColorFromImage(e, eyedropperActive);
@@ -596,13 +716,15 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   const scaledTitleFontSize = titleFontSize ? `${titleFontSize * scale}px` : 'clamp(1.5rem, 4vw, 3rem)';
                   const scaledSubtitleFontSize = subtitleFontSize ? `${subtitleFontSize * scale}px` : 'clamp(1rem, 2.5vw, 2rem)';
                   
+                  // Calculate overlay position - percentages are relative to the actual image display area
+                  const xPercent = overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : (displayAsset.overlayConfig.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50);
+                  const yPercent = overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : (displayAsset.overlayConfig.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80);
+                  
                   return (
                   <div
                     className="absolute cursor-move select-none border-2 border-dashed border-indigo-400 bg-indigo-50/20 rounded-lg p-3 backdrop-blur-sm"
                     style={{
-                      left: `${overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : (displayAsset.overlayConfig.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50)}%`,
-                      top: `${overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : (displayAsset.overlayConfig.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80)}%`,
-                      transform: 'translate(-50%, -50%)',
+                      ...getOverlayPosition(xPercent, yPercent),
                       textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
                       maxWidth: `${Math.min(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80, 85)}%`,
                       padding: '0.5rem',
@@ -628,11 +750,23 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       }
                       e.preventDefault();
                       setIsDragging(true);
-                      const rect = e.currentTarget.parentElement?.getBoundingClientRect();
-                      if (rect) {
-                        const x = ((e.clientX - rect.left) / rect.width) * 100;
-                        const y = ((e.clientY - rect.top) / rect.height) * 100;
-                        setDragStart({ x, y });
+                      const imageContainer = e.currentTarget.parentElement;
+                      if (imageContainer && imageDimensions) {
+                        const imageBounds = getImageDisplayBounds(imageContainer);
+                        if (imageBounds) {
+                          // Calculate position relative to the actual displayed image area
+                          const relativeX = e.clientX - imageBounds.x;
+                          const relativeY = e.clientY - imageBounds.y;
+                          const x = (relativeX / imageBounds.width) * 100;
+                          const y = (relativeY / imageBounds.height) * 100;
+                          setDragStart({ x, y });
+                        } else {
+                          // Fallback to container-based calculation
+                          const rect = imageContainer.getBoundingClientRect();
+                          const x = ((e.clientX - rect.left) / rect.width) * 100;
+                          const y = ((e.clientY - rect.top) / rect.height) * 100;
+                          setDragStart({ x, y });
+                        }
                       }
                     }}
                   >
