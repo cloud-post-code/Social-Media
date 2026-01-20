@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { BrandDNA, ScrapingCodeResponse } from "../types/index.js";
-import { getWebsiteStructure, executeScrapingCode } from "./imageScrapingService.js";
+import { getWebsiteStructure, executeScrapingCode, extractBrandColors } from "./imageScrapingService.js";
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -166,15 +166,59 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
 
   let visualInfo: any = {};
   try {
-    const visualResponse = await ai.models.generateContent({
-      model,
-      contents: visualContents,
-      config: { responseMimeType: "application/json" }
-    });
-    if (!visualResponse.text) {
-      throw new Error('No response text from Gemini API');
+    // If URL is provided, try Puppeteer-based color extraction first
+    if (input.url) {
+      try {
+        console.log('[Gemini Service] Attempting Puppeteer-based color extraction...');
+        const puppeteerColors = await extractBrandColors(input.url);
+        console.log('[Gemini Service] Puppeteer extracted colors:', {
+          primary: puppeteerColors.primary_color_hex,
+          secondary: puppeteerColors.secondary_color_hex,
+          colorCount: puppeteerColors.colors?.length || 0
+        });
+        
+        // Use Puppeteer colors if available, otherwise fall back to Gemini
+        if (puppeteerColors.primary_color_hex || puppeteerColors.colors?.length) {
+          visualInfo = {
+            primary_color_hex: puppeteerColors.primary_color_hex,
+            secondary_color_hex: puppeteerColors.secondary_color_hex,
+            neutrals: [],
+            additional_brand_colors: puppeteerColors.colors || [],
+            background_style: '',
+            imagery_style: '',
+            font_vibe: '',
+            logo_style: ''
+          };
+          console.log('[Gemini Service] Using Puppeteer-extracted colors');
+        } else {
+          // Fall back to Gemini extraction
+          throw new Error('Puppeteer extraction returned no colors, falling back to Gemini');
+        }
+      } catch (puppeteerError: any) {
+        console.log('[Gemini Service] Puppeteer color extraction failed, using Gemini:', puppeteerError.message);
+        // Fall through to Gemini extraction
+        const visualResponse = await ai.models.generateContent({
+          model,
+          contents: visualContents,
+          config: { responseMimeType: "application/json" }
+        });
+        if (!visualResponse.text) {
+          throw new Error('No response text from Gemini API');
+        }
+        visualInfo = safeJsonParse(visualResponse.text || '{}') || {};
+      }
+    } else {
+      // No URL, use Gemini extraction
+      const visualResponse = await ai.models.generateContent({
+        model,
+        contents: visualContents,
+        config: { responseMimeType: "application/json" }
+      });
+      if (!visualResponse.text) {
+        throw new Error('No response text from Gemini API');
+      }
+      visualInfo = safeJsonParse(visualResponse.text || '{}') || {};
     }
-    visualInfo = safeJsonParse(visualResponse.text || '{}') || {};
   } catch (error: any) {
     console.error('Error extracting visual identity:', error);
     // Continue with defaults instead of throwing to allow partial extraction
@@ -955,10 +999,10 @@ Brand DNA: ${JSON.stringify(brandDNA)}
 Product Focus: ${productFocus}
 
 ### BRAND COLOR PALETTE
-The brand has the following colors available: ${colorsList}
-Primary color: ${brandDNA.visual_identity.primary_color_hex}
-Accent color: ${brandDNA.visual_identity.accent_color_hex}
-Use these colors strategically in the image composition - incorporate brand colors naturally into backgrounds, props, lighting, or environmental elements where appropriate.
+All brand colors: ${allColors.join(', ')}
+Primary color (most important): ${brandDNA.visual_identity.primary_color_hex}
+Accent color (secondary): ${brandDNA.visual_identity.accent_color_hex}
+Use ALL these colors strategically in the image composition - incorporate brand colors naturally into backgrounds, props, lighting, or environmental elements where appropriate. Don't limit yourself to just primary and accent - use the full color palette.
 
 ### CRITICAL INSTRUCTION: VISUAL ANCHORING
 You must prevent "product hallucination." Before writing the final prompt, you must mentally isolate the product's **Material Physics**:
@@ -977,7 +1021,7 @@ Return ONLY:
   "reasoning": "Brief explanation of the visual strategy",
   "includes_person": boolean,
   "composition_notes": "Notes about composition and placement",
-  "imagen_prompt_final": "A prompt following this strict structure: [SUBJECT DEFINITION: detailed description of ${productFocus} focusing on texture, weave, and material weight] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + [LIGHTING: Specific lighting to highlight material quality] + [TECH SPECS: 8k, macro details, commercial photography, depth of field]. NO text in image."
+  "imagen_prompt_final": "A prompt following this strict structure: [SUBJECT DEFINITION: detailed description of ${productFocus} focusing on texture, weave, and material weight] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + [LIGHTING: Specific lighting to highlight material quality] + [TECH SPECS: 8k, macro details, commercial photography, depth of field]. NO text in image. NO watermark. NO branding sections. NO logos. Clean image only."
 }
   `;
 
@@ -1111,16 +1155,16 @@ Title: "${title}"
 Subtitle: "${subtitle}"
 
 ### BRAND COLOR PALETTE
-The brand has the following colors available: ${colorsList}
-Primary color: ${brandDNA.visual_identity.primary_color_hex}
-Accent color: ${brandDNA.visual_identity.accent_color_hex}
+All brand colors: ${allColors.join(', ')}
+Primary color (most important): ${brandDNA.visual_identity.primary_color_hex}
+Accent color (secondary): ${brandDNA.visual_identity.accent_color_hex}
 
 ### INSTRUCTIONS
 - Design styling that works for both title (larger, bolder) and subtitle (smaller, supporting)
 - Consider spacing between title and subtitle (typically 8-12px)
 - Ensure good contrast and readability
 - Position should leave room for both text elements
-- **COLOR SELECTION**: Choose the BEST color from the available brand colors (${colorsList}) OR white/black depending on contrast needs. Analyze the image background and pick the color that provides optimal contrast and aligns with the brand palette. You have access to ALL brand colors - use them strategically.
+- **COLOR SELECTION**: Choose the BEST color from ALL available brand colors (${allColors.join(', ')}) OR white/black depending on contrast needs. Analyze the image background and pick the color that provides optimal contrast and aligns with the brand palette. You have access to ALL brand colors - use them strategically. Don't limit yourself to just primary and accent colors.
 
 ### OUTPUT FORMAT (JSON)
 Return ONLY:
@@ -1130,7 +1174,7 @@ Return ONLY:
     "font_weight": "light" | "regular" | "bold",
     "text_transform": "uppercase" | "lowercase" | "capitalize",
     "letter_spacing": "normal" | "wide",
-    "text_color_hex": "Choose the BEST color from the brand palette [${colorsList}] OR white/black for contrast. Select the color that best complements the image and provides readability.",
+    "text_color_hex": "Choose the BEST color from the brand palette [${allColors.join(', ')}] OR white/black for contrast. Select the color that best complements the image and provides readability.",
     "suggested_position": "top-center" | "bottom-right" | "center-left" | "floating-center",
     "opacity": 1.0
   },
@@ -1189,24 +1233,24 @@ export const generateNonProductStrategy = async (brandDNA: BrandDNA, userPurpose
     User Purpose: ${userPurpose}
 
     ### BRAND COLOR PALETTE
-    The brand has the following colors available: ${colorsList}
-    Primary color: ${brandDNA.visual_identity.primary_color_hex}
-    Accent color: ${brandDNA.visual_identity.accent_color_hex}
-    Use these colors strategically in the visual concept and design. Incorporate brand colors naturally into the image composition.
+    All brand colors: ${allColors.join(', ')}
+    Primary color (most important): ${brandDNA.visual_identity.primary_color_hex}
+    Accent color (secondary): ${brandDNA.visual_identity.accent_color_hex}
+    Use ALL these colors strategically in the visual concept and design. Incorporate brand colors naturally into the image composition. Don't limit yourself to just primary and accent - use the full color palette.
 
     ### FINAL OUTPUT FORMAT (JSON)
     {
       "step_1_visual_concept": {
         "visual_metaphor_reasoning": "Explanation",
         "includes_person": boolean,
-        "imagen_prompt_final": "Detailed prompt for Imagen 3. Incorporate brand colors [${colorsList}] naturally into the composition."
+        "imagen_prompt_final": "Detailed prompt for Imagen 3. Incorporate brand colors [${allColors.join(', ')}] naturally into the composition. NO watermark. NO branding sections. NO logos. NO text overlays. Clean image only."
       },
       "step_2_message_strategy": {
         "headline_text": "Main text hook",
         "body_caption_draft": "Optional short caption",
         "design_instructions": { 
           "text_overlay_strength": "Heavy"|"Subtle", 
-          "suggested_text_color": "Choose the BEST color from brand palette [${colorsList}] OR white/black for contrast", 
+          "suggested_text_color": "Choose the BEST color from brand palette [${allColors.join(', ')}] OR white/black for contrast", 
           "suggested_position": "Center-Middle"|"Bottom-Right" 
         }
       }
@@ -1239,18 +1283,18 @@ export const generateCampaignStrategy = async (brandDNA: BrandDNA, campaignDetai
     Campaign Goal: ${campaignDetails}
 
     ### BRAND COLOR PALETTE
-    The brand has the following colors available: ${colorsList}
-    Primary color: ${brandDNA.visual_identity.primary_color_hex}
-    Accent color: ${brandDNA.visual_identity.accent_color_hex}
-    Use these colors strategically across the campaign. Vary which colors are used in each post to create visual interest while maintaining brand consistency. Each post should use colors from the brand palette [${colorsList}].
+    All brand colors: ${allColors.join(', ')}
+    Primary color (most important): ${brandDNA.visual_identity.primary_color_hex}
+    Accent color (secondary): ${brandDNA.visual_identity.accent_color_hex}
+    Use ALL these colors strategically across the campaign. Vary which colors are used in each post to create visual interest while maintaining brand consistency. Each post should use colors from the full brand palette [${allColors.join(', ')}]. Don't limit yourself to just primary and accent colors.
 
     Return JSON as an array of strategies:
     {
       "posts": [
         {
-          "visual_prompt": "Imagen 3 prompt for this post. Incorporate brand colors [${colorsList}] naturally into the composition.",
+          "visual_prompt": "Imagen 3 prompt for this post. Incorporate brand colors [${allColors.join(', ')}] naturally into the composition. NO watermark. NO branding sections. NO logos. NO text overlays. Clean image only.",
           "headline": "Headline for this post",
-          "suggested_text_color": "Choose the BEST color from brand palette [${colorsList}] OR white/black for contrast",
+          "suggested_text_color": "Choose the BEST color from brand palette [${allColors.join(', ')}] OR white/black for contrast",
           "reasoning": "Why this fits the sequence and which brand colors are used"
         }
       ]
@@ -1340,7 +1384,7 @@ export const editImage = async (originalImageBase64: string, feedback: string): 
     contents: {
       parts: [
         { inlineData: { mimeType: "image/png", data: base64Data } },
-        { text: `Edit this image based on feedback: ${feedback}` }
+        { text: `Edit this image based on feedback: ${feedback}. Ensure NO watermark, NO branding sections, NO logos, and NO text overlays remain in the image. Clean image only.` }
       ]
     },
     config: { imageConfig: { aspectRatio: "1:1", imageSize: "2K" } }

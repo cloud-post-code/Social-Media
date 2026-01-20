@@ -277,3 +277,196 @@ export async function executeScrapingCode(
   }
 }
 
+/**
+ * Extract brand colors from a website using Puppeteer
+ * Similar to how images are extracted, but focuses on CSS colors
+ */
+export async function extractBrandColors(url: string): Promise<{
+  primary_color_hex?: string;
+  secondary_color_hex?: string;
+  colors?: string[];
+}> {
+  let browser: Browser | null = null;
+  
+  try {
+    console.log(`[Scraping Service] Extracting colors from: ${url}`);
+    
+    // Launch browser
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-web-security'
+      ]
+    });
+    
+    const page = await browser.newPage();
+    page.setDefaultTimeout(30000);
+    await page.setViewport({ width: 1920, height: 1080 });
+    
+    // Navigate to the page
+    await page.goto(url, {
+      waitUntil: 'networkidle2',
+      timeout: 30000
+    });
+    
+    // Wait for content to load
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Extract colors from the page
+    const colors = await page.evaluate(() => {
+      // TypeScript doesn't know about browser globals inside evaluate
+      // @ts-expect-error - document is available in browser context
+      const doc = document;
+      
+      // Helper function to convert RGB/RGBA to hex
+      const rgbToHex = (r: number, g: number, b: number): string => {
+        const toHex = (n: number) => {
+          const hex = Math.round(n).toString(16);
+          return hex.length === 1 ? '0' + hex : hex;
+        };
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+      };
+      
+      // Helper function to parse color string
+      const parseColor = (colorStr: string): string | null => {
+        if (!colorStr) return null;
+        
+        // Already hex
+        if (colorStr.startsWith('#')) {
+          return colorStr.length === 7 ? colorStr.toUpperCase() : null;
+        }
+        
+        // RGB/RGBA
+        const rgbMatch = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (rgbMatch) {
+          return rgbToHex(parseInt(rgbMatch[1]), parseInt(rgbMatch[2]), parseInt(rgbMatch[3]));
+        }
+        
+        // Named colors (basic set)
+        const namedColors: { [key: string]: string } = {
+          'white': '#FFFFFF', 'black': '#000000', 'red': '#FF0000',
+          'green': '#00FF00', 'blue': '#0000FF', 'yellow': '#FFFF00',
+          'cyan': '#00FFFF', 'magenta': '#FF00FF', 'gray': '#808080',
+          'grey': '#808080', 'orange': '#FFA500', 'purple': '#800080',
+          'pink': '#FFC0CB', 'brown': '#A52A2A', 'navy': '#000080'
+        };
+        
+        const lower = colorStr.toLowerCase().trim();
+        return namedColors[lower] || null;
+      };
+      
+      // Collect colors from various sources
+      const colorSet = new Set<string>();
+      
+      // 1. Extract from computed styles of key UI elements
+      const uiElements = [
+        ...doc.querySelectorAll('button, a, [role="button"]'),
+        ...doc.querySelectorAll('header, nav, [role="navigation"]'),
+        ...doc.querySelectorAll('[class*="btn"], [class*="button"], [class*="cta"]'),
+        ...doc.querySelectorAll('h1, h2, h3, .logo, [class*="logo"]')
+      ];
+      
+      uiElements.forEach((el: any) => {
+        try {
+          // @ts-expect-error - window is available in browser context
+          const styles = window.getComputedStyle(el);
+          const bgColor = parseColor(styles.backgroundColor);
+          const textColor = parseColor(styles.color);
+          const borderColor = parseColor(styles.borderColor);
+          
+          if (bgColor && bgColor !== '#FFFFFF' && bgColor !== '#000000') colorSet.add(bgColor);
+          if (textColor && textColor !== '#FFFFFF' && textColor !== '#000000') colorSet.add(textColor);
+          if (borderColor && borderColor !== '#FFFFFF' && borderColor !== '#000000') colorSet.add(borderColor);
+        } catch (e) {
+          // Ignore errors for individual elements
+        }
+      });
+      
+      // 2. Extract from CSS variables
+      // @ts-expect-error - window is available in browser context
+      const rootStyles = window.getComputedStyle(doc.documentElement);
+      for (let i = 0; i < rootStyles.length; i++) {
+        const prop = rootStyles[i];
+        if (prop.startsWith('--')) {
+          const value = rootStyles.getPropertyValue(prop).trim();
+          const color = parseColor(value);
+          if (color && color !== '#FFFFFF' && color !== '#000000') {
+            colorSet.add(color);
+          }
+        }
+      }
+      
+      // 3. Extract from inline styles
+      const elementsWithStyles = doc.querySelectorAll('[style]');
+      elementsWithStyles.forEach((el: any) => {
+        const style = el.getAttribute('style') || '';
+        const colorMatches = style.match(/(?:color|background-color|border-color):\s*([^;]+)/gi);
+        if (colorMatches) {
+          colorMatches.forEach((match: string) => {
+            const colorStr = match.split(':')[1]?.trim();
+            if (colorStr) {
+              const color = parseColor(colorStr);
+              if (color && color !== '#FFFFFF' && color !== '#000000') {
+                colorSet.add(color);
+              }
+            }
+          });
+        }
+      });
+      
+      // Convert to array and filter out common neutrals
+      const colors = Array.from(colorSet).filter(color => {
+        // Filter out very light grays (likely backgrounds)
+        const rgb = parseInt(color.slice(1), 16);
+        const r = (rgb >> 16) & 0xFF;
+        const g = (rgb >> 8) & 0xFF;
+        const b = rgb & 0xFF;
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        
+        // Keep colors that are not too light (brightness < 240) and not pure black/white
+        return brightness < 240 && color !== '#FFFFFF' && color !== '#000000';
+      });
+      
+      // Sort by frequency (simple heuristic: prioritize colors found in buttons/CTAs)
+      const colorFrequency: { [key: string]: number } = {};
+      colors.forEach(color => {
+        colorFrequency[color] = (colorFrequency[color] || 0) + 1;
+      });
+      
+      const sortedColors = colors.sort((a, b) => {
+        return (colorFrequency[b] || 0) - (colorFrequency[a] || 0);
+      });
+      
+      // Return top colors
+      return {
+        colors: sortedColors.slice(0, 10), // Top 10 colors
+        primary: sortedColors[0] || null,
+        secondary: sortedColors[1] || null
+      };
+    });
+    
+    console.log(`[Scraping Service] Extracted ${colors.colors?.length || 0} colors`);
+    
+    return {
+      primary_color_hex: colors.primary || undefined,
+      secondary_color_hex: colors.secondary || undefined,
+      colors: colors.colors && colors.colors.length > 0 ? colors.colors : undefined
+    };
+  } catch (error: any) {
+    console.error(`[Scraping Service] Error extracting colors:`, error.message);
+    throw new Error(`Failed to extract brand colors: ${error.message}`);
+  } finally {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError: any) {
+        console.error(`[Scraping Service] Error closing browser in extractBrandColors:`, closeError.message);
+      }
+    }
+  }
+}
+

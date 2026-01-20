@@ -9,8 +9,8 @@ import LoadingSpinner from './components/LoadingSpinner.js';
 import ErrorMessage from './components/ErrorMessage.js';
 
 const App: React.FC = () => {
-  const { brands, loading: brandsLoading, error: brandsError, createBrand, updateBrand } = useBrands();
-  const { assets, loading: assetsLoading, createAsset } = useAssets();
+  const { brands, loading: brandsLoading, error: brandsError, createBrand, updateBrand, deleteBrand } = useBrands();
+  const { assets, loading: assetsLoading, createAsset, deleteAsset } = useAssets();
   const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
   const [view, setView] = useState<'home' | 'dna' | 'studio'>('home');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -108,6 +108,52 @@ const App: React.FC = () => {
     }
   };
 
+  // Handle deleting an asset
+  const handleDeleteAsset = async (assetId: string) => {
+    if (!confirm('Are you sure you want to delete this asset?')) return;
+    
+    try {
+      await deleteAsset(assetId);
+      // Clear editing state if the deleted asset was being edited
+      if (editingAssetId === assetId) {
+        setEditingAssetId(null);
+        if (brands.length > 0) {
+          setActiveBrandId(brands[0].id);
+          setView('studio');
+        } else {
+          setView('home');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete asset:', error);
+      alert('Failed to delete asset. Please try again.');
+    }
+  };
+
+  // Handle deleting a brand
+  const handleDeleteBrand = async (brandId: string) => {
+    if (!confirm('Are you sure you want to delete this brand library? This will also delete all associated assets.')) return;
+    
+    try {
+      await deleteBrand(brandId);
+      // Clear active brand if it was deleted
+      if (activeBrandId === brandId) {
+        if (brands.length > 1) {
+          // Set to another brand
+          const remainingBrands = brands.filter(b => b.id !== brandId);
+          setActiveBrandId(remainingBrands[0].id);
+        } else {
+          // No brands left
+          setActiveBrandId(null);
+          setView('home');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete brand:', error);
+      alert('Failed to delete brand. Please try again.');
+    }
+  };
+
   if (brandsLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -141,17 +187,33 @@ const App: React.FC = () => {
             </div>
             <div className="space-y-2">
               {brands.map(brand => (
-                <button
+                <div
                   key={brand.id}
-                  onClick={() => { setActiveBrandId(brand.id); setView('studio'); }}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all group ${brand.id === activeBrandId ? 'bg-slate-900 text-white shadow-xl shadow-slate-200' : 'hover:bg-slate-50 text-slate-500 hover:text-slate-800'}`}
                 >
-                  <div 
-                    className="w-5 h-5 rounded-full shrink-0 border-2 border-white group-hover:scale-110 transition" 
-                    style={{ backgroundColor: brand.visual_identity?.primary_color_hex || '#cbd5e1' }} 
-                  />
-                  <span className="font-bold text-sm truncate">{brand.name}</span>
-                </button>
+                  <button
+                    onClick={() => { setActiveBrandId(brand.id); setView('studio'); }}
+                    className="flex-1 flex items-center gap-4 text-left"
+                  >
+                    <div 
+                      className="w-5 h-5 rounded-full shrink-0 border-2 border-white group-hover:scale-110 transition" 
+                      style={{ backgroundColor: brand.visual_identity?.primary_color_hex || '#cbd5e1' }} 
+                    />
+                    <span className="font-bold text-sm truncate">{brand.name}</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteBrand(brand.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50"
+                    title="Delete brand"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
               ))}
               {brands.length === 0 && (
                 <div className="p-6 bg-slate-50 rounded-2xl text-center border-2 border-dashed border-slate-200">
@@ -198,6 +260,18 @@ const App: React.FC = () => {
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteAsset(asset.id);
+                          }}
+                          className="bg-red-600 text-white p-2.5 rounded-xl hover:bg-red-700 transition-all active:scale-95 shadow-lg"
+                          title="Delete Asset"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         </button>
                       </div>
@@ -285,6 +359,7 @@ const App: React.FC = () => {
               onNewBrand={() => { setActiveBrandId(null); setView('dna'); }}
               onEditAsset={handleEditAsset}
               onDownloadAsset={handleDownloadAsset}
+              onDeleteAsset={handleDeleteAsset}
             />
           )}
           {view === 'dna' && (

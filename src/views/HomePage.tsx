@@ -9,6 +9,7 @@ interface HomePageProps {
   onNewBrand: () => void;
   onEditAsset?: (assetId: string) => void;
   onDownloadAsset?: (asset: GeneratedAsset) => void;
+  onDeleteAsset?: (assetId: string) => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
@@ -18,7 +19,8 @@ const HomePage: React.FC<HomePageProps> = ({
   onBrandSelect, 
   onNewBrand,
   onEditAsset,
-  onDownloadAsset
+  onDownloadAsset,
+  onDeleteAsset
 }) => {
   const recentAssets = assets.slice(0, 8);
 
@@ -109,6 +111,20 @@ const HomePage: React.FC<HomePageProps> = ({
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </button>
+                    )}
+                    {onDeleteAsset && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteAsset(asset.id);
+                        }}
+                        className="bg-red-600 text-white p-2.5 rounded-xl hover:bg-red-700 transition-all active:scale-95 shadow-lg"
+                        title="Delete Asset"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
                     )}
