@@ -18,6 +18,11 @@ async function request<T>(
 
   const response = await fetch(url, config);
 
+  // Handle 204 No Content responses (common for DELETE requests)
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   // Check content type before parsing
   const contentType = response.headers.get('content-type');
   const isJson = contentType && contentType.includes('application/json');
