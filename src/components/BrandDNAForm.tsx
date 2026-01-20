@@ -550,30 +550,32 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
                       All Brand Colors ({formData.visual_identity.colors.length})
                     </label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-3">
                       {formData.visual_identity.colors.map((color, index) => (
                         <div
                           key={index}
-                          className="relative group"
-                          title={color}
+                          className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors group"
                         >
                           <div
-                            className="w-12 h-12 rounded-lg border-2 border-slate-200 shadow-sm cursor-pointer hover:scale-110 transition-transform"
+                            className="w-10 h-10 rounded-lg border-2 border-slate-200 shadow-sm flex-shrink-0"
                             style={{ backgroundColor: color }}
+                          />
+                          <span className="text-xs font-mono text-slate-700 font-medium">{color}</span>
+                          <button
                             onClick={() => {
                               const newColors = [...formData.visual_identity.colors!];
                               newColors.splice(index, 1);
                               updateNested('visual_identity.colors', newColors.length > 0 ? newColors : undefined);
                             }}
-                          />
-                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap pointer-events-none">
-                            {color}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900"></div>
-                          </div>
+                            className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-600 text-xs font-bold"
+                            title="Remove color"
+                          >
+                            ×
+                          </button>
                         </div>
                       ))}
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">Click a color to remove it</p>
+                    <p className="text-xs text-slate-500 mt-2">Hover over a color to remove it</p>
                   </div>
                 )}
                 <div>

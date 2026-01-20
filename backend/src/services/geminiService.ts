@@ -770,6 +770,13 @@ export const generateProductImagePrompt = async (
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
 
+  // Get all available colors from the brand DNA
+  const allColors = brandDNA.visual_identity.colors && brandDNA.visual_identity.colors.length > 0
+    ? brandDNA.visual_identity.colors
+    : [brandDNA.visual_identity.primary_color_hex, brandDNA.visual_identity.accent_color_hex].filter(Boolean);
+  
+  const colorsList = allColors.join(', ');
+
   const prompt = `
 You are an elite Product Photographer and Art Director.
 Goal: Create a highly technical image generation prompt that captures the *exact* physical reality of the product while placing it in a lifestyle context.
@@ -777,6 +784,12 @@ Goal: Create a highly technical image generation prompt that captures the *exact
 ### INPUT DATA
 Brand DNA: ${JSON.stringify(brandDNA)}
 Product Focus: ${productFocus}
+
+### BRAND COLOR PALETTE
+The brand has the following colors available: ${colorsList}
+Primary color: ${brandDNA.visual_identity.primary_color_hex}
+Accent color: ${brandDNA.visual_identity.accent_color_hex}
+Use these colors strategically in the image composition - incorporate brand colors naturally into backgrounds, props, lighting, or environmental elements where appropriate.
 
 ### CRITICAL INSTRUCTION: VISUAL ANCHORING
 You must prevent "product hallucination." Before writing the final prompt, you must mentally isolate the product's **Material Physics**:
@@ -912,6 +925,13 @@ export const designTextOverlay = async (
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
 
+  // Get all available colors from the brand DNA
+  const allColors = brandDNA.visual_identity.colors && brandDNA.visual_identity.colors.length > 0
+    ? brandDNA.visual_identity.colors
+    : [brandDNA.visual_identity.primary_color_hex, brandDNA.visual_identity.accent_color_hex].filter(Boolean);
+  
+  const colorsList = allColors.join(', ');
+
   const prompt = `
 You are a UI/UX Designer specializing in Social Media aesthetics.
 Goal: Determine the CSS/Design properties to overlay the title and subtitle onto the image.
@@ -921,11 +941,17 @@ Brand DNA: ${JSON.stringify(brandDNA)}
 Title: "${title}"
 Subtitle: "${subtitle}"
 
+### BRAND COLOR PALETTE
+The brand has the following colors available: ${colorsList}
+Primary color: ${brandDNA.visual_identity.primary_color_hex}
+Accent color: ${brandDNA.visual_identity.accent_color_hex}
+
 ### INSTRUCTIONS
 - Design styling that works for both title (larger, bolder) and subtitle (smaller, supporting)
 - Consider spacing between title and subtitle (typically 8-12px)
 - Ensure good contrast and readability
 - Position should leave room for both text elements
+- **COLOR SELECTION**: Choose the BEST color from the available brand colors (${colorsList}) OR white/black depending on contrast needs. Analyze the image background and pick the color that provides optimal contrast and aligns with the brand palette. You have access to ALL brand colors - use them strategically.
 
 ### OUTPUT FORMAT (JSON)
 Return ONLY:
@@ -935,11 +961,11 @@ Return ONLY:
     "font_weight": "light" | "regular" | "bold",
     "text_transform": "uppercase" | "lowercase" | "capitalize",
     "letter_spacing": "normal" | "wide",
-    "text_color_hex": "Choose a color from ${brandDNA.visual_identity.primary_color_hex} OR white/black depending on contrast needs.",
+    "text_color_hex": "Choose the BEST color from the brand palette [${colorsList}] OR white/black for contrast. Select the color that best complements the image and provides readability.",
     "suggested_position": "top-center" | "bottom-right" | "center-left" | "floating-center",
     "opacity": 1.0
   },
-  "reasoning": "Why this font and position complements the 'luxury product' vibe and works for both title and subtitle."
+  "reasoning": "Why this font, color selection, and position complements the 'luxury product' vibe and works for both title and subtitle. Explain which brand color you chose and why."
 }
   `;
 
@@ -961,12 +987,15 @@ Return ONLY:
   const result = safeJsonParse(response.text || '{}');
   const designStrategy = result.design_strategy || {};
   
+  // Use the first color from the array as fallback, or primary color
+  const fallbackColor = allColors.length > 0 ? allColors[0] : brandDNA.visual_identity.primary_color_hex;
+  
   return {
     font_family: designStrategy.font_family_category || result.font_family || 'sans-serif',
     font_weight: designStrategy.font_weight || result.font_weight || 'bold',
     font_transform: designStrategy.text_transform || result.font_transform || 'none',
     letter_spacing: designStrategy.letter_spacing || result.letter_spacing || 'normal',
-    text_color_hex: designStrategy.text_color_hex || result.text_color_hex || brandDNA.visual_identity.primary_color_hex,
+    text_color_hex: designStrategy.text_color_hex || result.text_color_hex || fallbackColor,
     position: designStrategy.suggested_position || result.position || 'bottom-right',
     max_width_percent: result.max_width_percent || 80,
     opacity: designStrategy.opacity !== undefined ? designStrategy.opacity : (result.opacity !== undefined ? result.opacity : 1.0),
@@ -978,22 +1007,39 @@ export const generateNonProductStrategy = async (brandDNA: BrandDNA, userPurpose
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
 
+  // Get all available colors from the brand DNA
+  const allColors = brandDNA.visual_identity.colors && brandDNA.visual_identity.colors.length > 0
+    ? brandDNA.visual_identity.colors
+    : [brandDNA.visual_identity.primary_color_hex, brandDNA.visual_identity.accent_color_hex].filter(Boolean);
+  
+  const colorsList = allColors.join(', ');
+
   const prompt = `
     You are an expert Creative Director. Create a "Non-Product" Brand Moment post.
     Brand DNA: ${JSON.stringify(brandDNA)}
     User Purpose: ${userPurpose}
+
+    ### BRAND COLOR PALETTE
+    The brand has the following colors available: ${colorsList}
+    Primary color: ${brandDNA.visual_identity.primary_color_hex}
+    Accent color: ${brandDNA.visual_identity.accent_color_hex}
+    Use these colors strategically in the visual concept and design. Incorporate brand colors naturally into the image composition.
 
     ### FINAL OUTPUT FORMAT (JSON)
     {
       "step_1_visual_concept": {
         "visual_metaphor_reasoning": "Explanation",
         "includes_person": boolean,
-        "imagen_prompt_final": "Detailed prompt for Imagen 3."
+        "imagen_prompt_final": "Detailed prompt for Imagen 3. Incorporate brand colors [${colorsList}] naturally into the composition."
       },
       "step_2_message_strategy": {
         "headline_text": "Main text hook",
         "body_caption_draft": "Optional short caption",
-        "design_instructions": { "text_overlay_strength": "Heavy"|"Subtle", "suggested_text_color": "Hex", "suggested_position": "Center-Middle"|"Bottom-Right" }
+        "design_instructions": { 
+          "text_overlay_strength": "Heavy"|"Subtle", 
+          "suggested_text_color": "Choose the BEST color from brand palette [${colorsList}] OR white/black for contrast", 
+          "suggested_position": "Center-Middle"|"Bottom-Right" 
+        }
       }
     }
   `;
@@ -1011,18 +1057,32 @@ export const generateCampaignStrategy = async (brandDNA: BrandDNA, campaignDetai
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
 
+  // Get all available colors from the brand DNA
+  const allColors = brandDNA.visual_identity.colors && brandDNA.visual_identity.colors.length > 0
+    ? brandDNA.visual_identity.colors
+    : [brandDNA.visual_identity.primary_color_hex, brandDNA.visual_identity.accent_color_hex].filter(Boolean);
+  
+  const colorsList = allColors.join(', ');
+
   const prompt = `
     Create a coordinated campaign of ${postCount} posts.
     Brand DNA: ${JSON.stringify(brandDNA)}
     Campaign Goal: ${campaignDetails}
 
+    ### BRAND COLOR PALETTE
+    The brand has the following colors available: ${colorsList}
+    Primary color: ${brandDNA.visual_identity.primary_color_hex}
+    Accent color: ${brandDNA.visual_identity.accent_color_hex}
+    Use these colors strategically across the campaign. Vary which colors are used in each post to create visual interest while maintaining brand consistency. Each post should use colors from the brand palette [${colorsList}].
+
     Return JSON as an array of strategies:
     {
       "posts": [
         {
-          "visual_prompt": "Imagen 3 prompt for this post",
+          "visual_prompt": "Imagen 3 prompt for this post. Incorporate brand colors [${colorsList}] naturally into the composition.",
           "headline": "Headline for this post",
-          "reasoning": "Why this fits the sequence"
+          "suggested_text_color": "Choose the BEST color from brand palette [${colorsList}] OR white/black for contrast",
+          "reasoning": "Why this fits the sequence and which brand colors are used"
         }
       ]
     }
