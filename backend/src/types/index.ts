@@ -40,11 +40,16 @@ export interface OverlayConfig {
   title_color_hex?: string; // Separate color for title
   subtitle_color_hex?: string; // Separate color for subtitle
   // New: Pixel-based positioning (percentages 0-100)
-  x_percent?: number; // Horizontal position as percentage (0 = left, 100 = right)
-  y_percent?: number; // Vertical position as percentage (0 = top, 100 = bottom)
+  x_percent?: number; // Horizontal position as percentage (0 = left, 100 = right) - legacy, applies to both
+  y_percent?: number; // Vertical position as percentage (0 = top, 100 = bottom) - legacy, applies to both
   text_anchor?: 'start' | 'middle' | 'end'; // Horizontal alignment of text (legacy, applies to both)
   title_text_anchor?: 'start' | 'middle' | 'end'; // Separate anchor for title
   subtitle_text_anchor?: 'start' | 'middle' | 'end'; // Separate anchor for subtitle
+  // Separate positioning for title and subtitle
+  title_x_percent?: number;
+  title_y_percent?: number;
+  subtitle_x_percent?: number;
+  subtitle_y_percent?: number;
   // Legacy: String-based position (for backward compatibility)
   position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
   max_width_percent: number;

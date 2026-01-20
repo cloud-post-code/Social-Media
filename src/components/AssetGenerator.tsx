@@ -71,6 +71,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [draggingElement, setDraggingElement] = useState<'title' | 'subtitle' | null>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   
   // Compute display asset and image URL from current asset
@@ -139,6 +140,46 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     const scaleX = displayWidth / imageDimensions.width;
     const scaleY = displayHeight / imageDimensions.height;
     return Math.min(scaleX, scaleY); // Use smaller to ensure text fits
+  };
+  
+  // Calculate font size based on actual image dimensions (matching backend logic)
+  const getFontSize = (baseFontSize: number | undefined, isTitle: boolean) => {
+    if (!imageDimensions) {
+      return isTitle ? 'clamp(1.5rem, 4vw, 3rem)' : 'clamp(1rem, 2.5vw, 2rem)';
+    }
+    
+    // If custom font size is provided, scale it
+    if (baseFontSize) {
+      const scale = getFontScale();
+      return `${baseFontSize * scale}px`;
+    }
+    
+    // Otherwise, calculate based on image width (matching backend logic)
+    const container = imageContainerRef.current;
+    if (!container) {
+      return isTitle ? 'clamp(1.5rem, 4vw, 3rem)' : 'clamp(1rem, 2.5vw, 2rem)';
+    }
+    
+    const rect = container.getBoundingClientRect();
+    const containerAspect = rect.width / rect.height;
+    const imageAspect = imageDimensions.width / imageDimensions.height;
+    let displayWidth: number;
+    
+    if (imageAspect > containerAspect) {
+      displayWidth = rect.width;
+    } else {
+      displayWidth = rect.height * imageAspect;
+    }
+    
+    // Match backend calculation: Math.max(56, Math.min(width / 10, 120)) for title
+    // Math.max(32, Math.min(width / 16, 64)) for subtitle
+    if (isTitle) {
+      const calculatedSize = Math.max(56, Math.min(displayWidth / 10, 120));
+      return `${calculatedSize}px`;
+    } else {
+      const calculatedSize = Math.max(32, Math.min(displayWidth / 16, 64));
+      return `${calculatedSize}px`;
+    }
   };
   
   // Calculate aspect ratio for the image container
@@ -303,7 +344,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   // Handle mouse move and up events globally when dragging
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging && dragStart && currentAsset && editingOverlay) {
+      if (isDragging && dragStart && currentAsset && editingOverlay && draggingElement) {
         const imageContainer = document.querySelector('.image-preview-container');
         if (imageContainer && imageDimensions) {
           const imageBounds = getImageDisplayBounds(imageContainer);
@@ -322,11 +363,21 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const clampedX = Math.max(15, Math.min(85, x));
             const clampedY = Math.max(15, Math.min(85, y));
             
-            setOverlayEdit(prev => ({
-              ...prev,
-              x_percent: clampedX,
-              y_percent: clampedY
-            }));
+            if (draggingElement === 'title') {
+              setOverlayEdit(prev => ({
+                ...prev,
+                title_x_percent: clampedX,
+                title_y_percent: clampedY,
+                x_percent: clampedX, // Keep legacy for backward compatibility
+                y_percent: clampedY
+              }));
+            } else {
+              setOverlayEdit(prev => ({
+                ...prev,
+                subtitle_x_percent: clampedX,
+                subtitle_y_percent: clampedY
+              }));
+            }
           } else {
             // Fallback to container-based calculation if image bounds can't be determined
             const rect = imageContainer.getBoundingClientRect();
@@ -334,11 +385,21 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const y = ((e.clientY - rect.top) / rect.height) * 100;
             const clampedX = Math.max(15, Math.min(85, x));
             const clampedY = Math.max(15, Math.min(85, y));
-            setOverlayEdit(prev => ({
-              ...prev,
-              x_percent: clampedX,
-              y_percent: clampedY
-            }));
+            if (draggingElement === 'title') {
+              setOverlayEdit(prev => ({
+                ...prev,
+                title_x_percent: clampedX,
+                title_y_percent: clampedY,
+                x_percent: clampedX,
+                y_percent: clampedY
+              }));
+            } else {
+              setOverlayEdit(prev => ({
+                ...prev,
+                subtitle_x_percent: clampedX,
+                subtitle_y_percent: clampedY
+              }));
+            }
           }
         }
       }
@@ -347,6 +408,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     const handleMouseUp = () => {
       setIsDragging(false);
       setDragStart(null);
+      setDraggingElement(null);
     };
     
     if (isDragging) {
@@ -357,7 +419,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart, currentAsset, editingOverlay, overlayEdit]);
+  }, [isDragging, dragStart, currentAsset, editingOverlay, draggingElement, imageDimensions]);
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -707,88 +769,132 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   </div>
                 )}
                 
-                {/* Draggable Text Overlay Preview (only when editing product assets) */}
-                {editingOverlay && displayAsset.type === 'product' && displayAsset.overlayConfig && (() => {
-                  const scale = getFontScale();
-                  const titleFontSize = overlayEdit.title_font_size || displayAsset.overlayConfig?.title_font_size;
-                  const subtitleFontSize = overlayEdit.subtitle_font_size || displayAsset.overlayConfig?.subtitle_font_size;
-                  // Scale font sizes to match preview container size
-                  const scaledTitleFontSize = titleFontSize ? `${titleFontSize * scale}px` : 'clamp(1.5rem, 4vw, 3rem)';
-                  const scaledSubtitleFontSize = subtitleFontSize ? `${subtitleFontSize * scale}px` : 'clamp(1rem, 2.5vw, 2rem)';
-                  
-                  // Calculate overlay position - percentages are relative to the actual image display area
-                  const xPercent = overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : (displayAsset.overlayConfig.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50);
-                  const yPercent = overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : (displayAsset.overlayConfig.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80);
-                  
-                  return (
-                  <div
-                    className="absolute cursor-move select-none border-2 border-dashed border-indigo-400 bg-indigo-50/20 rounded-lg p-3 backdrop-blur-sm"
-                    style={{
-                      ...getOverlayPosition(xPercent, yPercent),
-                      textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
-                      maxWidth: `${Math.min(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80, 85)}%`,
-                      padding: '0.5rem',
-                      color: overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
-                      opacity: overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1),
-                      fontFamily: overlayEdit.font_family || displayAsset.overlayConfig.font_family || 'sans-serif',
-                      fontWeight: overlayEdit.font_weight === 'bold' ? 'bold' : overlayEdit.font_weight === 'light' ? '300' : 'normal',
-                      fontSize: scaledTitleFontSize,
-                      letterSpacing: overlayEdit.letter_spacing === 'wide' ? '0.15em' : 'normal',
-                      textTransform: overlayEdit.font_transform || 'none',
-                      filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
-                      pointerEvents: 'all',
-                      zIndex: 10,
-                      // Ensure preview stays within bounds
-                      minWidth: 'fit-content',
-                      wordWrap: 'break-word',
-                      overflowWrap: 'break-word'
-                    }}
-                    onMouseDown={(e) => {
-                      if (eyedropperActive) {
-                        e.stopPropagation();
-                        return;
-                      }
-                      e.preventDefault();
-                      setIsDragging(true);
-                      const imageContainer = e.currentTarget.parentElement;
-                      if (imageContainer && imageDimensions) {
-                        const imageBounds = getImageDisplayBounds(imageContainer);
-                        if (imageBounds) {
-                          // Calculate position relative to the actual displayed image area
-                          const relativeX = e.clientX - imageBounds.x;
-                          const relativeY = e.clientY - imageBounds.y;
-                          const x = (relativeX / imageBounds.width) * 100;
-                          const y = (relativeY / imageBounds.height) * 100;
-                          setDragStart({ x, y });
-                        } else {
-                          // Fallback to container-based calculation
-                          const rect = imageContainer.getBoundingClientRect();
-                          const x = ((e.clientX - rect.left) / rect.width) * 100;
-                          const y = ((e.clientY - rect.top) / rect.height) * 100;
-                          setDragStart({ x, y });
-                        }
-                      }
-                    }}
-                  >
-                    <div style={{ whiteSpace: 'pre-line', pointerEvents: 'none' }}>
-                      {overlayEdit.title || displayAsset.overlayConfig.title || ''}
-                    </div>
-                    {(overlayEdit.subtitle || displayAsset.overlayConfig.subtitle) && (
-                      <div 
-                        style={{ 
-                          fontSize: scaledSubtitleFontSize,
-                          marginTop: '0.5rem',
-                          opacity: 0.9,
-                          pointerEvents: 'none',
-                          color: overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'
-                        }}
-                      >
-                        {overlayEdit.subtitle || displayAsset.overlayConfig.subtitle}
-                      </div>
-                    )}
-                  </div>
-                  );
-                })()}
+                {/* Draggable Text Overlay Preview (only when editing product assets) - Separate boxes for title and subtitle */}
+                {editingOverlay && displayAsset.type === 'product' && displayAsset.overlayConfig && (
+                  <>
+                    {/* Title Textbox */}
+                    {(overlayEdit.title || displayAsset.overlayConfig.title) && (() => {
+                      const titleXPercent = overlayEdit.title_x_percent !== undefined ? overlayEdit.title_x_percent : (overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : (displayAsset.overlayConfig.title_x_percent !== undefined ? displayAsset.overlayConfig.title_x_percent : (displayAsset.overlayConfig.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50)));
+                      const titleYPercent = overlayEdit.title_y_percent !== undefined ? overlayEdit.title_y_percent : (overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : (displayAsset.overlayConfig.title_y_percent !== undefined ? displayAsset.overlayConfig.title_y_percent : (displayAsset.overlayConfig.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 30)));
+                      const titleFontSize = overlayEdit.title_font_size || displayAsset.overlayConfig?.title_font_size;
+                      
+                      return (
+                        <div
+                          className="absolute cursor-move select-none border-2 border-dashed border-indigo-400 bg-indigo-50/20 rounded-lg p-3 backdrop-blur-sm"
+                          style={{
+                            ...getOverlayPosition(titleXPercent, titleYPercent),
+                            textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                            maxWidth: `${Math.min(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80, 85)}%`,
+                            padding: '0.5rem',
+                            color: overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
+                            opacity: overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1),
+                            fontFamily: overlayEdit.font_family || displayAsset.overlayConfig.font_family || 'sans-serif',
+                            fontWeight: overlayEdit.font_weight === 'bold' ? 'bold' : overlayEdit.font_weight === 'light' ? '300' : 'normal',
+                            fontSize: getFontSize(titleFontSize, true),
+                            letterSpacing: overlayEdit.letter_spacing === 'wide' ? '0.15em' : 'normal',
+                            textTransform: overlayEdit.font_transform || 'none',
+                            filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
+                            pointerEvents: 'all',
+                            zIndex: 10,
+                            minWidth: 'fit-content',
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word'
+                          }}
+                          onMouseDown={(e) => {
+                            if (eyedropperActive) {
+                              e.stopPropagation();
+                              return;
+                            }
+                            e.preventDefault();
+                            setIsDragging(true);
+                            setDraggingElement('title');
+                            const imageContainer = e.currentTarget.parentElement;
+                            if (imageContainer && imageDimensions) {
+                              const imageBounds = getImageDisplayBounds(imageContainer);
+                              if (imageBounds) {
+                                const relativeX = e.clientX - imageBounds.x;
+                                const relativeY = e.clientY - imageBounds.y;
+                                const x = (relativeX / imageBounds.width) * 100;
+                                const y = (relativeY / imageBounds.height) * 100;
+                                setDragStart({ x, y });
+                              } else {
+                                const rect = imageContainer.getBoundingClientRect();
+                                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                                setDragStart({ x, y });
+                              }
+                            }
+                          }}
+                        >
+                          <div style={{ whiteSpace: 'pre-line', pointerEvents: 'none' }}>
+                            {overlayEdit.title || displayAsset.overlayConfig.title || ''}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    
+                    {/* Subtitle Textbox */}
+                    {(overlayEdit.subtitle || displayAsset.overlayConfig.subtitle) && (() => {
+                      const subtitleXPercent = overlayEdit.subtitle_x_percent !== undefined ? overlayEdit.subtitle_x_percent : (overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : (displayAsset.overlayConfig.subtitle_x_percent !== undefined ? displayAsset.overlayConfig.subtitle_x_percent : (displayAsset.overlayConfig.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50)));
+                      const subtitleYPercent = overlayEdit.subtitle_y_percent !== undefined ? overlayEdit.subtitle_y_percent : (overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : (displayAsset.overlayConfig.subtitle_y_percent !== undefined ? displayAsset.overlayConfig.subtitle_y_percent : (displayAsset.overlayConfig.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80)));
+                      const subtitleFontSize = overlayEdit.subtitle_font_size || displayAsset.overlayConfig?.subtitle_font_size;
+                      
+                      return (
+                        <div
+                          className="absolute cursor-move select-none border-2 border-dashed border-blue-400 bg-blue-50/20 rounded-lg p-3 backdrop-blur-sm"
+                          style={{
+                            ...getOverlayPosition(subtitleXPercent, subtitleYPercent),
+                            textAlign: (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                            maxWidth: `${Math.min(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent || 80, 85)}%`,
+                            padding: '0.5rem',
+                            color: overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
+                            opacity: (overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1)) * 0.9,
+                            fontFamily: overlayEdit.font_family || displayAsset.overlayConfig.font_family || 'sans-serif',
+                            fontWeight: overlayEdit.font_weight === 'bold' ? 'bold' : overlayEdit.font_weight === 'light' ? '300' : 'normal',
+                            fontSize: getFontSize(subtitleFontSize, false),
+                            letterSpacing: overlayEdit.letter_spacing === 'wide' ? '0.15em' : 'normal',
+                            textTransform: overlayEdit.font_transform || 'none',
+                            filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
+                            pointerEvents: 'all',
+                            zIndex: 10,
+                            minWidth: 'fit-content',
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word'
+                          }}
+                          onMouseDown={(e) => {
+                            if (eyedropperActive) {
+                              e.stopPropagation();
+                              return;
+                            }
+                            e.preventDefault();
+                            setIsDragging(true);
+                            setDraggingElement('subtitle');
+                            const imageContainer = e.currentTarget.parentElement;
+                            if (imageContainer && imageDimensions) {
+                              const imageBounds = getImageDisplayBounds(imageContainer);
+                              if (imageBounds) {
+                                const relativeX = e.clientX - imageBounds.x;
+                                const relativeY = e.clientY - imageBounds.y;
+                                const x = (relativeX / imageBounds.width) * 100;
+                                const y = (relativeY / imageBounds.height) * 100;
+                                setDragStart({ x, y });
+                              } else {
+                                const rect = imageContainer.getBoundingClientRect();
+                                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                                setDragStart({ x, y });
+                              }
+                            }
+                          }}
+                        >
+                          <div style={{ whiteSpace: 'pre-line', pointerEvents: 'none' }}>
+                            {overlayEdit.subtitle || displayAsset.overlayConfig.subtitle}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
               </div>
               
               {/* For non-product assets, show CSS overlay if needed */}
@@ -863,6 +969,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           subtitle_max_lines: displayAsset.overlayConfig?.subtitle_max_lines || 3,
                           x_percent: displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50,
                           y_percent: displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80,
+                          title_x_percent: displayAsset.overlayConfig?.title_x_percent !== undefined ? displayAsset.overlayConfig.title_x_percent : (displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50),
+                          title_y_percent: displayAsset.overlayConfig?.title_y_percent !== undefined ? displayAsset.overlayConfig.title_y_percent : (displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 30),
+                          subtitle_x_percent: displayAsset.overlayConfig?.subtitle_x_percent !== undefined ? displayAsset.overlayConfig.subtitle_x_percent : (displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50),
+                          subtitle_y_percent: displayAsset.overlayConfig?.subtitle_y_percent !== undefined ? displayAsset.overlayConfig.subtitle_y_percent : (displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80),
                           text_anchor: displayAsset.overlayConfig?.text_anchor || 'middle',
                           title_text_anchor: displayAsset.overlayConfig?.title_text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle',
                           subtitle_text_anchor: displayAsset.overlayConfig?.subtitle_text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle'
