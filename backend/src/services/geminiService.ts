@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
-import { BrandDNA } from "../types/index.js";
+import { BrandDNA, ScrapingCodeResponse } from "../types/index.js";
+import { getWebsiteStructure, executeScrapingCode } from "./imageScrapingService.js";
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -268,50 +269,13 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
   // Step 5: Extract Brand Images (Logo + Key Images) - Only when URL is provided
   let imagesInfo: any = {};
   if (input.url) {
-    const imagesPrompt = `
-      You are an expert Web Scraper and Brand Asset Analyst.
-      Analyze the website at ${input.url} to extract brand images.
-      ${urlContext}
-      
-      Your task:
-      1. Identify the logo image URL (the main brand logo, typically in header/navbar)
-      2. Extract 3-10 key brand images (hero images, product images, lifestyle images, etc.)
-         - Prioritize high-quality, representative images
-         - Avoid duplicates or very similar images
-         - Focus on images that represent the brand visually
-         - Look for images in the main content area, hero sections, and product galleries
-      
-      Return ONLY a JSON object with this exact structure:
-      {
-        "logo_url": "Full URL to the logo image (or empty string if not found)",
-        "image_urls": [
-          "Full URL to image 1",
-          "Full URL to image 2",
-          "Full URL to image 3",
-          ...
-        ]
-      }
-      
-      Important:
-      - Return absolute URLs (include https:// or http://)
-      - Return 3-10 images in image_urls array (minimum 3 if available)
-      - If logo is not found, return empty string for logo_url
-      - Ensure URLs are directly accessible (not relative paths)
-      - Return ONLY JSON. No markdown, no explanations.
-    `;
-
-    const imagesContents = { parts: [{ text: imagesPrompt }] };
-
     try {
-      const imagesResponse = await ai.models.generateContent({
-        model,
-        contents: imagesContents,
-        config: { responseMimeType: "application/json" }
-      });
-      if (!imagesResponse.text) {
-        throw new Error('No response text from Gemini API');
-      }
-      imagesInfo = safeJsonParse(imagesResponse.text || '{}') || {};
+      // Use the new AI-powered scraping approach
+      const extractedImages = await extractBrandImages(input.url);
+      imagesInfo = {
+        logo_url: extractedImages.logoUrl || '',
+        image_urls: extractedImages.imageUrls || []
+      };
     } catch (error: any) {
       console.error('Error extracting brand images:', error);
       // Continue with defaults instead of throwing to allow partial extraction
@@ -663,6 +627,7 @@ export const extractStrategicProfile = async (input: { url?: string; imageBase64
 
 /**
  * Step 5: Extract Brand Images (logo and key images) - Only works with URL
+ * Uses AI-generated Puppeteer scraping code for one-time execution
  */
 export const extractBrandImages = async (url: string): Promise<{ logoUrl?: string; imageUrls?: string[] }> => {
   if (!url) {
@@ -670,6 +635,135 @@ export const extractBrandImages = async (url: string): Promise<{ logoUrl?: strin
   }
   
   console.log(`[Gemini Service] extractBrandImages called with URL: ${url}`);
+  
+  try {
+    // Step 1: Extract website structure using Puppeteer
+    console.log(`[Gemini Service] Step 1/4: Extracting website structure...`);
+    const domStructure = await getWebsiteStructure(url);
+    console.log(`[Gemini Service] Step 1/4: Structure extracted (${domStructure.length} chars)`);
+    
+    // Step 2: Send structure to Gemini to generate scraping code
+    console.log(`[Gemini Service] Step 2/4: Requesting scraping code from Gemini...`);
+    const ai = getAIClient();
+    const model = 'gemini-3-flash-preview';
+    
+    const imagesPrompt = `
+      You are an expert Web Scraper and JavaScript Developer.
+      
+      I will provide you with the DOM structure of a website. Your task is to write executable Puppeteer JavaScript code that will scrape images from this website.
+      
+      Website URL: ${url}
+      
+      DOM Structure:
+      ${domStructure}
+      
+      Your task:
+      1. Analyze the DOM structure to understand where images are located
+      2. Write executable JavaScript code that uses Puppeteer to:
+         - Identify the logo image (typically in header/navbar - look for images in navigation elements)
+         - Extract 3-10 key brand images (hero images, product images, lifestyle images, etc.)
+           - Prioritize high-quality, representative images
+           - Avoid duplicates or very similar images
+           - Focus on images that represent the brand visually
+           - Look for images in the main content area, hero sections, and product galleries
+      
+      IMPORTANT CODE REQUIREMENTS:
+      - The code will run in a Node.js VM with a Puppeteer Page object already available as 'page'
+      - The page is already navigated to the target URL
+      - You must return an object with this exact structure: { logo_url: string, image_urls: string[] }
+      - logo_url should be a full absolute URL (or empty string if not found)
+      - image_urls should be an array of full absolute URLs (3-10 images)
+      - Use page.$eval() or page.$$eval() to extract image src attributes
+      - Handle relative URLs by converting them to absolute URLs using new URL(src, page.url())
+      - Filter out small images (icons, avatars) - focus on images larger than 100x100px
+      - Handle lazy-loaded images (check data-src, data-lazy-src attributes)
+      - Return ONLY the code that will be executed - no explanations, no markdown
+      
+      Return ONLY a JSON object with this exact structure:
+      {
+        "scraping_code": "async function scrapeImages(page) {\\n  // Your Puppeteer code here\\n  const logo = await page.$eval('...', el => el.src);\\n  const images = await page.$$eval('...', els => els.map(el => el.src));\\n  return { logo_url: logo || '', image_urls: images.filter(url => url) };\\n}\\n\\nreturn await scrapeImages(page);",
+        "reasoning": "Brief explanation of your scraping strategy"
+      }
+      
+      Return ONLY JSON. No markdown, no explanations outside the JSON.
+    `;
+
+    const imagesContents = { parts: [{ text: imagesPrompt }] };
+
+    const imagesResponse = await ai.models.generateContent({
+      model,
+      contents: imagesContents,
+      config: { responseMimeType: "application/json" }
+    });
+    
+    if (!imagesResponse.text) {
+      console.error('[Gemini Service] No response text from Gemini API');
+      throw new Error('No response text from Gemini API');
+    }
+    
+    console.log(`[Gemini Service] Step 2/4: Received response from Gemini (length: ${imagesResponse.text.length})`);
+    
+    const codeResponse = safeJsonParse(imagesResponse.text || '{}') as ScrapingCodeResponse;
+    
+    if (!codeResponse.scraping_code) {
+      throw new Error('Gemini did not return scraping_code in response');
+    }
+    
+    console.log(`[Gemini Service] Step 2/4: Parsed scraping code (${codeResponse.scraping_code.length} chars)`);
+    if (codeResponse.reasoning) {
+      console.log(`[Gemini Service] Reasoning: ${codeResponse.reasoning}`);
+    }
+    
+    // Step 3: Execute the generated scraping code
+    console.log(`[Gemini Service] Step 3/4: Executing scraping code...`);
+    const scrapingResult = await executeScrapingCode(codeResponse.scraping_code, url);
+    
+    console.log(`[Gemini Service] Step 3/4: Scraping completed:`, {
+      hasLogo: !!scrapingResult.logo_url,
+      imageCount: scrapingResult.image_urls?.length || 0
+    });
+    
+    // Step 4: Convert URLs to base64 (if needed) and return
+    // Note: The existing brandAssetService.createBrandAsset() handles URL to base64 conversion
+    // So we can return URLs directly - they'll be converted when saved
+    const result = {
+      logoUrl: scrapingResult.logo_url || undefined,
+      imageUrls: scrapingResult.image_urls && scrapingResult.image_urls.length > 0 
+        ? scrapingResult.image_urls.slice(0, 10) // Limit to max 10 images
+        : undefined
+    };
+    
+    console.log(`[Gemini Service] Step 4/4: Returning result:`, {
+      hasLogo: !!result.logoUrl,
+      imageCount: result.imageUrls?.length || 0
+    });
+    
+    return result;
+  } catch (error: any) {
+    console.error(`[Gemini Service] Error in extractBrandImages:`, error);
+    console.error(`[Gemini Service] Error details:`, {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
+    // Fallback to old URL-based approach if scraping fails
+    console.log(`[Gemini Service] Falling back to old URL-based extraction...`);
+    try {
+      return await extractBrandImagesFallback(url);
+    } catch (fallbackError: any) {
+      console.error(`[Gemini Service] Fallback also failed:`, fallbackError.message);
+      throw new Error(`Image extraction failed: ${error.message}. Fallback also failed: ${fallbackError.message}`);
+    }
+  }
+};
+
+/**
+ * Fallback method: Old URL-based extraction approach
+ * Used when the new scraping code approach fails
+ */
+async function extractBrandImagesFallback(url: string): Promise<{ logoUrl?: string; imageUrls?: string[] }> {
+  console.log(`[Gemini Service] Using fallback URL-based extraction for: ${url}`);
   
   const ai = getAIClient();
   const model = 'gemini-3-flash-preview';
@@ -709,55 +803,25 @@ export const extractBrandImages = async (url: string): Promise<{ logoUrl?: strin
 
   const imagesContents = { parts: [{ text: imagesPrompt }] };
 
-  console.log(`[Gemini Service] Calling Gemini API for image extraction...`);
+  const imagesResponse = await ai.models.generateContent({
+    model,
+    contents: imagesContents,
+    config: { responseMimeType: "application/json" }
+  });
   
-  try {
-    const imagesResponse = await ai.models.generateContent({
-      model,
-      contents: imagesContents,
-      config: { responseMimeType: "application/json" }
-    });
-    
-    if (!imagesResponse.text) {
-      console.error('[Gemini Service] No response text from Gemini API');
-      throw new Error('No response text from Gemini API');
-    }
-    
-    console.log(`[Gemini Service] Received response from Gemini (length: ${imagesResponse.text.length})`);
-    console.log(`[Gemini Service] Raw response preview: ${imagesResponse.text.substring(0, 200)}...`);
-    
-    const imagesInfo = safeJsonParse(imagesResponse.text || '{}') || {};
-    
-    console.log(`[Gemini Service] Parsed images info:`, {
-      hasLogoUrl: !!imagesInfo.logo_url,
-      logoUrl: imagesInfo.logo_url?.substring(0, 100),
-      imageUrlsCount: imagesInfo.image_urls?.length || 0,
-      imageUrls: imagesInfo.image_urls?.slice(0, 3).map((u: string) => u.substring(0, 100))
-    });
-    
-    const result = {
-      logoUrl: imagesInfo.logo_url || undefined,
-      imageUrls: imagesInfo.image_urls && imagesInfo.image_urls.length > 0 
-        ? imagesInfo.image_urls.slice(0, 10) // Limit to max 10 images
-        : undefined
-    };
-    
-    console.log(`[Gemini Service] Returning result:`, {
-      hasLogo: !!result.logoUrl,
-      imageCount: result.imageUrls?.length || 0
-    });
-    
-    return result;
-  } catch (error: any) {
-    console.error(`[Gemini Service] Error in extractBrandImages:`, error);
-    console.error(`[Gemini Service] Error details:`, {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-    throw error;
+  if (!imagesResponse.text) {
+    throw new Error('No response text from Gemini API');
   }
-};
+  
+  const imagesInfo = safeJsonParse(imagesResponse.text || '{}') || {};
+  
+  return {
+    logoUrl: imagesInfo.logo_url || undefined,
+    imageUrls: imagesInfo.image_urls && imagesInfo.image_urls.length > 0 
+      ? imagesInfo.image_urls.slice(0, 10)
+      : undefined
+  };
+}
 
 /**
  * Step 1: Generate image prompt for product in use

@@ -113,3 +113,8 @@ export interface AssetRow {
   created_at: Date;
 }
 
+export interface ScrapingCodeResponse {
+  scraping_code: string;
+  reasoning?: string;
+}
+
