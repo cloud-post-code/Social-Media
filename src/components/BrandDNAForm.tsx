@@ -66,7 +66,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
             }
           }
           if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
-            for (const imageUrl of extractedAssets.imageUrls.slice(0, 10)) {
+            for (const imageUrl of extractedAssets.imageUrls.slice(0, 50)) {
               try {
                 await uploadAsset(imageUrl, 'brand_image');
               } catch (err: any) {
@@ -234,10 +234,10 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
           
           if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
             console.log(`[Extraction] Attempting to save ${extractedAssets.imageUrls.length} brand images...`);
-            for (let i = 0; i < Math.min(extractedAssets.imageUrls.length, 10); i++) {
+            for (let i = 0; i < Math.min(extractedAssets.imageUrls.length, 50); i++) {
               const imageUrl = extractedAssets.imageUrls[i];
               try {
-                console.log(`[Extraction] Saving image ${i + 1}/${Math.min(extractedAssets.imageUrls.length, 10)}: ${imageUrl.substring(0, 100)}...`);
+                console.log(`[Extraction] Saving image ${i + 1}/${Math.min(extractedAssets.imageUrls.length, 50)}: ${imageUrl.substring(0, 100)}...`);
                 await brandAssetApi.uploadAsset(createdBrand.id, imageUrl, 'brand_image');
                 savedImages++;
                 console.log(`[Extraction] ✓ Image ${i + 1} saved successfully`);
@@ -438,7 +438,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
         
         // Save brand images if extracted
         if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
-          for (const imageUrl of extractedAssets.imageUrls.slice(0, 10)) {
+          for (const imageUrl of extractedAssets.imageUrls.slice(0, 50)) {
             try {
               await brandAssetApi.uploadAsset(savedBrand.id, imageUrl, 'brand_image');
             } catch (err: any) {
@@ -464,7 +464,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     setFormData({ ...savedBrand });
   };
 
-  const canUploadMoreImages = assets.length < 10;
+  const canUploadMoreImages = assets.length < 50;
   const hasLogo = !!logo;
 
   return (
@@ -766,7 +766,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">
-                  Brand Images ({assets.length} / 10)
+                  Brand Images ({assets.length} / 50)
                 </h4>
                 {canUploadMoreImages && (
                   <label className="text-xs text-indigo-600 font-bold cursor-pointer hover:text-indigo-700 transition">
@@ -833,7 +833,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
               )}
               {!canUploadMoreImages && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                  <p className="text-xs text-amber-800">Maximum of 10 images reached. Delete an image to upload a new one.</p>
+                  <p className="text-xs text-amber-800">Maximum of 50 images reached. Delete an image to upload a new one.</p>
                 </div>
               )}
             </div>

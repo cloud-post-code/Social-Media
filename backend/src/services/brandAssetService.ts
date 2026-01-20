@@ -156,8 +156,8 @@ export const createBrandAsset = async (
     }
   } else if (assetType === 'brand_image') {
     const existingImages = await getBrandAssets(brandId, 'brand_image');
-    if (existingImages.length >= 10) {
-      throw new Error('Maximum of 10 brand images allowed');
+    if (existingImages.length >= 50) {
+      throw new Error('Maximum of 50 brand images allowed');
     }
   }
   

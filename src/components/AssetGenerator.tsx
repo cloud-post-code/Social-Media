@@ -144,35 +144,35 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   
   // Calculate font size based on actual image dimensions (matching backend logic)
   const getFontSize = (baseFontSize: number | undefined, isTitle: boolean) => {
-    if (!imageDimensions) {
+    if (!imageDimensions || !imageContainerRef.current) {
       return isTitle ? 'clamp(1.5rem, 4vw, 3rem)' : 'clamp(1rem, 2.5vw, 2rem)';
     }
     
-    // If custom font size is provided, scale it
-    if (baseFontSize) {
-      const scale = getFontScale();
-      return `${baseFontSize * scale}px`;
-    }
-    
-    // Otherwise, calculate based on image width (matching backend logic)
     const container = imageContainerRef.current;
-    if (!container) {
-      return isTitle ? 'clamp(1.5rem, 4vw, 3rem)' : 'clamp(1rem, 2.5vw, 2rem)';
-    }
-    
     const rect = container.getBoundingClientRect();
     const containerAspect = rect.width / rect.height;
     const imageAspect = imageDimensions.width / imageDimensions.height;
     let displayWidth: number;
     
+    // Calculate actual displayed image width (accounting for object-contain)
     if (imageAspect > containerAspect) {
+      // Image is wider - fit to width
       displayWidth = rect.width;
     } else {
+      // Image is taller - fit to height
       displayWidth = rect.height * imageAspect;
     }
     
+    // If custom font size is provided, scale it based on the ratio of displayed width to original width
+    if (baseFontSize) {
+      const scale = displayWidth / imageDimensions.width;
+      return `${baseFontSize * scale}px`;
+    }
+    
+    // Otherwise, calculate based on displayed image width (matching backend logic)
     // Match backend calculation: Math.max(56, Math.min(width / 10, 120)) for title
     // Math.max(32, Math.min(width / 16, 64)) for subtitle
+    // But scale to displayed size
     if (isTitle) {
       const calculatedSize = Math.max(56, Math.min(displayWidth / 10, 120));
       return `${calculatedSize}px`;
@@ -748,8 +748,13 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       pickColorFromImage(e, eyedropperActive);
                     }
                   }}
-                  onLoad={() => {
+                  onLoad={(e) => {
                     console.log('[Eyedropper] Image loaded, ready for color picking');
+                    // Ensure image dimensions are set when image loads (important for edit mode)
+                    const img = e.currentTarget;
+                    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                      setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+                    }
                   }}
                   onError={(e) => {
                     console.error('[Eyedropper] Image failed to load:', imageUrl);
@@ -774,8 +779,25 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   <>
                     {/* Title Textbox */}
                     {(overlayEdit.title || displayAsset.overlayConfig.title) && (() => {
-                      const titleXPercent = overlayEdit.title_x_percent !== undefined ? overlayEdit.title_x_percent : (overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : (displayAsset.overlayConfig.title_x_percent !== undefined ? displayAsset.overlayConfig.title_x_percent : (displayAsset.overlayConfig.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50)));
-                      const titleYPercent = overlayEdit.title_y_percent !== undefined ? overlayEdit.title_y_percent : (overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : (displayAsset.overlayConfig.title_y_percent !== undefined ? displayAsset.overlayConfig.title_y_percent : (displayAsset.overlayConfig.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 30)));
+                      // Use title-specific positions first, then fallback to legacy x_percent/y_percent, but never use subtitle positions
+                      const titleXPercent = overlayEdit.title_x_percent !== undefined 
+                        ? overlayEdit.title_x_percent 
+                        : (displayAsset.overlayConfig.title_x_percent !== undefined 
+                          ? displayAsset.overlayConfig.title_x_percent 
+                          : (overlayEdit.x_percent !== undefined 
+                            ? overlayEdit.x_percent 
+                            : (displayAsset.overlayConfig.x_percent !== undefined 
+                              ? displayAsset.overlayConfig.x_percent 
+                              : 50)));
+                      const titleYPercent = overlayEdit.title_y_percent !== undefined 
+                        ? overlayEdit.title_y_percent 
+                        : (displayAsset.overlayConfig.title_y_percent !== undefined 
+                          ? displayAsset.overlayConfig.title_y_percent 
+                          : (overlayEdit.y_percent !== undefined 
+                            ? overlayEdit.y_percent 
+                            : (displayAsset.overlayConfig.y_percent !== undefined 
+                              ? displayAsset.overlayConfig.y_percent 
+                              : 30)));
                       const titleFontSize = overlayEdit.title_font_size || displayAsset.overlayConfig?.title_font_size;
                       
                       return (
@@ -795,7 +817,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             textTransform: overlayEdit.font_transform || 'none',
                             filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
                             pointerEvents: 'all',
-                            zIndex: 10,
+                            zIndex: draggingElement === 'title' ? 20 : 10,
                             minWidth: 'fit-content',
                             wordWrap: 'break-word',
                             overflowWrap: 'break-word'
@@ -835,8 +857,25 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                     
                     {/* Subtitle Textbox */}
                     {(overlayEdit.subtitle || displayAsset.overlayConfig.subtitle) && (() => {
-                      const subtitleXPercent = overlayEdit.subtitle_x_percent !== undefined ? overlayEdit.subtitle_x_percent : (overlayEdit.x_percent !== undefined ? overlayEdit.x_percent : (displayAsset.overlayConfig.subtitle_x_percent !== undefined ? displayAsset.overlayConfig.subtitle_x_percent : (displayAsset.overlayConfig.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50)));
-                      const subtitleYPercent = overlayEdit.subtitle_y_percent !== undefined ? overlayEdit.subtitle_y_percent : (overlayEdit.y_percent !== undefined ? overlayEdit.y_percent : (displayAsset.overlayConfig.subtitle_y_percent !== undefined ? displayAsset.overlayConfig.subtitle_y_percent : (displayAsset.overlayConfig.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80)));
+                      // Use subtitle-specific positions first, then fallback to legacy x_percent/y_percent, but never use title positions
+                      const subtitleXPercent = overlayEdit.subtitle_x_percent !== undefined 
+                        ? overlayEdit.subtitle_x_percent 
+                        : (displayAsset.overlayConfig.subtitle_x_percent !== undefined 
+                          ? displayAsset.overlayConfig.subtitle_x_percent 
+                          : (overlayEdit.x_percent !== undefined 
+                            ? overlayEdit.x_percent 
+                            : (displayAsset.overlayConfig.x_percent !== undefined 
+                              ? displayAsset.overlayConfig.x_percent 
+                              : 50)));
+                      const subtitleYPercent = overlayEdit.subtitle_y_percent !== undefined 
+                        ? overlayEdit.subtitle_y_percent 
+                        : (displayAsset.overlayConfig.subtitle_y_percent !== undefined 
+                          ? displayAsset.overlayConfig.subtitle_y_percent 
+                          : (overlayEdit.y_percent !== undefined 
+                            ? overlayEdit.y_percent 
+                            : (displayAsset.overlayConfig.y_percent !== undefined 
+                              ? displayAsset.overlayConfig.y_percent 
+                              : 80)));
                       const subtitleFontSize = overlayEdit.subtitle_font_size || displayAsset.overlayConfig?.subtitle_font_size;
                       
                       return (
@@ -856,7 +895,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             textTransform: overlayEdit.font_transform || 'none',
                             filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
                             pointerEvents: 'all',
-                            zIndex: 10,
+                            zIndex: draggingElement === 'subtitle' ? 20 : 10,
                             minWidth: 'fit-content',
                             wordWrap: 'break-word',
                             overflowWrap: 'break-word'
@@ -953,6 +992,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         setOverlayEdit({});
                       } else {
                         setEditingOverlay(true);
+                        // Ensure image dimensions are loaded before editing starts
+                        if (imageUrl && !imageDimensions) {
+                          const img = new Image();
+                          img.onload = () => {
+                            setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+                          };
+                          img.src = imageUrl;
+                        }
                         setOverlayEdit({
                           title: displayAsset.overlayConfig?.title || displayAsset.overlayConfig?.text || '',
                           subtitle: displayAsset.overlayConfig?.subtitle || '',
@@ -960,6 +1007,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           font_weight: displayAsset.overlayConfig?.font_weight,
                           font_transform: displayAsset.overlayConfig?.font_transform,
                           text_color_hex: displayAsset.overlayConfig?.text_color_hex,
+                          title_color_hex: displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex,
+                          subtitle_color_hex: displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex,
                           position: displayAsset.overlayConfig?.position,
                           max_width_percent: displayAsset.overlayConfig?.max_width_percent,
                           opacity: displayAsset.overlayConfig?.opacity,
@@ -969,10 +1018,19 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           subtitle_max_lines: displayAsset.overlayConfig?.subtitle_max_lines || 3,
                           x_percent: displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50,
                           y_percent: displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80,
-                          title_x_percent: displayAsset.overlayConfig?.title_x_percent !== undefined ? displayAsset.overlayConfig.title_x_percent : (displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50),
-                          title_y_percent: displayAsset.overlayConfig?.title_y_percent !== undefined ? displayAsset.overlayConfig.title_y_percent : (displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 30),
-                          subtitle_x_percent: displayAsset.overlayConfig?.subtitle_x_percent !== undefined ? displayAsset.overlayConfig.subtitle_x_percent : (displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50),
-                          subtitle_y_percent: displayAsset.overlayConfig?.subtitle_y_percent !== undefined ? displayAsset.overlayConfig.subtitle_y_percent : (displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80),
+                          // Ensure title and subtitle have separate default positions
+                          title_x_percent: displayAsset.overlayConfig?.title_x_percent !== undefined 
+                            ? displayAsset.overlayConfig.title_x_percent 
+                            : (displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50),
+                          title_y_percent: displayAsset.overlayConfig?.title_y_percent !== undefined 
+                            ? displayAsset.overlayConfig.title_y_percent 
+                            : (displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 30),
+                          subtitle_x_percent: displayAsset.overlayConfig?.subtitle_x_percent !== undefined 
+                            ? displayAsset.overlayConfig.subtitle_x_percent 
+                            : (displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50),
+                          subtitle_y_percent: displayAsset.overlayConfig?.subtitle_y_percent !== undefined 
+                            ? displayAsset.overlayConfig.subtitle_y_percent 
+                            : (displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80),
                           text_anchor: displayAsset.overlayConfig?.text_anchor || 'middle',
                           title_text_anchor: displayAsset.overlayConfig?.title_text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle',
                           subtitle_text_anchor: displayAsset.overlayConfig?.subtitle_text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle'

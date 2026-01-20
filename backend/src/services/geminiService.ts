@@ -416,7 +416,7 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
     _extractedAssets: {
       logoUrl: imagesInfo.logo_url || undefined,
       imageUrls: imagesInfo.image_urls && imagesInfo.image_urls.length > 0 
-        ? imagesInfo.image_urls.slice(0, 10) // Limit to max 10 images
+        ? imagesInfo.image_urls.slice(0, 50) // Limit to max 50 images
         : undefined
     }
   } as BrandDNA & { _extractedAssets?: { logoUrl?: string; imageUrls?: string[] } };
@@ -879,7 +879,7 @@ export const extractBrandImages = async (url: string): Promise<{ logoUrl?: strin
     const result = {
       logoUrl: scrapingResult.logo_url || undefined,
       imageUrls: scrapingResult.image_urls && scrapingResult.image_urls.length > 0 
-        ? scrapingResult.image_urls.slice(0, 10) // Limit to max 10 images
+        ? scrapingResult.image_urls.slice(0, 50) // Limit to max 50 images
         : undefined
     };
     
