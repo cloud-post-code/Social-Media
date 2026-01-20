@@ -227,44 +227,97 @@ export const applyTextOverlay = async (
     const actualMaxWidth = Math.min(maxTextWidth, (width * overlayConfig.max_width_percent) / 100);
     
     // Use pixel-based positioning if provided, otherwise fall back to string-based
-    let x: number;
-    let y: number;
+    let titleX: number;
+    let titleY: number;
+    let subtitleX: number;
+    let subtitleY: number;
     let textAnchor: 'start' | 'middle' | 'end';
     let titleTextAnchor: 'start' | 'middle' | 'end';
     let subtitleTextAnchor: 'start' | 'middle' | 'end';
     
-    if (overlayConfig.x_percent !== undefined && overlayConfig.y_percent !== undefined) {
-      // Use pixel-based positioning (percentages)
+    // Check if separate positions are provided for title and subtitle
+    const hasSeparatePositions = overlayConfig.title_x_percent !== undefined && 
+                                  overlayConfig.title_y_percent !== undefined &&
+                                  overlayConfig.subtitle_x_percent !== undefined && 
+                                  overlayConfig.subtitle_y_percent !== undefined;
+    
+    // Boundary validation helper
+    const padding = Math.max(30, Math.min(width, height) * 0.03);
+    const clampPosition = (requestedX: number, requestedY: number, textWidth: number, textHeight: number, anchor: 'start' | 'middle' | 'end') => {
+      const halfTextWidth = textWidth / 2;
+      const halfTextHeight = textHeight / 2;
+      
+      let clampedX: number;
+      if (anchor === 'start') {
+        clampedX = Math.max(padding, Math.min(requestedX, width - textWidth - padding));
+      } else if (anchor === 'end') {
+        clampedX = Math.max(textWidth + padding, Math.min(requestedX, width - padding));
+      } else {
+        clampedX = Math.max(halfTextWidth + padding, Math.min(requestedX, width - halfTextWidth - padding));
+      }
+      
+      const clampedY = Math.max(halfTextHeight + padding, Math.min(requestedY, height - halfTextHeight - padding));
+      return { x: clampedX, y: clampedY };
+    };
+    
+    if (hasSeparatePositions) {
+      // Use separate positions for title and subtitle
+      const titleRequestedX = (width * overlayConfig.title_x_percent!) / 100;
+      const titleRequestedY = (height * overlayConfig.title_y_percent!) / 100;
+      const subtitleRequestedX = (width * overlayConfig.subtitle_x_percent!) / 100;
+      const subtitleRequestedY = (height * overlayConfig.subtitle_y_percent!) / 100;
+      
+      titleTextAnchor = overlayConfig.title_text_anchor || overlayConfig.text_anchor || 'middle';
+      subtitleTextAnchor = overlayConfig.subtitle_text_anchor || overlayConfig.text_anchor || 'middle';
+      textAnchor = overlayConfig.text_anchor || 'middle';
+      
+      // Calculate title width and height for boundary validation
+      const titleMaxWidth = (width * overlayConfig.max_width_percent) / 100;
+      // titleY represents the center anchor point, convert to first line Y position
+      const titleCenterY = titleRequestedY;
+      const titleClamped = clampPosition(titleRequestedX, titleCenterY, Math.min(titleMaxWidth, maxTitleLineWidth), titleHeight, titleTextAnchor);
+      titleX = titleClamped.x;
+      // Convert center Y to first line Y position (center - half height + line height)
+      titleY = titleClamped.y - (titleHeight / 2) + titleLineHeight;
+      
+      // Calculate subtitle width and height for boundary validation
+      const subtitleMaxWidth = (width * overlayConfig.max_width_percent) / 100;
+      // subtitleY represents the center anchor point, convert to first line Y position
+      const subtitleCenterY = subtitleRequestedY;
+      const subtitleClamped = clampPosition(subtitleRequestedX, subtitleCenterY, Math.min(subtitleMaxWidth, maxSubtitleLineWidth), subtitleHeight, subtitleTextAnchor);
+      subtitleX = subtitleClamped.x;
+      // Convert center Y to first line Y position (center - half height + line height)
+      subtitleY = subtitleClamped.y - (subtitleHeight / 2) + subtitleLineHeight;
+    } else if (overlayConfig.x_percent !== undefined && overlayConfig.y_percent !== undefined) {
+      // Use legacy pixel-based positioning (single position for both)
       const requestedX = (width * overlayConfig.x_percent) / 100;
       const requestedY = (height * overlayConfig.y_percent) / 100;
       textAnchor = overlayConfig.text_anchor || 'middle';
       titleTextAnchor = overlayConfig.title_text_anchor || overlayConfig.text_anchor || 'middle';
       subtitleTextAnchor = overlayConfig.subtitle_text_anchor || overlayConfig.text_anchor || 'middle';
       
-      // Boundary validation: ensure text stays within image bounds
-      // Use larger padding to ensure text never overlaps edges
-      const padding = Math.max(30, Math.min(width, height) * 0.03); // At least 30px or 3% of smaller dimension
       const halfTextWidth = actualMaxWidth / 2;
       const halfTextHeight = totalTextHeight / 2;
       
       // Adjust X based on title text anchor (primary anchor) to keep text within bounds
       const anchorForBounds = titleTextAnchor;
       if (anchorForBounds === 'start') {
-        // Left-aligned: ensure left edge doesn't go past padding, right edge doesn't exceed width
-        x = Math.max(padding, Math.min(requestedX, width - actualMaxWidth - padding));
+        titleX = Math.max(padding, Math.min(requestedX, width - actualMaxWidth - padding));
       } else if (anchorForBounds === 'end') {
-        // Right-aligned: ensure right edge doesn't go past width-padding, left edge doesn't go below padding
-        x = Math.max(actualMaxWidth + padding, Math.min(requestedX, width - padding));
+        titleX = Math.max(actualMaxWidth + padding, Math.min(requestedX, width - padding));
       } else {
-        // Center-aligned: ensure center ± half width stays within bounds
-        x = Math.max(halfTextWidth + padding, Math.min(requestedX, width - halfTextWidth - padding));
+        titleX = Math.max(halfTextWidth + padding, Math.min(requestedX, width - halfTextWidth - padding));
       }
       
+      // Use same X for subtitle
+      subtitleX = titleX;
+      
       // Adjust Y to keep text within bounds
-      // y represents the center anchor point of the text block
-      // Ensure top edge (y - halfTextHeight) >= padding
-      // Ensure bottom edge (y + halfTextHeight) <= height - padding
-      y = Math.max(halfTextHeight + padding, Math.min(requestedY, height - halfTextHeight - padding));
+      const y = Math.max(halfTextHeight + padding, Math.min(requestedY, height - halfTextHeight - padding));
+      
+      // Position title and subtitle relative to the anchor point
+      titleY = y - (totalTextHeight / 2) + titleLineHeight;
+      subtitleY = titleY + titleHeight + lineSpacing + subtitleLineHeight;
     } else {
       // Fall back to string-based positioning (legacy)
       const positionResult = calculatePosition(
@@ -275,12 +328,12 @@ export const applyTextOverlay = async (
         totalTextHeight,
         overlayConfig.max_width_percent
       );
-      x = positionResult.x;
-      y = positionResult.y;
+      titleX = positionResult.x;
+      subtitleX = positionResult.x;
       
       if (overlayConfig.position === 'floating-center') {
-        x = width / 2;
-        y = height / 2;
+        titleX = width / 2;
+        subtitleX = width / 2;
       }
       
       textAnchor = overlayConfig.position?.includes('right') 
@@ -290,34 +343,29 @@ export const applyTextOverlay = async (
         : 'middle';
       titleTextAnchor = overlayConfig.title_text_anchor || textAnchor;
       subtitleTextAnchor = overlayConfig.subtitle_text_anchor || textAnchor;
-    }
-    
-    // Calculate Y positions for title and subtitle (accounting for multiple lines)
-    // If using pixel-based positioning, y represents the anchor point (middle of text block)
-    // If using string-based positioning, adjust based on position string
-    let titleStartY = y;
-    let subtitleStartY = y;
-    
-    if (overlayConfig.x_percent !== undefined && overlayConfig.y_percent !== undefined) {
-      // Pixel-based: y is the anchor point, position title and subtitle relative to it
-      titleStartY = y - (totalTextHeight / 2) + titleLineHeight;
-      subtitleStartY = titleStartY + titleHeight + lineSpacing + subtitleLineHeight;
-    } else {
-      // String-based positioning (legacy)
+      
+      const y = overlayConfig.position === 'floating-center' ? height / 2 : positionResult.y;
+      
+      // Calculate Y positions based on position string
       const position = overlayConfig.position || 'center-middle';
       if (position.includes('top')) {
-        titleStartY = y + titleLineHeight;
-        subtitleStartY = titleStartY + titleHeight + lineSpacing + subtitleLineHeight;
+        titleY = y + titleLineHeight;
+        subtitleY = titleY + titleHeight + lineSpacing + subtitleLineHeight;
       } else if (position.includes('bottom')) {
-        subtitleStartY = y - subtitleHeight + subtitleLineHeight;
-        titleStartY = subtitleStartY - lineSpacing - titleHeight + titleLineHeight;
+        subtitleY = y - subtitleHeight + subtitleLineHeight;
+        titleY = subtitleY - lineSpacing - titleHeight + titleLineHeight;
       } else {
         // Center - position title in middle, subtitle below
         const centerY = position === 'floating-center' ? height / 2 : y;
-        titleStartY = centerY - (subtitleLines.length > 0 ? (lineSpacing + subtitleHeight) / 2 : 0) - titleHeight / 2 + titleLineHeight;
-        subtitleStartY = titleStartY + titleHeight + lineSpacing + subtitleLineHeight;
+        titleY = centerY - (subtitleLines.length > 0 ? (lineSpacing + subtitleHeight) / 2 : 0) - titleHeight / 2 + titleLineHeight;
+        subtitleY = titleY + titleHeight + lineSpacing + subtitleLineHeight;
       }
     }
+    
+    // Calculate Y positions for title and subtitle (accounting for multiple lines)
+    // titleY and subtitleY are now the anchor points (middle of first line)
+    let titleStartY = titleY;
+    let subtitleStartY = subtitleY;
     
     // Escape XML special characters
     const escapeXml = (text: string) => {
@@ -334,11 +382,11 @@ export const applyTextOverlay = async (
     const escapedSubtitleLines = subtitleLines.map(line => escapeXml(line));
     
     // Generate SVG text elements for each line
-    const generateTextElements = (lines: string[], startY: number, fontSize: number, lineHeight: number, fontWeight: string, opacity: number, color: string, anchor: 'start' | 'middle' | 'end') => {
+    const generateTextElements = (lines: string[], xPos: number, startY: number, fontSize: number, lineHeight: number, fontWeight: string, opacity: number, color: string, anchor: 'start' | 'middle' | 'end') => {
       return lines.map((line, index) => {
         const yPos = startY + (index * lineHeight);
         return `<text
-    x="${x}"
+    x="${xPos}"
     y="${yPos}"
     font-family="${fontFamily}"
     font-size="${fontSize}"
@@ -367,8 +415,8 @@ export const applyTextOverlay = async (
       </feMerge>
     </filter>
   </defs>
-  ${generateTextElements(escapedTitleLines, titleStartY, titleFontSize, titleLineHeight, fontWeight, opacity, titleColor, titleTextAnchor)}
-  ${subtitleLines.length > 0 ? generateTextElements(escapedSubtitleLines, subtitleStartY, subtitleFontSize, subtitleLineHeight, fontWeight === '700' ? '400' : fontWeight, opacity * 0.9, subtitleColor, subtitleTextAnchor) : ''}
+  ${generateTextElements(escapedTitleLines, titleX, titleStartY, titleFontSize, titleLineHeight, fontWeight, opacity, titleColor, titleTextAnchor)}
+  ${subtitleLines.length > 0 ? generateTextElements(escapedSubtitleLines, subtitleX, subtitleStartY, subtitleFontSize, subtitleLineHeight, fontWeight === '700' ? '400' : fontWeight, opacity * 0.9, subtitleColor, subtitleTextAnchor) : ''}
 </svg>`;
     
     // Debug logging
@@ -385,7 +433,10 @@ export const applyTextOverlay = async (
       color: overlayConfig.text_color_hex,
       titleFontSize,
       subtitleFontSize,
-      x,
+      titleX,
+      titleY,
+      subtitleX,
+      subtitleY,
       titleStartY,
       subtitleStartY,
       imageSize: `${width}x${height}`

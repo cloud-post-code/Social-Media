@@ -194,6 +194,11 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
       subtitle_max_lines: overlay_config.subtitle_max_lines !== undefined ? overlay_config.subtitle_max_lines : (asset.overlay_config?.subtitle_max_lines || 3),
       x_percent: overlay_config.x_percent !== undefined ? overlay_config.x_percent : asset.overlay_config?.x_percent,
       y_percent: overlay_config.y_percent !== undefined ? overlay_config.y_percent : asset.overlay_config?.y_percent,
+      // Separate positioning for title and subtitle
+      title_x_percent: overlay_config.title_x_percent !== undefined ? overlay_config.title_x_percent : asset.overlay_config?.title_x_percent,
+      title_y_percent: overlay_config.title_y_percent !== undefined ? overlay_config.title_y_percent : asset.overlay_config?.title_y_percent,
+      subtitle_x_percent: overlay_config.subtitle_x_percent !== undefined ? overlay_config.subtitle_x_percent : asset.overlay_config?.subtitle_x_percent,
+      subtitle_y_percent: overlay_config.subtitle_y_percent !== undefined ? overlay_config.subtitle_y_percent : asset.overlay_config?.subtitle_y_percent,
       text_anchor: overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle',
       title_text_anchor: overlay_config.title_text_anchor !== undefined ? overlay_config.title_text_anchor : (asset.overlay_config?.title_text_anchor || overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle'),
       subtitle_text_anchor: overlay_config.subtitle_text_anchor !== undefined ? overlay_config.subtitle_text_anchor : (asset.overlay_config?.subtitle_text_anchor || overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle'),

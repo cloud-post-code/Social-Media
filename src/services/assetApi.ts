@@ -39,6 +39,8 @@ export const assetApi = {
     font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
     letter_spacing?: 'normal' | 'wide';
     text_color_hex?: string;
+    title_color_hex?: string;
+    subtitle_color_hex?: string;
     position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
     max_width_percent?: number;
     opacity?: number;
@@ -48,6 +50,13 @@ export const assetApi = {
     subtitle_max_lines?: number;
     title_text_anchor?: 'start' | 'middle' | 'end';
     subtitle_text_anchor?: 'start' | 'middle' | 'end';
+    x_percent?: number;
+    y_percent?: number;
+    title_x_percent?: number;
+    title_y_percent?: number;
+    subtitle_x_percent?: number;
+    subtitle_y_percent?: number;
+    text_anchor?: 'start' | 'middle' | 'end';
   }) => api.put<GeneratedAsset>(`/assets/${id}/overlay`, { overlay_config: overlayConfig }),
   
   delete: (id: string) => api.delete<void>(`/assets/${id}`),
