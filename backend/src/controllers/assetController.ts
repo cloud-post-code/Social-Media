@@ -103,7 +103,12 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
       text_color_hex: overlayDesign.text_color_hex,
       position: overlayDesign.position,
       max_width_percent: overlayDesign.max_width_percent,
-      opacity: overlayDesign.opacity
+      opacity: overlayDesign.opacity,
+      overlay_background_type: overlayDesign.overlay_background_type,
+      overlay_background_color: overlayDesign.overlay_background_color,
+      overlay_background_opacity: overlayDesign.overlay_background_opacity,
+      overlay_background_shape: overlayDesign.overlay_background_shape,
+      overlay_background_padding: overlayDesign.overlay_background_padding
     };
 
     const finalImageUrl = await imageOverlayService.applyTextOverlay(
@@ -202,7 +207,13 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
       text_anchor: overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle',
       title_text_anchor: overlay_config.title_text_anchor !== undefined ? overlay_config.title_text_anchor : (asset.overlay_config?.title_text_anchor || overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle'),
       subtitle_text_anchor: overlay_config.subtitle_text_anchor !== undefined ? overlay_config.subtitle_text_anchor : (asset.overlay_config?.subtitle_text_anchor || overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle'),
-      position: overlay_config.position || asset.overlay_config?.position || 'bottom-right' // Keep for backward compatibility
+      position: overlay_config.position || asset.overlay_config?.position || 'bottom-right', // Keep for backward compatibility
+      // Overlay background elements
+      overlay_background_type: overlay_config.overlay_background_type !== undefined ? overlay_config.overlay_background_type : asset.overlay_config?.overlay_background_type,
+      overlay_background_color: overlay_config.overlay_background_color !== undefined ? overlay_config.overlay_background_color : asset.overlay_config?.overlay_background_color,
+      overlay_background_opacity: overlay_config.overlay_background_opacity !== undefined ? overlay_config.overlay_background_opacity : asset.overlay_config?.overlay_background_opacity,
+      overlay_background_shape: overlay_config.overlay_background_shape !== undefined ? overlay_config.overlay_background_shape : asset.overlay_config?.overlay_background_shape,
+      overlay_background_padding: overlay_config.overlay_background_padding !== undefined ? overlay_config.overlay_background_padding : asset.overlay_config?.overlay_background_padding
     };
 
     const finalImageUrl = await imageOverlayService.updateOverlay(

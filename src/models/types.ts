@@ -58,6 +58,12 @@ export interface OverlayConfig {
   subtitle_font_size?: number;
   title_max_lines?: number;
   subtitle_max_lines?: number;
+  // Overlay background elements for improved text visibility
+  overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
+  overlay_background_color?: string; // hex color
+  overlay_background_opacity?: number; // 0-1
+  overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
+  overlay_background_padding?: number; // padding around text in pixels
   // Legacy support
   text?: string;
 }

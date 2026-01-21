@@ -1011,18 +1011,40 @@ You must prevent "product hallucination." Before writing the final prompt, you m
 2. **Weight/Drape:** Does it hang heavily (like wool) or float light (like silk)?
 3. **Imperfections:** Real products have grain and weave. Mentioning these creates realism.
 
+### CRITICAL INSTRUCTION: TEXT OVERLAY SPACE PLANNING
+This image will have marketing text overlays (title and subtitle) added later. You MUST plan the composition to accommodate text:
+
+1. **Negative Space Strategy:**
+   - Create areas with simpler, less busy backgrounds (top, bottom, or sides)
+   - Avoid placing important product details in areas where text will likely be placed
+   - Consider leaving 20-30% of the image with simpler backgrounds (solid colors, gradients, or minimal detail)
+
+2. **Background Zones for Text:**
+   - **Top area (top 25%):** Often ideal for text - ensure this area has simpler backgrounds if text will be placed here
+   - **Bottom area (bottom 25%):** Common text placement - create clean, less cluttered backgrounds
+   - **Center areas:** Only if background is uniform and provides good contrast
+
+3. **Visual Hierarchy:**
+   - Keep the product as the hero in the center or prominent position
+   - Use depth of field or lighting to create natural separation between product and background areas
+   - Ensure background areas (especially top/bottom) have sufficient contrast for text readability
+
+4. **Composition Notes:**
+   - Mention in composition_logic where you're creating negative space for text
+   - Describe the background characteristics in text overlay zones (e.g., "soft gradient background at top", "clean minimal background at bottom")
+
 ### OUTPUT FORMAT (JSON)
 Return ONLY:
 {
   "step_1_analysis": {
     "texture_lock": "A few words describing the specific material surface (e.g., 'coarse woven linen', 'ribbed wool knit').",
     "lighting_strategy": "How light hits the texture (e.g., 'Raking side light to accentuate the weave').",
-    "composition_logic": "Where the subject is placed to leave 'Negative Space' for text overlay later."
+    "composition_logic": "Where the subject is placed to leave 'Negative Space' for text overlay later. Specifically describe which areas (top/bottom/sides) have simpler backgrounds suitable for text placement, and how the composition creates visual separation between product and text overlay zones."
   },
   "reasoning": "Brief explanation of the visual strategy",
   "includes_person": boolean,
   "composition_notes": "Notes about composition and placement",
-  "imagen_prompt_final": "A prompt following this strict structure: [SUBJECT DEFINITION: detailed description of ${productFocus} focusing on texture, weave, and material weight] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + [LIGHTING: Specific lighting to highlight material quality] + [TECH SPECS: 8k, macro details, commercial photography, depth of field]. NO text in image. NO watermark. NO branding sections. NO logos. Clean image only."
+  "imagen_prompt_final": "A prompt following this strict structure: [SUBJECT DEFINITION: detailed description of ${productFocus} focusing on texture, weave, and material weight] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + [COMPOSITION: Create negative space areas (top/bottom/sides) with simpler backgrounds suitable for text overlays - use depth of field or lighting to separate product from background zones] + [LIGHTING: Specific lighting to highlight material quality and create contrast in background areas] + [TECH SPECS: 8k, macro details, commercial photography, depth of field]. NO text in image. NO watermark. NO branding sections. NO logos. Clean image only. Ensure background areas where text will be placed have simpler, less busy compositions."
 }
   `;
 
@@ -1134,6 +1156,11 @@ export const designTextOverlay = async (
   position: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
   max_width_percent: number;
   opacity: number;
+  overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
+  overlay_background_color?: string;
+  overlay_background_opacity?: number;
+  overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
+  overlay_background_padding?: number;
   reasoning: string;
 }> => {
   const ai = getAIClient();
@@ -1147,8 +1174,8 @@ export const designTextOverlay = async (
   const colorsList = allColors.join(', ');
 
   const prompt = `
-You are a UI/UX Designer specializing in Social Media aesthetics.
-Goal: Determine the CSS/Design properties to overlay the title and subtitle onto the image.
+You are a UI/UX Designer specializing in Social Media aesthetics and accessibility.
+Goal: Determine the CSS/Design properties to overlay the title and subtitle onto the image with MAXIMUM READABILITY.
 
 ### INPUT DATA
 Brand DNA: ${JSON.stringify(brandDNA)}
@@ -1160,12 +1187,50 @@ All brand colors: ${allColors.join(', ')}
 Primary color (most important): ${brandDNA.visual_identity.primary_color_hex}
 Accent color (secondary): ${brandDNA.visual_identity.accent_color_hex}
 
+### CRITICAL READABILITY ANALYSIS
+Before determining placement, you MUST analyze the image:
+
+1. **Contrast Analysis:**
+   - Identify areas with sufficient brightness contrast (light backgrounds need dark text, dark backgrounds need light text)
+   - Look for zones with minimal visual clutter (avoid busy/complex areas)
+   - Find areas with consistent color/brightness that won't interfere with text legibility
+
+2. **Readability Zones:**
+   - Top areas: Often work well if image has simpler backgrounds at top
+   - Bottom areas: Common choice, but ensure sufficient contrast
+   - Center areas: Use only if background is uniform and provides good contrast
+   - Avoid: Areas with high detail, busy patterns, or extreme brightness variations
+
+3. **Text Length Consideration:**
+   - Title length: "${title.length}" characters - needs ${Math.ceil(title.length / 20)} lines approximately
+   - Subtitle length: "${subtitle.length}" characters - needs ${Math.ceil(subtitle.length / 30)} lines approximately
+   - Position must accommodate both text blocks without overlapping important image elements
+
+4. **Accessibility Standards:**
+   - Ensure text meets WCAG contrast ratio of at least 4.5:1 for normal text, 3:1 for large text
+   - Test color combinations: If background is light, use dark text; if background is dark, use light text
+   - Consider adding subtle text shadows or backgrounds if contrast is borderline
+
+5. **Overlay Background Elements Analysis:**
+   - Analyze the image at the chosen text position
+   - Determine if overlay elements (gradients, shapes, blur) would improve readability
+   - Consider: Is the background too busy? Too bright/dark? Does it need visual separation?
+   - If overlay elements are needed, choose:
+     - **Type**: 'gradient' (smooth color transition), 'solid' (solid color background), 'blur' (blurred background), 'shape' (geometric shape), or 'none' (no overlay needed)
+     - **Color**: Choose from brand colors [${allColors.join(', ')}] or derive from image analysis
+     - **Opacity**: 0.3-0.7 for subtle, 0.7-0.9 for stronger (ensure text remains readable)
+     - **Shape**: 'rectangle' (sharp corners), 'rounded' (slightly rounded), 'pill' (very rounded), 'circle' (circular)
+     - **Padding**: 20-40 pixels around text for comfortable spacing
+   - Overlay elements should be NON-INTRUSIVE and match the brand's visual style
+   - Only suggest overlay elements if they genuinely improve readability without detracting from the image
+
 ### INSTRUCTIONS
+- **PRIORITY: READABILITY FIRST** - Choose position and color that maximizes text legibility
 - Design styling that works for both title (larger, bolder) and subtitle (smaller, supporting)
 - Consider spacing between title and subtitle (typically 8-12px)
-- Ensure good contrast and readability
-- Position should leave room for both text elements
-- **COLOR SELECTION**: Choose the BEST color from ALL available brand colors (${allColors.join(', ')}) OR white/black depending on contrast needs. Analyze the image background and pick the color that provides optimal contrast and aligns with the brand palette. You have access to ALL brand colors - use them strategically. Don't limit yourself to just primary and accent colors.
+- Position should leave room for both text elements AND avoid busy/complex image areas
+- **COLOR SELECTION**: Analyze the image background at the chosen position. Choose the BEST color from ALL available brand colors (${allColors.join(', ')}) OR white/black depending on contrast needs. The chosen color MUST provide excellent contrast against the background at the selected position.
+- **POSITION SELECTION**: Choose position based on readability analysis, not just aesthetics. Prefer positions with simpler backgrounds and better contrast.
 
 ### OUTPUT FORMAT (JSON)
 Return ONLY:
@@ -1175,11 +1240,17 @@ Return ONLY:
     "font_weight": "light" | "regular" | "bold",
     "text_transform": "uppercase" | "lowercase" | "capitalize",
     "letter_spacing": "normal" | "wide",
-    "text_color_hex": "Choose the BEST color from the brand palette [${allColors.join(', ')}] OR white/black for contrast. Select the color that best complements the image and provides readability.",
-    "suggested_position": "top-center" | "bottom-right" | "center-left" | "floating-center",
-    "opacity": 1.0
+    "text_color_hex": "Choose the BEST color from the brand palette [${allColors.join(', ')}] OR white/black for contrast. Select the color that provides MAXIMUM readability against the background at the chosen position.",
+    "suggested_position": "top-center" | "bottom-right" | "center-left" | "floating-center" | "top-left" | "top-right" | "bottom-left" | "bottom-center" | "center-right" | "center-middle",
+    "opacity": 1.0,
+    "max_width_percent": 80,
+    "overlay_background_type": "gradient" | "solid" | "blur" | "shape" | "none",
+    "overlay_background_color": "Hex color from brand palette or derived from image (e.g., #FFFFFF, #000000, or brand color)",
+    "overlay_background_opacity": 0.0-1.0,
+    "overlay_background_shape": "rectangle" | "rounded" | "pill" | "circle",
+    "overlay_background_padding": 20-40
   },
-  "reasoning": "Why this font, color selection, and position complements the 'luxury product' vibe and works for both title and subtitle. Explain which brand color you chose and why."
+  "reasoning": "Explain: (1) Which area of the image you analyzed for readability, (2) Why this position provides optimal contrast and avoids visual clutter, (3) Which brand color you chose and why it provides excellent readability, (4) How this placement accommodates both title and subtitle without overlapping important image elements, (5) Whether overlay elements are needed and why (or why not), (6) If overlay elements are suggested, explain how they improve readability while matching brand style."
 }
   `;
 
@@ -1211,8 +1282,13 @@ Return ONLY:
     letter_spacing: designStrategy.letter_spacing || result.letter_spacing || 'normal',
     text_color_hex: designStrategy.text_color_hex || result.text_color_hex || fallbackColor,
     position: designStrategy.suggested_position || result.position || 'bottom-right',
-    max_width_percent: result.max_width_percent || 80,
+    max_width_percent: designStrategy.max_width_percent || result.max_width_percent || 80,
     opacity: designStrategy.opacity !== undefined ? designStrategy.opacity : (result.opacity !== undefined ? result.opacity : 1.0),
+    overlay_background_type: designStrategy.overlay_background_type || result.overlay_background_type || 'none',
+    overlay_background_color: designStrategy.overlay_background_color || result.overlay_background_color,
+    overlay_background_opacity: designStrategy.overlay_background_opacity !== undefined ? designStrategy.overlay_background_opacity : (result.overlay_background_opacity !== undefined ? result.overlay_background_opacity : 0.5),
+    overlay_background_shape: designStrategy.overlay_background_shape || result.overlay_background_shape || 'rounded',
+    overlay_background_padding: designStrategy.overlay_background_padding !== undefined ? designStrategy.overlay_background_padding : (result.overlay_background_padding !== undefined ? result.overlay_background_padding : 30),
     reasoning: result.reasoning || ''
   };
 };

@@ -381,6 +381,85 @@ export const applyTextOverlay = async (
     const escapedTitleLines = titleLines.map(line => escapeXml(line));
     const escapedSubtitleLines = subtitleLines.map(line => escapeXml(line));
     
+    // Generate overlay background elements if configured
+    const generateOverlayBackground = (): string => {
+      const overlayType = overlayConfig.overlay_background_type || 'none';
+      if (overlayType === 'none' || !overlayConfig.overlay_background_color) {
+        return '';
+      }
+      
+      // Calculate text bounding box
+      const padding = overlayConfig.overlay_background_padding || 30;
+      const charWidthMultiplier = overlayConfig.font_weight === 'bold' ? 0.7 : 0.6;
+      const maxTitleLineWidth = Math.max(...titleLines.map(line => line.length * titleFontSize * charWidthMultiplier));
+      const maxSubtitleLineWidth = subtitleLines.length > 0 
+        ? Math.max(...subtitleLines.map(line => line.length * subtitleFontSize * charWidthMultiplier))
+        : 0;
+      const textWidth = Math.max(maxTitleLineWidth, maxSubtitleLineWidth);
+      const textHeight = totalTextHeight;
+      
+      // Calculate overlay dimensions
+      const overlayWidth = Math.min(textWidth + (padding * 2), width * 0.9);
+      const overlayHeight = textHeight + (padding * 2);
+      
+      // Calculate overlay position (centered on text)
+      let overlayX: number;
+      if (titleTextAnchor === 'start') {
+        overlayX = titleX - padding;
+      } else if (titleTextAnchor === 'end') {
+        overlayX = titleX - overlayWidth + padding;
+      } else {
+        overlayX = titleX - (overlayWidth / 2);
+      }
+      
+      // Ensure overlay stays within image bounds
+      overlayX = Math.max(padding, Math.min(overlayX, width - overlayWidth - padding));
+      const overlayY = Math.min(titleStartY, subtitleStartY || titleStartY) - padding - (textHeight / 2);
+      const clampedOverlayY = Math.max(padding, Math.min(overlayY, height - overlayHeight - padding));
+      
+      const bgColor = overlayConfig.overlay_background_color;
+      const bgOpacity = overlayConfig.overlay_background_opacity !== undefined ? overlayConfig.overlay_background_opacity : 0.5;
+      const shape = overlayConfig.overlay_background_shape || 'rounded';
+      
+      // Calculate corner radius based on shape
+      let rx = 0;
+      if (shape === 'rounded') {
+        rx = 12;
+      } else if (shape === 'pill') {
+        rx = overlayHeight / 2;
+      } else if (shape === 'circle') {
+        const size = Math.min(overlayWidth, overlayHeight);
+        return `<circle cx="${overlayX + overlayWidth / 2}" cy="${clampedOverlayY + overlayHeight / 2}" r="${size / 2}" fill="${bgColor}" opacity="${bgOpacity}"/>`;
+      }
+      
+      if (overlayType === 'gradient') {
+        // Create gradient definition
+        const gradientId = 'overlayGradient';
+        const gradientDef = `<defs>
+    <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:${bgColor};stop-opacity:${bgOpacity * 0.8}" />
+      <stop offset="100%" style="stop-color:${bgColor};stop-opacity:${bgOpacity}" />
+    </linearGradient>
+  </defs>`;
+        
+        return `${gradientDef}
+  <rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="url(#${gradientId})"/>`;
+      } else if (overlayType === 'blur') {
+        // For blur, we'll use a semi-transparent background with a filter
+        const blurFilterId = 'overlayBlur';
+        const blurDef = `<defs>
+    <filter id="${blurFilterId}" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10"/>
+    </filter>
+  </defs>`;
+        return `${blurDef}
+  <rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="${bgColor}" opacity="${bgOpacity}" filter="url(#${blurFilterId})"/>`;
+      } else {
+        // Solid or shape
+        return `<rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="${bgColor}" opacity="${bgOpacity}"/>`;
+      }
+    };
+    
     // Generate SVG text elements for each line
     const generateTextElements = (lines: string[], xPos: number, startY: number, fontSize: number, lineHeight: number, fontWeight: string, opacity: number, color: string, anchor: 'start' | 'middle' | 'end') => {
       return lines.map((line, index) => {
@@ -400,7 +479,10 @@ export const applyTextOverlay = async (
       }).join('\n  ');
     };
     
-    // Create SVG with title and subtitle (multiple lines)
+    // Generate overlay background
+    const overlayBackground = generateOverlayBackground();
+    
+    // Create SVG with overlay background (if any), then title and subtitle (multiple lines)
     const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -415,6 +497,7 @@ export const applyTextOverlay = async (
       </feMerge>
     </filter>
   </defs>
+  ${overlayBackground}
   ${generateTextElements(escapedTitleLines, titleX, titleStartY, titleFontSize, titleLineHeight, fontWeight, opacity, titleColor, titleTextAnchor)}
   ${subtitleLines.length > 0 ? generateTextElements(escapedSubtitleLines, subtitleX, subtitleStartY, subtitleFontSize, subtitleLineHeight, fontWeight === '700' ? '400' : fontWeight, opacity * 0.9, subtitleColor, subtitleTextAnchor) : ''}
 </svg>`;
