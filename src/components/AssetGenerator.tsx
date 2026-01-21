@@ -72,6 +72,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [draggingElement, setDraggingElement] = useState<'title' | 'subtitle' | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizingElement, setResizingElement] = useState<'title' | 'subtitle' | null>(null);
+  const [resizeHandle, setResizeHandle] = useState<'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null>(null);
+  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [editingTextBlock, setEditingTextBlock] = useState<'title' | 'subtitle' | null>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   
   // Compute display asset and image URL from current asset
@@ -236,8 +241,135 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     if (!dims) {
       return '80%'; // Fallback to percentage if dimensions not available
     }
-    const percent = Math.min(maxWidthPercent || 80, 85);
+    const percent = Math.min(maxWidthPercent || 80, 95);
     return `${(dims.displayWidth * percent) / 100}px`;
+  };
+  
+  // Render resize handles for text blocks
+  const renderResizeHandles = (element: 'title' | 'subtitle') => {
+    if (editingTextBlock === element) {
+      return (
+        <>
+          {/* Corner handles */}
+          <div
+            className="absolute -top-1 -left-1 w-3 h-3 bg-indigo-600 border border-white rounded-sm cursor-nwse-resize z-30"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsResizing(true);
+              setResizingElement(element);
+              setResizeHandle('nw');
+              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              setResizeStart({
+                x: e.clientX,
+                y: e.clientY,
+                width: currentWidth,
+                height: 0
+              });
+            }}
+          />
+          <div
+            className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-600 border border-white rounded-sm cursor-nesw-resize z-30"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsResizing(true);
+              setResizingElement(element);
+              setResizeHandle('ne');
+              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              setResizeStart({
+                x: e.clientX,
+                y: e.clientY,
+                width: currentWidth,
+                height: 0
+              });
+            }}
+          />
+          <div
+            className="absolute -bottom-1 -left-1 w-3 h-3 bg-indigo-600 border border-white rounded-sm cursor-nesw-resize z-30"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsResizing(true);
+              setResizingElement(element);
+              setResizeHandle('sw');
+              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              setResizeStart({
+                x: e.clientX,
+                y: e.clientY,
+                width: currentWidth,
+                height: 0
+              });
+            }}
+          />
+          <div
+            className="absolute -bottom-1 -right-1 w-3 h-3 bg-indigo-600 border border-white rounded-sm cursor-nwse-resize z-30"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsResizing(true);
+              setResizingElement(element);
+              setResizeHandle('se');
+              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              setResizeStart({
+                x: e.clientX,
+                y: e.clientY,
+                width: currentWidth,
+                height: 0
+              });
+            }}
+          />
+          {/* Side handles */}
+          <div
+            className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-600 border border-white rounded-sm cursor-ns-resize z-30"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsResizing(true);
+              setResizingElement(element);
+              setResizeHandle('n');
+            }}
+          />
+          <div
+            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-600 border border-white rounded-sm cursor-ns-resize z-30"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsResizing(true);
+              setResizingElement(element);
+              setResizeHandle('s');
+            }}
+          />
+          <div
+            className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-600 border border-white rounded-sm cursor-ew-resize z-30"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsResizing(true);
+              setResizingElement(element);
+              setResizeHandle('w');
+              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              setResizeStart({
+                x: e.clientX,
+                y: e.clientY,
+                width: currentWidth,
+                height: 0
+              });
+            }}
+          />
+          <div
+            className="absolute -right-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-600 border border-white rounded-sm cursor-ew-resize z-30"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsResizing(true);
+              setResizingElement(element);
+              setResizeHandle('e');
+              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              setResizeStart({
+                x: e.clientX,
+                y: e.clientY,
+                width: currentWidth,
+                height: 0
+              });
+            }}
+          />
+        </>
+      );
+    }
+    return null;
   };
   
   // Function to pick color from image using canvas
@@ -350,10 +482,50 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     };
   };
   
-  // Handle mouse move and up events globally when dragging
+  // Handle mouse move and up events globally when dragging or resizing
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging && dragStart && currentAsset && editingOverlay && draggingElement) {
+      if (isResizing && resizeStart && resizeHandle && resizingElement && currentAsset && editingOverlay) {
+        const imageContainer = document.querySelector('.image-preview-container');
+        if (imageContainer && imageDimensions) {
+          const imageBounds = getImageDisplayBounds(imageContainer);
+          if (imageBounds) {
+            const deltaX = e.clientX - resizeStart.x;
+            const deltaY = e.clientY - resizeStart.y;
+            
+            // Convert pixel deltas to percentage changes
+            const deltaXPercent = (deltaX / imageBounds.width) * 100;
+            const deltaYPercent = (deltaY / imageBounds.height) * 100;
+            
+            // Calculate new width and height based on resize handle
+            let newWidthPercent = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+            let newXPercent = overlayEdit.title_x_percent !== undefined ? overlayEdit.title_x_percent : (displayAsset?.overlayConfig?.title_x_percent || 50);
+            
+            if (resizingElement === 'subtitle') {
+              newXPercent = overlayEdit.subtitle_x_percent !== undefined ? overlayEdit.subtitle_x_percent : (displayAsset?.overlayConfig?.subtitle_x_percent || 50);
+            }
+            
+            if (resizeHandle.includes('e')) {
+              newWidthPercent = Math.max(20, Math.min(95, resizeStart.width + deltaXPercent));
+            }
+            if (resizeHandle.includes('w')) {
+              newWidthPercent = Math.max(20, Math.min(95, resizeStart.width - deltaXPercent));
+              // Adjust X position when resizing from left
+              const currentX = resizingElement === 'title' 
+                ? (overlayEdit.title_x_percent !== undefined ? overlayEdit.title_x_percent : (displayAsset?.overlayConfig?.title_x_percent || 50))
+                : (overlayEdit.subtitle_x_percent !== undefined ? overlayEdit.subtitle_x_percent : (displayAsset?.overlayConfig?.subtitle_x_percent || 50));
+              newXPercent = Math.max(5, Math.min(95, currentX - deltaXPercent / 2));
+            }
+            
+            setOverlayEdit(prev => ({
+              ...prev,
+              max_width_percent: newWidthPercent,
+              ...(resizeHandle.includes('w') && resizingElement === 'title' ? { title_x_percent: newXPercent } : {}),
+              ...(resizeHandle.includes('w') && resizingElement === 'subtitle' ? { subtitle_x_percent: newXPercent } : {})
+            }));
+          }
+        }
+      } else if (isDragging && dragStart && currentAsset && editingOverlay && draggingElement) {
         const imageContainer = document.querySelector('.image-preview-container');
         if (imageContainer && imageDimensions) {
           const imageBounds = getImageDisplayBounds(imageContainer);
@@ -418,9 +590,13 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       setIsDragging(false);
       setDragStart(null);
       setDraggingElement(null);
+      setIsResizing(false);
+      setResizingElement(null);
+      setResizeHandle(null);
+      setResizeStart(null);
     };
     
-    if (isDragging) {
+    if (isDragging || isResizing) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -428,7 +604,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart, currentAsset, editingOverlay, draggingElement, imageDimensions]);
+  }, [isDragging, isResizing, dragStart, resizeStart, resizeHandle, resizingElement, currentAsset, editingOverlay, draggingElement, imageDimensions, overlayEdit, displayAsset]);
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -748,7 +924,17 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           <div className="lg:col-span-6 space-y-8">
             {/* Visual Preview with Draggable Text Overlay */}
             <div className="relative group rounded-[4rem] overflow-hidden shadow-[0_48px_80px_-24px_rgba(0,0,0,0.3)] border-[20px] border-white ring-1 ring-slate-200">
-              <div ref={imageContainerRef} className="image-preview-container relative w-full" style={getAspectRatioStyle()}>
+              <div 
+                ref={imageContainerRef} 
+                className="image-preview-container relative w-full" 
+                style={getAspectRatioStyle()}
+                onClick={(e) => {
+                  // Close editing mode when clicking outside text blocks
+                  if (editingTextBlock && (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'IMG')) {
+                    setEditingTextBlock(null);
+                  }
+                }}
+              >
                 <img 
                   src={imageUrl} 
                   className={`w-full h-full object-contain transition duration-700 group-hover:scale-105 ${eyedropperActive ? 'cursor-crosshair' : ''}`}
@@ -811,10 +997,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       
                       return (
                         <div
-                          className="absolute cursor-move select-none border-2 border-dashed border-indigo-400 bg-indigo-50/20 rounded-lg p-3 backdrop-blur-sm"
+                          className={`absolute select-none border-2 ${editingTextBlock === 'title' ? 'border-indigo-600' : 'border-dashed border-indigo-400'} bg-indigo-50/20 rounded-lg p-3 backdrop-blur-sm ${editingTextBlock === 'title' ? 'cursor-default' : 'cursor-move'}`}
                           style={{
                             ...getOverlayPosition(titleXPercent, titleYPercent),
                             textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                            width: getMaxWidthPixels(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent),
                             maxWidth: getMaxWidthPixels(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent),
                             padding: '0.5rem',
                             color: overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
@@ -826,14 +1013,17 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             textTransform: overlayEdit.font_transform || 'none',
                             filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
                             pointerEvents: 'all',
-                            zIndex: draggingElement === 'title' ? 20 : 10,
-                            minWidth: 'fit-content',
+                            zIndex: draggingElement === 'title' || editingTextBlock === 'title' ? 20 : 10,
                             wordWrap: 'break-word',
                             overflowWrap: 'break-word',
                             wordBreak: 'normal'
                           }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTextBlock(editingTextBlock === 'title' ? null : 'title');
+                          }}
                           onMouseDown={(e) => {
-                            if (eyedropperActive) {
+                            if (eyedropperActive || editingTextBlock === 'title') {
                               e.stopPropagation();
                               return;
                             }
@@ -858,7 +1048,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             }
                           }}
                         >
-                          <div style={{ whiteSpace: 'pre-wrap', pointerEvents: 'none', wordBreak: 'normal', overflowWrap: 'break-word' }}>
+                          {renderResizeHandles('title')}
+                          <div style={{ whiteSpace: 'pre-wrap', pointerEvents: editingTextBlock === 'title' ? 'auto' : 'none', wordBreak: 'normal', overflowWrap: 'break-word', width: '100%' }}>
                             {overlayEdit.title || displayAsset.overlayConfig.title || ''}
                           </div>
                         </div>
@@ -890,10 +1081,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       
                       return (
                         <div
-                          className="absolute cursor-move select-none border-2 border-dashed border-blue-400 bg-blue-50/20 rounded-lg p-3 backdrop-blur-sm"
+                          className={`absolute select-none border-2 ${editingTextBlock === 'subtitle' ? 'border-blue-600' : 'border-dashed border-blue-400'} bg-blue-50/20 rounded-lg p-3 backdrop-blur-sm ${editingTextBlock === 'subtitle' ? 'cursor-default' : 'cursor-move'}`}
                           style={{
                             ...getOverlayPosition(subtitleXPercent, subtitleYPercent),
                             textAlign: (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                            width: getMaxWidthPixels(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent),
                             maxWidth: getMaxWidthPixels(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent),
                             padding: '0.5rem',
                             color: overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
@@ -905,14 +1097,17 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             textTransform: overlayEdit.font_transform || 'none',
                             filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
                             pointerEvents: 'all',
-                            zIndex: draggingElement === 'subtitle' ? 20 : 10,
-                            minWidth: 'fit-content',
+                            zIndex: draggingElement === 'subtitle' || editingTextBlock === 'subtitle' ? 20 : 10,
                             wordWrap: 'break-word',
                             overflowWrap: 'break-word',
                             wordBreak: 'normal'
                           }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTextBlock(editingTextBlock === 'subtitle' ? null : 'subtitle');
+                          }}
                           onMouseDown={(e) => {
-                            if (eyedropperActive) {
+                            if (eyedropperActive || editingTextBlock === 'subtitle') {
                               e.stopPropagation();
                               return;
                             }
@@ -937,7 +1132,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             }
                           }}
                         >
-                          <div style={{ whiteSpace: 'pre-wrap', pointerEvents: 'none', wordBreak: 'normal', overflowWrap: 'break-word' }}>
+                          {renderResizeHandles('subtitle')}
+                          <div style={{ whiteSpace: 'pre-wrap', pointerEvents: editingTextBlock === 'subtitle' ? 'auto' : 'none', wordBreak: 'normal', overflowWrap: 'break-word', width: '100%' }}>
                             {overlayEdit.subtitle || displayAsset.overlayConfig.subtitle}
                           </div>
                         </div>
@@ -1078,7 +1274,29 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider">Title</h3>
                         {(overlayEdit.title !== undefined && overlayEdit.title !== '') || displayAsset.overlayConfig?.title ? (
                           <button
-                            onClick={() => setOverlayEdit({...overlayEdit, title: ''})}
+                            onClick={async () => {
+                              setOverlayEdit({...overlayEdit, title: ''});
+                              // Immediately save the deletion
+                              if (currentAsset && currentAsset.type === 'product') {
+                                try {
+                                  const updated = await assetApi.updateOverlay(currentAsset.id, {...overlayEdit, title: ''});
+                                  const frontendAsset: GeneratedAsset = {
+                                    ...updated,
+                                    imageUrl: updated.image_url,
+                                    brandId: updated.brand_id,
+                                    campaignImages: updated.campaign_images,
+                                    overlayConfig: updated.overlay_config,
+                                    baseImageUrl: updated.base_image_url,
+                                    userPrompt: updated.user_prompt,
+                                    feedbackHistory: updated.feedback_history,
+                                    timestamp: updated.created_at ? new Date(updated.created_at).getTime() : Date.now()
+                                  };
+                                  setCurrentAsset(frontendAsset);
+                                } catch (err) {
+                                  console.error('Failed to delete title:', err);
+                                }
+                              }
+                            }}
                             className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-all"
                             title="Delete title"
                           >
@@ -1095,10 +1313,22 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         </label>
                         <textarea
                           value={overlayEdit.title || ''}
-                          onChange={e => setOverlayEdit({...overlayEdit, title: e.target.value})}
+                          onChange={e => {
+                            setOverlayEdit({...overlayEdit, title: e.target.value});
+                            // Auto-resize textarea
+                            e.target.style.height = 'auto';
+                            e.target.style.height = `${e.target.scrollHeight}px`;
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              // Allow Enter to create new line
+                              // Textarea will auto-resize via onChange
+                            }
+                          }}
                           rows={3}
-                          className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold resize-y"
+                          className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold resize-y overflow-hidden"
                           placeholder="Enter title... (Press Enter for new line)"
+                          style={{ minHeight: '3rem' }}
                         />
                       </div>
 
@@ -1210,7 +1440,29 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider">Subtitle</h3>
                         {(overlayEdit.subtitle !== undefined && overlayEdit.subtitle !== '') || displayAsset.overlayConfig?.subtitle ? (
                           <button
-                            onClick={() => setOverlayEdit({...overlayEdit, subtitle: ''})}
+                            onClick={async () => {
+                              setOverlayEdit({...overlayEdit, subtitle: ''});
+                              // Immediately save the deletion
+                              if (currentAsset && currentAsset.type === 'product') {
+                                try {
+                                  const updated = await assetApi.updateOverlay(currentAsset.id, {...overlayEdit, subtitle: ''});
+                                  const frontendAsset: GeneratedAsset = {
+                                    ...updated,
+                                    imageUrl: updated.image_url,
+                                    brandId: updated.brand_id,
+                                    campaignImages: updated.campaign_images,
+                                    overlayConfig: updated.overlay_config,
+                                    baseImageUrl: updated.base_image_url,
+                                    userPrompt: updated.user_prompt,
+                                    feedbackHistory: updated.feedback_history,
+                                    timestamp: updated.created_at ? new Date(updated.created_at).getTime() : Date.now()
+                                  };
+                                  setCurrentAsset(frontendAsset);
+                                } catch (err) {
+                                  console.error('Failed to delete subtitle:', err);
+                                }
+                              }
+                            }}
                             className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-all"
                             title="Delete subtitle"
                           >
@@ -1227,10 +1479,22 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         </label>
                         <textarea
                           value={overlayEdit.subtitle || ''}
-                          onChange={e => setOverlayEdit({...overlayEdit, subtitle: e.target.value})}
+                          onChange={e => {
+                            setOverlayEdit({...overlayEdit, subtitle: e.target.value});
+                            // Auto-resize textarea
+                            e.target.style.height = 'auto';
+                            e.target.style.height = `${e.target.scrollHeight}px`;
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              // Allow Enter to create new line
+                              // Textarea will auto-resize via onChange
+                            }
+                          }}
                           rows={3}
-                          className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium resize-y"
+                          className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium resize-y overflow-hidden"
                           placeholder="Enter subtitle... (Press Enter for new line)"
+                          style={{ minHeight: '3rem' }}
                         />
                       </div>
 
