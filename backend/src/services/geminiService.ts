@@ -1202,8 +1202,8 @@ Before determining placement, you MUST analyze the image:
    - Avoid: Areas with high detail, busy patterns, or extreme brightness variations
 
 3. **Text Length Consideration:**
-   - Title length: "${title.length}" characters - needs ${Math.ceil(title.length / 20)} lines approximately
-   - Subtitle length: "${subtitle.length}" characters - needs ${Math.ceil(subtitle.length / 30)} lines approximately
+   - Title length: "${title.length}" characters
+   - Subtitle length: "${subtitle.length}" characters
    - Position must accommodate both text blocks without overlapping important image elements
 
 4. **Accessibility Standards:**

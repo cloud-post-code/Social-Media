@@ -73,53 +73,74 @@ const processTextLines = (
   text: string,
   fontSize: number,
   maxWidth: number,
-  maxLines: number,
   fontWeight: 'light' | 'regular' | 'bold'
 ): string[] => {
-      // First, split by manual line breaks
-      const manualLines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-      
-      // If we have manual line breaks, use them (but respect maxLines)
-      if (manualLines.length > 1) {
-        return manualLines.slice(0, maxLines);
-      }
-      
-      // Otherwise, auto-wrap the text
-      const words = text.split(' ');
-      const lines: string[] = [];
-      let currentLine = '';
+  // First, split by manual line breaks
+  const manualLines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
   
+  // If we have manual line breaks, use them
+  if (manualLines.length > 1) {
+    return manualLines;
+  }
+  
+  // Otherwise, auto-wrap the text
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+
   const charWidthMultiplier = fontWeight === 'bold' ? 0.7 : 0.6;
       
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const estimatedWidth = testLine.length * fontSize * charWidthMultiplier;
-        
-        if (estimatedWidth <= maxWidth || currentLine === '') {
-          currentLine = testLine;
-        } else {
-          if (lines.length < maxLines - 1) {
-            lines.push(currentLine);
-            currentLine = word;
-          } else {
-            // Last line - add ellipsis if needed
-            const lastLine = currentLine + ' ' + word;
-            if (lastLine.length * fontSize * charWidthMultiplier > maxWidth) {
-              currentLine = currentLine + '...';
-            } else {
-              currentLine = lastLine;
-            }
-            break;
-          }
-        }
-      }
-      
+  for (const word of words) {
+    // Check if the word itself is longer than maxWidth - if so, break it
+    const wordWidth = word.length * fontSize * charWidthMultiplier;
+    
+    if (wordWidth > maxWidth) {
+      // Word is too long - break it into characters
       if (currentLine) {
         lines.push(currentLine);
+        currentLine = '';
       }
       
-      return lines.slice(0, maxLines);
-    };
+      // Break the long word into chunks that fit within maxWidth
+      let wordChunk = '';
+      for (const char of word) {
+        const testChunk = wordChunk + char;
+        const chunkWidth = testChunk.length * fontSize * charWidthMultiplier;
+        if (chunkWidth <= maxWidth) {
+          wordChunk = testChunk;
+        } else {
+          if (wordChunk) {
+            lines.push(wordChunk);
+          }
+          wordChunk = char;
+        }
+      }
+      if (wordChunk) {
+        currentLine = wordChunk;
+      }
+    } else {
+      // Word fits - try to add it to current line
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const estimatedWidth = testLine.length * fontSize * charWidthMultiplier;
+      
+      if (estimatedWidth <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        // Current line is full - start a new line with this word
+        if (currentLine) {
+          lines.push(currentLine);
+        }
+        currentLine = word;
+      }
+    }
+  }
+  
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  
+  return lines;
+};
     
 /**
  * Calculate text dimensions and position for a single text element
@@ -132,7 +153,6 @@ const calculateTextElement = (
     fontWeight: string;
     fontSize: number;
     maxWidthPercent: number;
-    maxLines: number;
     xPercent: number;
     yPercent: number;
     textAnchor: 'start' | 'middle' | 'end';
@@ -151,7 +171,7 @@ const calculateTextElement = (
   const maxWidth = (imageWidth * config.maxWidthPercent) / 100;
   const lineHeight = config.fontSize * 1.2;
   
-  const lines = processTextLines(text, config.fontSize, maxWidth, config.maxLines, config.fontWeightValue);
+  const lines = processTextLines(text, config.fontSize, maxWidth, config.fontWeightValue);
   const height = lines.length * lineHeight;
     
   // Calculate width from longest line
@@ -164,7 +184,7 @@ const calculateTextElement = (
   // For SVG, we position at the center and use text-anchor to match text-align behavior
   const centerX = (imageWidth * config.xPercent) / 100;
   const centerY = (imageHeight * config.yPercent) / 100;
-  
+    
   // Calculate x position based on text-anchor
   // For middle: x is at center (matches text-align: center)
   // For start: x is at center - half width (so text starts at left edge of centered div)
@@ -177,7 +197,7 @@ const calculateTextElement = (
   } else if (config.textAnchor === 'end') {
     // Position so text ends at the right edge of the centered area
     x = centerX + (maxWidth / 2);
-  } else {
+      } else {
     // Middle: text centered at centerX
     x = centerX;
   }
@@ -190,8 +210,8 @@ const calculateTextElement = (
     lines,
     x,
     y: firstLineY,
-    width,
-    height,
+        width,
+        height,
     lineHeight
   };
 };
@@ -224,7 +244,7 @@ const generateElementOverlayBackground = (
       }
       
   const padding = config.overlayBackgroundPadding || 30;
-  const overlayWidth = Math.min(element.width + (padding * 2), imageWidth * 0.9);
+  const overlayWidth = element.width + (padding * 2);
   const overlayHeight = element.height + (padding * 2);
       
   // Calculate overlay position (centered on text, matching frontend)
@@ -232,14 +252,14 @@ const generateElementOverlayBackground = (
   // Center Y of text = element.y - lineHeight + (height / 2)
   const centerY = element.y - element.lineHeight + (element.height / 2);
   
-  let overlayX: number;
+      let overlayX: number;
   if (config.textAnchor === 'start') {
     // For start anchor, element.x is the start position
     overlayX = element.x - padding;
   } else if (config.textAnchor === 'end') {
     // For end anchor, element.x is the end position
     overlayX = element.x - overlayWidth + padding;
-  } else {
+      } else {
     // For middle anchor, element.x is the center position
     overlayX = element.x - (overlayWidth / 2);
   }
@@ -376,7 +396,6 @@ export const applyTextOverlay = async (
           fontWeight: titleFontWeight,
           fontSize: titleFontSize,
           maxWidthPercent: overlayConfig.title_max_width_percent,
-          maxLines: overlayConfig.title_max_lines || 3,
           xPercent: overlayConfig.title_x_percent,
           yPercent: overlayConfig.title_y_percent,
           textAnchor: overlayConfig.title_text_anchor,
@@ -412,7 +431,6 @@ export const applyTextOverlay = async (
           fontWeight: subtitleFontWeight,
           fontSize: subtitleFontSize,
           maxWidthPercent: overlayConfig.subtitle_max_width_percent,
-          maxLines: overlayConfig.subtitle_max_lines || 3,
           xPercent: overlayConfig.subtitle_x_percent,
           yPercent: overlayConfig.subtitle_y_percent,
           textAnchor: overlayConfig.subtitle_text_anchor,

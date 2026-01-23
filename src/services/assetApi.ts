@@ -46,7 +46,6 @@ export const assetApi = {
     title_max_width_percent?: number;
     title_opacity?: number;
     title_font_size?: number;
-    title_max_lines?: number;
     title_overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
     title_overlay_background_color?: string;
     title_overlay_background_opacity?: number;
@@ -64,7 +63,6 @@ export const assetApi = {
     subtitle_max_width_percent?: number;
     subtitle_opacity?: number;
     subtitle_font_size?: number;
-    subtitle_max_lines?: number;
     subtitle_overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
     subtitle_overlay_background_color?: string;
     subtitle_overlay_background_opacity?: number;

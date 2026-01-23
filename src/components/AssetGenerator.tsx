@@ -48,7 +48,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     title_max_width_percent?: number;
     title_opacity?: number;
     title_font_size?: number;
-    title_max_lines?: number;
     title_overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
     title_overlay_background_color?: string;
     title_overlay_background_opacity?: number;
@@ -66,7 +65,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     subtitle_max_width_percent?: number;
     subtitle_opacity?: number;
     subtitle_font_size?: number;
-    subtitle_max_lines?: number;
     subtitle_overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
     subtitle_overlay_background_color?: string;
     subtitle_overlay_background_opacity?: number;
@@ -588,25 +586,19 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const x = (actualX / imageDimensions.width) * 100;
             const y = (actualY / imageDimensions.height) * 100;
             
-            // Better boundary validation: account for text dimensions
-            // Use more conservative bounds (15% to 85%) to ensure text never overlaps edges
-            // This matches the grid preset positions
-            const clampedX = Math.max(15, Math.min(85, x));
-            const clampedY = Math.max(15, Math.min(85, y));
-            
             if (draggingElement === 'title') {
               setOverlayEdit(prev => ({
                 ...prev,
-                title_x_percent: clampedX,
-                title_y_percent: clampedY,
-                x_percent: clampedX, // Keep legacy for backward compatibility
-                y_percent: clampedY
+                title_x_percent: x,
+                title_y_percent: y,
+                x_percent: x, // Keep legacy for backward compatibility
+                y_percent: y
               }));
             } else {
               setOverlayEdit(prev => ({
                 ...prev,
-                subtitle_x_percent: clampedX,
-                subtitle_y_percent: clampedY
+                subtitle_x_percent: x,
+                subtitle_y_percent: y
               }));
             }
           } else {
@@ -632,21 +624,19 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const actualY = relativeY * scaleY;
             const x = (actualX / imageDimensions.width) * 100;
             const y = (actualY / imageDimensions.height) * 100;
-            const clampedX = Math.max(15, Math.min(85, x));
-            const clampedY = Math.max(15, Math.min(85, y));
             if (draggingElement === 'title') {
               setOverlayEdit(prev => ({
                 ...prev,
-                title_x_percent: clampedX,
-                title_y_percent: clampedY,
-                x_percent: clampedX,
-                y_percent: clampedY
+                title_x_percent: x,
+                title_y_percent: y,
+                x_percent: x,
+                y_percent: y
               }));
             } else {
               setOverlayEdit(prev => ({
                 ...prev,
-                subtitle_x_percent: clampedX,
-                subtitle_y_percent: clampedY
+                subtitle_x_percent: x,
+                subtitle_y_percent: y
               }));
             }
           }
@@ -1314,7 +1304,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           title_max_width_percent: displayAsset.overlayConfig?.title_max_width_percent || 80,
                           title_opacity: displayAsset.overlayConfig?.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1.0,
                           title_font_size: displayAsset.overlayConfig?.title_font_size,
-                          title_max_lines: displayAsset.overlayConfig?.title_max_lines || 3,
                           title_overlay_background_type: displayAsset.overlayConfig?.title_overlay_background_type,
                           title_overlay_background_color: displayAsset.overlayConfig?.title_overlay_background_color,
                           title_overlay_background_opacity: displayAsset.overlayConfig?.title_overlay_background_opacity,
@@ -1332,7 +1321,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           subtitle_max_width_percent: displayAsset.overlayConfig?.subtitle_max_width_percent || 80,
                           subtitle_opacity: displayAsset.overlayConfig?.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9,
                           subtitle_font_size: displayAsset.overlayConfig?.subtitle_font_size,
-                          subtitle_max_lines: displayAsset.overlayConfig?.subtitle_max_lines || 3,
                           subtitle_overlay_background_type: displayAsset.overlayConfig?.subtitle_overlay_background_type,
                           subtitle_overlay_background_color: displayAsset.overlayConfig?.subtitle_overlay_background_color,
                           subtitle_overlay_background_opacity: displayAsset.overlayConfig?.subtitle_overlay_background_opacity,
