@@ -233,15 +233,29 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   };
 
   // Calculate overlay position accounting for actual image display area (letterboxing)
+  // xPercent and yPercent are percentages of ACTUAL image dimensions (matching backend)
+  // We need to convert to displayed image position for preview
   const getOverlayPosition = (xPercent: number, yPercent: number): React.CSSProperties => {
     const dims = getDisplayedImageDimensions();
-    if (!dims) {
+    if (!dims || !imageDimensions) {
       return { left: `${xPercent}%`, top: `${yPercent}%`, transform: 'translate(-50%, -50%)' };
     }
     
-    // Calculate position relative to container, accounting for letterboxing
-    const left = dims.offsetX + (dims.displayWidth * xPercent / 100);
-    const top = dims.offsetY + (dims.displayHeight * yPercent / 100);
+    // Convert actual image percentage to actual image pixel position
+    const actualX = (imageDimensions.width * xPercent) / 100;
+    const actualY = (imageDimensions.height * yPercent) / 100;
+    
+    // Scale to displayed dimensions (accounting for letterboxing)
+    const scaleX = dims.displayWidth / imageDimensions.width;
+    const scaleY = dims.displayHeight / imageDimensions.height;
+    
+    // Calculate displayed position
+    const displayedX = actualX * scaleX;
+    const displayedY = actualY * scaleY;
+    
+    // Position relative to container
+    const left = dims.offsetX + displayedX;
+    const top = dims.offsetY + displayedY;
     
     return {
       left: `${left}px`,
@@ -556,13 +570,23 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         if (imageContainer && imageDimensions) {
           const imageBounds = getImageDisplayBounds(imageContainer);
           if (imageBounds) {
-            // Calculate position relative to the actual displayed image area
+            // Calculate position relative to the displayed image area
             const relativeX = e.clientX - imageBounds.x;
             const relativeY = e.clientY - imageBounds.y;
             
-            // Convert to percentage based on actual image dimensions
-            const x = (relativeX / imageBounds.width) * 100;
-            const y = (relativeY / imageBounds.height) * 100;
+            // Convert displayed position to actual image position
+            // Since imageBounds accounts for letterboxing, we need to convert to actual image coordinates
+            // The displayed image maintains aspect ratio, so we can scale the position
+            const scaleX = imageDimensions.width / imageBounds.width;
+            const scaleY = imageDimensions.height / imageBounds.height;
+            
+            // Calculate actual image position
+            const actualX = relativeX * scaleX;
+            const actualY = relativeY * scaleY;
+            
+            // Convert to percentage based on ACTUAL image dimensions (matching backend)
+            const x = (actualX / imageDimensions.width) * 100;
+            const y = (actualY / imageDimensions.height) * 100;
             
             // Better boundary validation: account for text dimensions
             // Use more conservative bounds (15% to 85%) to ensure text never overlaps edges
@@ -587,9 +611,27 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             }
           } else {
             // Fallback to container-based calculation if image bounds can't be determined
+            // This shouldn't happen, but if it does, use container dimensions
             const rect = imageContainer.getBoundingClientRect();
-            const x = ((e.clientX - rect.left) / rect.width) * 100;
-            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            // Try to estimate displayed image size (assuming it fills container maintaining aspect ratio)
+            const containerAspect = rect.width / rect.height;
+            const imageAspect = imageDimensions.width / imageDimensions.height;
+            let displayWidth: number, displayHeight: number;
+            if (imageAspect > containerAspect) {
+              displayWidth = rect.width;
+              displayHeight = rect.width / imageAspect;
+            } else {
+              displayHeight = rect.height;
+              displayWidth = rect.height * imageAspect;
+            }
+            const relativeX = e.clientX - rect.left - (rect.width - displayWidth) / 2;
+            const relativeY = e.clientY - rect.top - (rect.height - displayHeight) / 2;
+            const scaleX = imageDimensions.width / displayWidth;
+            const scaleY = imageDimensions.height / displayHeight;
+            const actualX = relativeX * scaleX;
+            const actualY = relativeY * scaleY;
+            const x = (actualX / imageDimensions.width) * 100;
+            const y = (actualY / imageDimensions.height) * 100;
             const clampedX = Math.max(15, Math.min(85, x));
             const clampedY = Math.max(15, Math.min(85, y));
             if (draggingElement === 'title') {
@@ -1053,13 +1095,34 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                               if (imageBounds) {
                                 const relativeX = e.clientX - imageBounds.x;
                                 const relativeY = e.clientY - imageBounds.y;
-                                const x = (relativeX / imageBounds.width) * 100;
-                                const y = (relativeY / imageBounds.height) * 100;
+                                // Convert to actual image coordinates
+                                const scaleX = imageDimensions.width / imageBounds.width;
+                                const scaleY = imageDimensions.height / imageBounds.height;
+                                const actualX = relativeX * scaleX;
+                                const actualY = relativeY * scaleY;
+                                const x = (actualX / imageDimensions.width) * 100;
+                                const y = (actualY / imageDimensions.height) * 100;
                                 setDragStart({ x, y });
                               } else {
                                 const rect = imageContainer.getBoundingClientRect();
-                                const x = ((e.clientX - rect.left) / rect.width) * 100;
-                                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                                const containerAspect = rect.width / rect.height;
+                                const imageAspect = imageDimensions.width / imageDimensions.height;
+                                let displayWidth: number, displayHeight: number;
+                                if (imageAspect > containerAspect) {
+                                  displayWidth = rect.width;
+                                  displayHeight = rect.width / imageAspect;
+                                } else {
+                                  displayHeight = rect.height;
+                                  displayWidth = rect.height * imageAspect;
+                                }
+                                const relativeX = e.clientX - rect.left - (rect.width - displayWidth) / 2;
+                                const relativeY = e.clientY - rect.top - (rect.height - displayHeight) / 2;
+                                const scaleX = imageDimensions.width / displayWidth;
+                                const scaleY = imageDimensions.height / displayHeight;
+                                const actualX = relativeX * scaleX;
+                                const actualY = relativeY * scaleY;
+                                const x = (actualX / imageDimensions.width) * 100;
+                                const y = (actualY / imageDimensions.height) * 100;
                                 setDragStart({ x, y });
                               }
                             }
@@ -1128,13 +1191,34 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                               if (imageBounds) {
                                 const relativeX = e.clientX - imageBounds.x;
                                 const relativeY = e.clientY - imageBounds.y;
-                                const x = (relativeX / imageBounds.width) * 100;
-                                const y = (relativeY / imageBounds.height) * 100;
+                                // Convert to actual image coordinates
+                                const scaleX = imageDimensions.width / imageBounds.width;
+                                const scaleY = imageDimensions.height / imageBounds.height;
+                                const actualX = relativeX * scaleX;
+                                const actualY = relativeY * scaleY;
+                                const x = (actualX / imageDimensions.width) * 100;
+                                const y = (actualY / imageDimensions.height) * 100;
                                 setDragStart({ x, y });
                               } else {
                                 const rect = imageContainer.getBoundingClientRect();
-                                const x = ((e.clientX - rect.left) / rect.width) * 100;
-                                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                                const containerAspect = rect.width / rect.height;
+                                const imageAspect = imageDimensions.width / imageDimensions.height;
+                                let displayWidth: number, displayHeight: number;
+                                if (imageAspect > containerAspect) {
+                                  displayWidth = rect.width;
+                                  displayHeight = rect.width / imageAspect;
+                                } else {
+                                  displayHeight = rect.height;
+                                  displayWidth = rect.height * imageAspect;
+                                }
+                                const relativeX = e.clientX - rect.left - (rect.width - displayWidth) / 2;
+                                const relativeY = e.clientY - rect.top - (rect.height - displayHeight) / 2;
+                                const scaleX = imageDimensions.width / displayWidth;
+                                const scaleY = imageDimensions.height / displayHeight;
+                                const actualX = relativeX * scaleX;
+                                const actualY = relativeY * scaleY;
+                                const x = (actualX / imageDimensions.width) * 100;
+                                const y = (actualY / imageDimensions.height) * 100;
                                 setDragStart({ x, y });
                               }
                             }
