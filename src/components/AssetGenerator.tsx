@@ -36,27 +36,42 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [overlayEdit, setOverlayEdit] = useState<{
     title?: string;
     subtitle?: string;
-    font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
-    font_weight?: 'light' | 'regular' | 'bold';
-    font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
-    letter_spacing?: 'normal' | 'wide';
-    text_color_hex?: string; // Legacy
-    title_color_hex?: string; // Separate color for title
-    subtitle_color_hex?: string; // Separate color for subtitle
-    // New: Pixel-based positioning
-    x_percent?: number;
-    y_percent?: number;
-    text_anchor?: 'start' | 'middle' | 'end';
-    title_text_anchor?: 'start' | 'middle' | 'end'; // Separate anchor for title
-    subtitle_text_anchor?: 'start' | 'middle' | 'end'; // Separate anchor for subtitle
-    // Legacy: String-based position
-    position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
-    max_width_percent?: number;
-    opacity?: number;
+    // Title properties - completely separate
+    title_font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+    title_font_weight?: 'light' | 'regular' | 'bold';
+    title_font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+    title_letter_spacing?: 'normal' | 'wide';
+    title_color_hex?: string;
+    title_x_percent?: number;
+    title_y_percent?: number;
+    title_text_anchor?: 'start' | 'middle' | 'end';
+    title_max_width_percent?: number;
+    title_opacity?: number;
     title_font_size?: number;
-    subtitle_font_size?: number;
     title_max_lines?: number;
+    title_overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
+    title_overlay_background_color?: string;
+    title_overlay_background_opacity?: number;
+    title_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
+    title_overlay_background_padding?: number;
+    // Subtitle properties - completely separate
+    subtitle_font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+    subtitle_font_weight?: 'light' | 'regular' | 'bold';
+    subtitle_font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+    subtitle_letter_spacing?: 'normal' | 'wide';
+    subtitle_color_hex?: string;
+    subtitle_x_percent?: number;
+    subtitle_y_percent?: number;
+    subtitle_text_anchor?: 'start' | 'middle' | 'end';
+    subtitle_max_width_percent?: number;
+    subtitle_opacity?: number;
+    subtitle_font_size?: number;
     subtitle_max_lines?: number;
+    subtitle_overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
+    subtitle_overlay_background_color?: string;
+    subtitle_overlay_background_opacity?: number;
+    subtitle_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
+    subtitle_overlay_background_padding?: number;
   }>({});
   
   // Image size selector state
@@ -258,7 +273,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               setIsResizing(true);
               setResizingElement(element);
               setResizeHandle('nw');
-              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              const currentWidth = element === 'title' 
+                ? (overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -274,7 +291,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               setIsResizing(true);
               setResizingElement(element);
               setResizeHandle('ne');
-              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              const currentWidth = element === 'title' 
+                ? (overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -290,7 +309,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               setIsResizing(true);
               setResizingElement(element);
               setResizeHandle('sw');
-              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              const currentWidth = element === 'title' 
+                ? (overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -306,7 +327,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               setIsResizing(true);
               setResizingElement(element);
               setResizeHandle('se');
-              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              const currentWidth = element === 'title' 
+                ? (overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -341,7 +364,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               setIsResizing(true);
               setResizingElement(element);
               setResizeHandle('w');
-              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              const currentWidth = element === 'title' 
+                ? (overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -357,7 +382,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               setIsResizing(true);
               setResizingElement(element);
               setResizeHandle('e');
-              const currentWidth = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
+              const currentWidth = element === 'title' 
+                ? (overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -498,12 +525,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const deltaYPercent = (deltaY / imageBounds.height) * 100;
             
             // Calculate new width and height based on resize handle
-            let newWidthPercent = overlayEdit.max_width_percent || displayAsset?.overlayConfig?.max_width_percent || 80;
-            let newXPercent = overlayEdit.title_x_percent !== undefined ? overlayEdit.title_x_percent : (displayAsset?.overlayConfig?.title_x_percent || 50);
+            const currentMaxWidth = resizingElement === 'title'
+              ? (overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+              : (overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
             
-            if (resizingElement === 'subtitle') {
-              newXPercent = overlayEdit.subtitle_x_percent !== undefined ? overlayEdit.subtitle_x_percent : (displayAsset?.overlayConfig?.subtitle_x_percent || 50);
-            }
+            let newWidthPercent = currentMaxWidth;
+            let newXPercent = resizingElement === 'title'
+              ? (overlayEdit.title_x_percent !== undefined ? overlayEdit.title_x_percent : (displayAsset?.overlayConfig?.title_x_percent || 50))
+              : (overlayEdit.subtitle_x_percent !== undefined ? overlayEdit.subtitle_x_percent : (displayAsset?.overlayConfig?.subtitle_x_percent || 50));
             
             if (resizeHandle.includes('e')) {
               newWidthPercent = Math.max(20, Math.min(95, resizeStart.width + deltaXPercent));
@@ -511,15 +540,12 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             if (resizeHandle.includes('w')) {
               newWidthPercent = Math.max(20, Math.min(95, resizeStart.width - deltaXPercent));
               // Adjust X position when resizing from left
-              const currentX = resizingElement === 'title' 
-                ? (overlayEdit.title_x_percent !== undefined ? overlayEdit.title_x_percent : (displayAsset?.overlayConfig?.title_x_percent || 50))
-                : (overlayEdit.subtitle_x_percent !== undefined ? overlayEdit.subtitle_x_percent : (displayAsset?.overlayConfig?.subtitle_x_percent || 50));
-              newXPercent = Math.max(5, Math.min(95, currentX - deltaXPercent / 2));
+              newXPercent = Math.max(5, Math.min(95, newXPercent - deltaXPercent / 2));
             }
             
             setOverlayEdit(prev => ({
               ...prev,
-              max_width_percent: newWidthPercent,
+              ...(resizingElement === 'title' ? { title_max_width_percent: newWidthPercent } : { subtitle_max_width_percent: newWidthPercent }),
               ...(resizeHandle.includes('w') && resizingElement === 'title' ? { title_x_percent: newXPercent } : {}),
               ...(resizeHandle.includes('w') && resizingElement === 'subtitle' ? { subtitle_x_percent: newXPercent } : {})
             }));
@@ -974,25 +1000,16 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   <>
                     {/* Title Textbox */}
                     {(overlayEdit.title || displayAsset.overlayConfig.title) && (() => {
-                      // Use title-specific positions first, then fallback to legacy x_percent/y_percent, but never use subtitle positions
                       const titleXPercent = overlayEdit.title_x_percent !== undefined 
                         ? overlayEdit.title_x_percent 
                         : (displayAsset.overlayConfig.title_x_percent !== undefined 
                           ? displayAsset.overlayConfig.title_x_percent 
-                          : (overlayEdit.x_percent !== undefined 
-                            ? overlayEdit.x_percent 
-                            : (displayAsset.overlayConfig.x_percent !== undefined 
-                              ? displayAsset.overlayConfig.x_percent 
-                              : 50)));
+                          : 50);
                       const titleYPercent = overlayEdit.title_y_percent !== undefined 
                         ? overlayEdit.title_y_percent 
                         : (displayAsset.overlayConfig.title_y_percent !== undefined 
                           ? displayAsset.overlayConfig.title_y_percent 
-                          : (overlayEdit.y_percent !== undefined 
-                            ? overlayEdit.y_percent 
-                            : (displayAsset.overlayConfig.y_percent !== undefined 
-                              ? displayAsset.overlayConfig.y_percent 
-                              : 30)));
+                          : 30);
                       const titleFontSize = overlayEdit.title_font_size || displayAsset.overlayConfig?.title_font_size;
                       
                       return (
@@ -1000,17 +1017,17 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           className={`absolute select-none border-2 ${editingTextBlock === 'title' ? 'border-indigo-600' : 'border-dashed border-indigo-400'} bg-indigo-50/20 rounded-lg p-3 backdrop-blur-sm ${editingTextBlock === 'title' ? 'cursor-default' : 'cursor-move'}`}
                           style={{
                             ...getOverlayPosition(titleXPercent, titleYPercent),
-                            textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
-                            width: getMaxWidthPixels(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent),
-                            maxWidth: getMaxWidthPixels(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent),
+                            textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                            width: getMaxWidthPixels(overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset.overlayConfig.title_max_width_percent || 80)),
+                            maxWidth: getMaxWidthPixels(overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset.overlayConfig.title_max_width_percent || 80)),
                             padding: '0.5rem',
-                            color: overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
-                            opacity: overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1),
-                            fontFamily: overlayEdit.font_family || displayAsset.overlayConfig.font_family || 'sans-serif',
-                            fontWeight: overlayEdit.font_weight === 'bold' ? 'bold' : overlayEdit.font_weight === 'light' ? '300' : 'normal',
+                            color: overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF',
+                            opacity: overlayEdit.title_opacity !== undefined ? overlayEdit.title_opacity : (displayAsset.overlayConfig.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1),
+                            fontFamily: overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif',
+                            fontWeight: overlayEdit.title_font_weight === 'bold' ? 'bold' : overlayEdit.title_font_weight === 'light' ? '300' : 'normal',
                             fontSize: getFontSize(titleFontSize, true),
-                            letterSpacing: overlayEdit.letter_spacing === 'wide' ? '0.15em' : 'normal',
-                            textTransform: overlayEdit.font_transform || 'none',
+                            letterSpacing: overlayEdit.title_letter_spacing === 'wide' ? '0.15em' : 'normal',
+                            textTransform: overlayEdit.title_font_transform || 'none',
                             filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
                             pointerEvents: 'all',
                             zIndex: draggingElement === 'title' || editingTextBlock === 'title' ? 20 : 10,
@@ -1058,25 +1075,16 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                     
                     {/* Subtitle Textbox */}
                     {(overlayEdit.subtitle || displayAsset.overlayConfig.subtitle) && (() => {
-                      // Use subtitle-specific positions first, then fallback to legacy x_percent/y_percent, but never use title positions
                       const subtitleXPercent = overlayEdit.subtitle_x_percent !== undefined 
                         ? overlayEdit.subtitle_x_percent 
                         : (displayAsset.overlayConfig.subtitle_x_percent !== undefined 
                           ? displayAsset.overlayConfig.subtitle_x_percent 
-                          : (overlayEdit.x_percent !== undefined 
-                            ? overlayEdit.x_percent 
-                            : (displayAsset.overlayConfig.x_percent !== undefined 
-                              ? displayAsset.overlayConfig.x_percent 
-                              : 50)));
+                          : 50);
                       const subtitleYPercent = overlayEdit.subtitle_y_percent !== undefined 
                         ? overlayEdit.subtitle_y_percent 
                         : (displayAsset.overlayConfig.subtitle_y_percent !== undefined 
                           ? displayAsset.overlayConfig.subtitle_y_percent 
-                          : (overlayEdit.y_percent !== undefined 
-                            ? overlayEdit.y_percent 
-                            : (displayAsset.overlayConfig.y_percent !== undefined 
-                              ? displayAsset.overlayConfig.y_percent 
-                              : 80)));
+                          : 80);
                       const subtitleFontSize = overlayEdit.subtitle_font_size || displayAsset.overlayConfig?.subtitle_font_size;
                       
                       return (
@@ -1084,17 +1092,17 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           className={`absolute select-none border-2 ${editingTextBlock === 'subtitle' ? 'border-blue-600' : 'border-dashed border-blue-400'} bg-blue-50/20 rounded-lg p-3 backdrop-blur-sm ${editingTextBlock === 'subtitle' ? 'cursor-default' : 'cursor-move'}`}
                           style={{
                             ...getOverlayPosition(subtitleXPercent, subtitleYPercent),
-                            textAlign: (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || overlayEdit.text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle') === 'end' ? 'right' : 'center',
-                            width: getMaxWidthPixels(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent),
-                            maxWidth: getMaxWidthPixels(overlayEdit.max_width_percent || displayAsset.overlayConfig.max_width_percent),
+                            textAlign: (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                            width: getMaxWidthPixels(overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset.overlayConfig.subtitle_max_width_percent || 80)),
+                            maxWidth: getMaxWidthPixels(overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset.overlayConfig.subtitle_max_width_percent || 80)),
                             padding: '0.5rem',
-                            color: overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF',
-                            opacity: (overlayEdit.opacity !== undefined ? overlayEdit.opacity : (displayAsset.overlayConfig.opacity !== undefined ? displayAsset.overlayConfig.opacity : 1)) * 0.9,
-                            fontFamily: overlayEdit.font_family || displayAsset.overlayConfig.font_family || 'sans-serif',
-                            fontWeight: overlayEdit.font_weight === 'bold' ? 'bold' : overlayEdit.font_weight === 'light' ? '300' : 'normal',
+                            color: overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF',
+                            opacity: overlayEdit.subtitle_opacity !== undefined ? overlayEdit.subtitle_opacity : (displayAsset.overlayConfig.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9),
+                            fontFamily: overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif',
+                            fontWeight: overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal',
                             fontSize: getFontSize(subtitleFontSize, false),
-                            letterSpacing: overlayEdit.letter_spacing === 'wide' ? '0.15em' : 'normal',
-                            textTransform: overlayEdit.font_transform || 'none',
+                            letterSpacing: overlayEdit.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal',
+                            textTransform: overlayEdit.subtitle_font_transform || 'none',
                             filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
                             pointerEvents: 'all',
                             zIndex: draggingElement === 'subtitle' || editingTextBlock === 'subtitle' ? 20 : 10,
@@ -1208,39 +1216,44 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           img.src = imageUrl;
                         }
                         setOverlayEdit({
-                          title: displayAsset.overlayConfig?.title || displayAsset.overlayConfig?.text || '',
+                          title: displayAsset.overlayConfig?.title || '',
                           subtitle: displayAsset.overlayConfig?.subtitle || '',
-                          font_family: displayAsset.overlayConfig?.font_family,
-                          font_weight: displayAsset.overlayConfig?.font_weight,
-                          font_transform: displayAsset.overlayConfig?.font_transform,
-                          text_color_hex: displayAsset.overlayConfig?.text_color_hex,
-                          title_color_hex: displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex,
-                          subtitle_color_hex: displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex,
-                          position: displayAsset.overlayConfig?.position,
-                          max_width_percent: displayAsset.overlayConfig?.max_width_percent,
-                          opacity: displayAsset.overlayConfig?.opacity,
+                          // Title properties - completely separate
+                          title_font_family: displayAsset.overlayConfig?.title_font_family || 'sans-serif',
+                          title_font_weight: displayAsset.overlayConfig?.title_font_weight || 'bold',
+                          title_font_transform: displayAsset.overlayConfig?.title_font_transform || 'none',
+                          title_letter_spacing: displayAsset.overlayConfig?.title_letter_spacing || 'normal',
+                          title_color_hex: displayAsset.overlayConfig?.title_color_hex || '#FFFFFF',
+                          title_x_percent: displayAsset.overlayConfig?.title_x_percent || 50,
+                          title_y_percent: displayAsset.overlayConfig?.title_y_percent || 30,
+                          title_text_anchor: displayAsset.overlayConfig?.title_text_anchor || 'middle',
+                          title_max_width_percent: displayAsset.overlayConfig?.title_max_width_percent || 80,
+                          title_opacity: displayAsset.overlayConfig?.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1.0,
                           title_font_size: displayAsset.overlayConfig?.title_font_size,
-                          subtitle_font_size: displayAsset.overlayConfig?.subtitle_font_size,
                           title_max_lines: displayAsset.overlayConfig?.title_max_lines || 3,
+                          title_overlay_background_type: displayAsset.overlayConfig?.title_overlay_background_type,
+                          title_overlay_background_color: displayAsset.overlayConfig?.title_overlay_background_color,
+                          title_overlay_background_opacity: displayAsset.overlayConfig?.title_overlay_background_opacity,
+                          title_overlay_background_shape: displayAsset.overlayConfig?.title_overlay_background_shape,
+                          title_overlay_background_padding: displayAsset.overlayConfig?.title_overlay_background_padding,
+                          // Subtitle properties - completely separate
+                          subtitle_font_family: displayAsset.overlayConfig?.subtitle_font_family || 'sans-serif',
+                          subtitle_font_weight: displayAsset.overlayConfig?.subtitle_font_weight || 'regular',
+                          subtitle_font_transform: displayAsset.overlayConfig?.subtitle_font_transform || 'none',
+                          subtitle_letter_spacing: displayAsset.overlayConfig?.subtitle_letter_spacing || 'normal',
+                          subtitle_color_hex: displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF',
+                          subtitle_x_percent: displayAsset.overlayConfig?.subtitle_x_percent || 50,
+                          subtitle_y_percent: displayAsset.overlayConfig?.subtitle_y_percent || 80,
+                          subtitle_text_anchor: displayAsset.overlayConfig?.subtitle_text_anchor || 'middle',
+                          subtitle_max_width_percent: displayAsset.overlayConfig?.subtitle_max_width_percent || 80,
+                          subtitle_opacity: displayAsset.overlayConfig?.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9,
+                          subtitle_font_size: displayAsset.overlayConfig?.subtitle_font_size,
                           subtitle_max_lines: displayAsset.overlayConfig?.subtitle_max_lines || 3,
-                          x_percent: displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50,
-                          y_percent: displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80,
-                          // Ensure title and subtitle have separate default positions
-                          title_x_percent: displayAsset.overlayConfig?.title_x_percent !== undefined 
-                            ? displayAsset.overlayConfig.title_x_percent 
-                            : (displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50),
-                          title_y_percent: displayAsset.overlayConfig?.title_y_percent !== undefined 
-                            ? displayAsset.overlayConfig.title_y_percent 
-                            : (displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 30),
-                          subtitle_x_percent: displayAsset.overlayConfig?.subtitle_x_percent !== undefined 
-                            ? displayAsset.overlayConfig.subtitle_x_percent 
-                            : (displayAsset.overlayConfig?.x_percent !== undefined ? displayAsset.overlayConfig.x_percent : 50),
-                          subtitle_y_percent: displayAsset.overlayConfig?.subtitle_y_percent !== undefined 
-                            ? displayAsset.overlayConfig.subtitle_y_percent 
-                            : (displayAsset.overlayConfig?.y_percent !== undefined ? displayAsset.overlayConfig.y_percent : 80),
-                          text_anchor: displayAsset.overlayConfig?.text_anchor || 'middle',
-                          title_text_anchor: displayAsset.overlayConfig?.title_text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle',
-                          subtitle_text_anchor: displayAsset.overlayConfig?.subtitle_text_anchor || displayAsset.overlayConfig?.text_anchor || 'middle'
+                          subtitle_overlay_background_type: displayAsset.overlayConfig?.subtitle_overlay_background_type,
+                          subtitle_overlay_background_color: displayAsset.overlayConfig?.subtitle_overlay_background_color,
+                          subtitle_overlay_background_opacity: displayAsset.overlayConfig?.subtitle_overlay_background_opacity,
+                          subtitle_overlay_background_shape: displayAsset.overlayConfig?.subtitle_overlay_background_shape,
+                          subtitle_overlay_background_padding: displayAsset.overlayConfig?.subtitle_overlay_background_padding
                         });
                       }
                     }}
@@ -1253,17 +1266,19 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 {!editingOverlay ? (
                   <div className="space-y-3">
                     <div>
-                      <p className="text-xl font-black text-slate-800">{stripMarkdown(displayAsset.overlayConfig.title || displayAsset.overlayConfig.text || '')}</p>
+                      <p className="text-xl font-black text-slate-800">{stripMarkdown(displayAsset.overlayConfig.title || '')}</p>
                       {displayAsset.overlayConfig.subtitle && (
                         <p className="text-sm font-medium text-slate-600 mt-1">{stripMarkdown(displayAsset.overlayConfig.subtitle)}</p>
                       )}
                     </div>
                     <div className="flex gap-4 text-xs text-slate-500">
-                      <span>{displayAsset.overlayConfig.font_family}</span>
+                      <span>Title: {displayAsset.overlayConfig.title_font_family}</span>
                       <span>•</span>
-                      <span>{displayAsset.overlayConfig.font_weight}</span>
+                      <span>{displayAsset.overlayConfig.title_font_weight}</span>
                       <span>•</span>
-                      <span>{displayAsset.overlayConfig.position}</span>
+                      <span>Subtitle: {displayAsset.overlayConfig.subtitle_font_family}</span>
+                      <span>•</span>
+                      <span>{displayAsset.overlayConfig.subtitle_font_weight}</span>
                     </div>
                   </div>
                 ) : (
@@ -1363,13 +1378,13 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           <div className="flex gap-2">
                             <input
                               type="color"
-                              value={overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                              value={overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF'}
                               onChange={e => setOverlayEdit({...overlayEdit, title_color_hex: e.target.value})}
                               className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
                             />
                             <input
                               type="text"
-                              value={overlayEdit.title_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.title_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                              value={overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF'}
                               onChange={e => setOverlayEdit({...overlayEdit, title_color_hex: e.target.value})}
                               className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
                               placeholder="#FFFFFF"
@@ -1529,13 +1544,13 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           <div className="flex gap-2">
                             <input
                               type="color"
-                              value={overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                              value={overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF'}
                               onChange={e => setOverlayEdit({...overlayEdit, subtitle_color_hex: e.target.value})}
                               className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
                             />
                             <input
                               type="text"
-                              value={overlayEdit.subtitle_color_hex || overlayEdit.text_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || displayAsset.overlayConfig?.text_color_hex || '#FFFFFF'}
+                              value={overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF'}
                               onChange={e => setOverlayEdit({...overlayEdit, subtitle_color_hex: e.target.value})}
                               className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
                               placeholder="#FFFFFF"

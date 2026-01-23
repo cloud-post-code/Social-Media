@@ -93,22 +93,52 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
     );
 
     // Apply overlay to image - strip markdown before storing
+    // Convert shared design to separate title and subtitle properties
+    // Default positions: title at 30% from top, subtitle at 80% from top
+    const titleYPercent = overlayDesign.position?.includes('top') ? 30 : 
+                         overlayDesign.position?.includes('bottom') ? 20 : 30;
+    const subtitleYPercent = overlayDesign.position?.includes('top') ? 70 : 
+                            overlayDesign.position?.includes('bottom') ? 80 : 80;
+    const xPercent = overlayDesign.position?.includes('left') ? 20 : 
+                    overlayDesign.position?.includes('right') ? 80 : 50;
+    
     const overlayConfig: OverlayConfig = {
       title: stripMarkdown(titleSubtitle.title),
       subtitle: stripMarkdown(titleSubtitle.subtitle),
-      font_family: overlayDesign.font_family,
-      font_weight: overlayDesign.font_weight,
-      font_transform: overlayDesign.font_transform,
-      letter_spacing: overlayDesign.letter_spacing,
-      text_color_hex: overlayDesign.text_color_hex,
-      position: overlayDesign.position,
-      max_width_percent: overlayDesign.max_width_percent,
-      opacity: overlayDesign.opacity,
-      overlay_background_type: overlayDesign.overlay_background_type,
-      overlay_background_color: overlayDesign.overlay_background_color,
-      overlay_background_opacity: overlayDesign.overlay_background_opacity,
-      overlay_background_shape: overlayDesign.overlay_background_shape,
-      overlay_background_padding: overlayDesign.overlay_background_padding
+      // Title properties - separate
+      title_font_family: overlayDesign.font_family,
+      title_font_weight: overlayDesign.font_weight,
+      title_font_transform: overlayDesign.font_transform,
+      title_letter_spacing: overlayDesign.letter_spacing,
+      title_color_hex: overlayDesign.text_color_hex,
+      title_x_percent: xPercent,
+      title_y_percent: titleYPercent,
+      title_text_anchor: overlayDesign.position?.includes('right') ? 'end' : 
+                        overlayDesign.position?.includes('left') ? 'start' : 'middle',
+      title_max_width_percent: overlayDesign.max_width_percent,
+      title_opacity: overlayDesign.opacity,
+      title_overlay_background_type: overlayDesign.overlay_background_type,
+      title_overlay_background_color: overlayDesign.overlay_background_color,
+      title_overlay_background_opacity: overlayDesign.overlay_background_opacity,
+      title_overlay_background_shape: overlayDesign.overlay_background_shape,
+      title_overlay_background_padding: overlayDesign.overlay_background_padding,
+      // Subtitle properties - separate
+      subtitle_font_family: overlayDesign.font_family,
+      subtitle_font_weight: overlayDesign.font_weight === 'bold' ? 'regular' : overlayDesign.font_weight,
+      subtitle_font_transform: overlayDesign.font_transform,
+      subtitle_letter_spacing: overlayDesign.letter_spacing,
+      subtitle_color_hex: overlayDesign.text_color_hex,
+      subtitle_x_percent: xPercent,
+      subtitle_y_percent: subtitleYPercent,
+      subtitle_text_anchor: overlayDesign.position?.includes('right') ? 'end' : 
+                            overlayDesign.position?.includes('left') ? 'start' : 'middle',
+      subtitle_max_width_percent: overlayDesign.max_width_percent,
+      subtitle_opacity: overlayDesign.opacity * 0.9,
+      subtitle_overlay_background_type: overlayDesign.overlay_background_type,
+      subtitle_overlay_background_color: overlayDesign.overlay_background_color,
+      subtitle_overlay_background_opacity: overlayDesign.overlay_background_opacity,
+      subtitle_overlay_background_shape: overlayDesign.overlay_background_shape,
+      subtitle_overlay_background_padding: overlayDesign.overlay_background_padding
     };
 
     const finalImageUrl = await imageOverlayService.applyTextOverlay(
@@ -180,40 +210,49 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
     // Use base image if available, otherwise use current image
     const baseImage = asset.base_image_url || asset.image_url;
     
+    // Get existing config or use defaults
+    const existing = asset.overlay_config;
+    
     // Strip markdown from title and subtitle before storing
     const updatedOverlayConfig: OverlayConfig = {
-      title: stripMarkdown(overlay_config.title || asset.overlay_config?.title || asset.overlay_config?.text || ''),
-      subtitle: stripMarkdown(overlay_config.subtitle || asset.overlay_config?.subtitle || ''),
-      font_family: overlay_config.font_family || asset.overlay_config?.font_family || 'sans-serif',
-      font_weight: overlay_config.font_weight || asset.overlay_config?.font_weight || 'bold',
-      font_transform: overlay_config.font_transform || asset.overlay_config?.font_transform || 'none',
-      letter_spacing: overlay_config.letter_spacing || asset.overlay_config?.letter_spacing || 'normal',
-      text_color_hex: overlay_config.text_color_hex || asset.overlay_config?.text_color_hex || '#FFFFFF', // Legacy
-      title_color_hex: overlay_config.title_color_hex !== undefined ? overlay_config.title_color_hex : (asset.overlay_config?.title_color_hex || overlay_config.text_color_hex || asset.overlay_config?.text_color_hex || '#FFFFFF'),
-      subtitle_color_hex: overlay_config.subtitle_color_hex !== undefined ? overlay_config.subtitle_color_hex : (asset.overlay_config?.subtitle_color_hex || overlay_config.text_color_hex || asset.overlay_config?.text_color_hex || '#FFFFFF'),
-      max_width_percent: overlay_config.max_width_percent || asset.overlay_config?.max_width_percent || 80,
-      opacity: overlay_config.opacity !== undefined ? overlay_config.opacity : (asset.overlay_config?.opacity !== undefined ? asset.overlay_config.opacity : 1.0),
-      title_font_size: overlay_config.title_font_size !== undefined ? overlay_config.title_font_size : asset.overlay_config?.title_font_size,
-      subtitle_font_size: overlay_config.subtitle_font_size !== undefined ? overlay_config.subtitle_font_size : asset.overlay_config?.subtitle_font_size,
-      title_max_lines: overlay_config.title_max_lines !== undefined ? overlay_config.title_max_lines : (asset.overlay_config?.title_max_lines || 3),
-      subtitle_max_lines: overlay_config.subtitle_max_lines !== undefined ? overlay_config.subtitle_max_lines : (asset.overlay_config?.subtitle_max_lines || 3),
-      x_percent: overlay_config.x_percent !== undefined ? overlay_config.x_percent : asset.overlay_config?.x_percent,
-      y_percent: overlay_config.y_percent !== undefined ? overlay_config.y_percent : asset.overlay_config?.y_percent,
-      // Separate positioning for title and subtitle
-      title_x_percent: overlay_config.title_x_percent !== undefined ? overlay_config.title_x_percent : asset.overlay_config?.title_x_percent,
-      title_y_percent: overlay_config.title_y_percent !== undefined ? overlay_config.title_y_percent : asset.overlay_config?.title_y_percent,
-      subtitle_x_percent: overlay_config.subtitle_x_percent !== undefined ? overlay_config.subtitle_x_percent : asset.overlay_config?.subtitle_x_percent,
-      subtitle_y_percent: overlay_config.subtitle_y_percent !== undefined ? overlay_config.subtitle_y_percent : asset.overlay_config?.subtitle_y_percent,
-      text_anchor: overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle',
-      title_text_anchor: overlay_config.title_text_anchor !== undefined ? overlay_config.title_text_anchor : (asset.overlay_config?.title_text_anchor || overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle'),
-      subtitle_text_anchor: overlay_config.subtitle_text_anchor !== undefined ? overlay_config.subtitle_text_anchor : (asset.overlay_config?.subtitle_text_anchor || overlay_config.text_anchor || asset.overlay_config?.text_anchor || 'middle'),
-      position: overlay_config.position || asset.overlay_config?.position || 'bottom-right', // Keep for backward compatibility
-      // Overlay background elements
-      overlay_background_type: overlay_config.overlay_background_type !== undefined ? overlay_config.overlay_background_type : asset.overlay_config?.overlay_background_type,
-      overlay_background_color: overlay_config.overlay_background_color !== undefined ? overlay_config.overlay_background_color : asset.overlay_config?.overlay_background_color,
-      overlay_background_opacity: overlay_config.overlay_background_opacity !== undefined ? overlay_config.overlay_background_opacity : asset.overlay_config?.overlay_background_opacity,
-      overlay_background_shape: overlay_config.overlay_background_shape !== undefined ? overlay_config.overlay_background_shape : asset.overlay_config?.overlay_background_shape,
-      overlay_background_padding: overlay_config.overlay_background_padding !== undefined ? overlay_config.overlay_background_padding : asset.overlay_config?.overlay_background_padding
+      title: stripMarkdown(overlay_config.title !== undefined ? overlay_config.title : (existing?.title || '')),
+      subtitle: stripMarkdown(overlay_config.subtitle !== undefined ? overlay_config.subtitle : (existing?.subtitle || '')),
+      // Title properties - completely separate
+      title_font_family: overlay_config.title_font_family !== undefined ? overlay_config.title_font_family : (existing?.title_font_family || 'sans-serif'),
+      title_font_weight: overlay_config.title_font_weight !== undefined ? overlay_config.title_font_weight : (existing?.title_font_weight || 'bold'),
+      title_font_transform: overlay_config.title_font_transform !== undefined ? overlay_config.title_font_transform : (existing?.title_font_transform || 'none'),
+      title_letter_spacing: overlay_config.title_letter_spacing !== undefined ? overlay_config.title_letter_spacing : (existing?.title_letter_spacing || 'normal'),
+      title_color_hex: overlay_config.title_color_hex !== undefined ? overlay_config.title_color_hex : (existing?.title_color_hex || '#FFFFFF'),
+      title_x_percent: overlay_config.title_x_percent !== undefined ? overlay_config.title_x_percent : (existing?.title_x_percent || 50),
+      title_y_percent: overlay_config.title_y_percent !== undefined ? overlay_config.title_y_percent : (existing?.title_y_percent || 30),
+      title_text_anchor: overlay_config.title_text_anchor !== undefined ? overlay_config.title_text_anchor : (existing?.title_text_anchor || 'middle'),
+      title_max_width_percent: overlay_config.title_max_width_percent !== undefined ? overlay_config.title_max_width_percent : (existing?.title_max_width_percent || 80),
+      title_opacity: overlay_config.title_opacity !== undefined ? overlay_config.title_opacity : (existing?.title_opacity !== undefined ? existing.title_opacity : 1.0),
+      title_font_size: overlay_config.title_font_size !== undefined ? overlay_config.title_font_size : existing?.title_font_size,
+      title_max_lines: overlay_config.title_max_lines !== undefined ? overlay_config.title_max_lines : (existing?.title_max_lines || 3),
+      title_overlay_background_type: overlay_config.title_overlay_background_type !== undefined ? overlay_config.title_overlay_background_type : existing?.title_overlay_background_type,
+      title_overlay_background_color: overlay_config.title_overlay_background_color !== undefined ? overlay_config.title_overlay_background_color : existing?.title_overlay_background_color,
+      title_overlay_background_opacity: overlay_config.title_overlay_background_opacity !== undefined ? overlay_config.title_overlay_background_opacity : existing?.title_overlay_background_opacity,
+      title_overlay_background_shape: overlay_config.title_overlay_background_shape !== undefined ? overlay_config.title_overlay_background_shape : existing?.title_overlay_background_shape,
+      title_overlay_background_padding: overlay_config.title_overlay_background_padding !== undefined ? overlay_config.title_overlay_background_padding : existing?.title_overlay_background_padding,
+      // Subtitle properties - completely separate
+      subtitle_font_family: overlay_config.subtitle_font_family !== undefined ? overlay_config.subtitle_font_family : (existing?.subtitle_font_family || 'sans-serif'),
+      subtitle_font_weight: overlay_config.subtitle_font_weight !== undefined ? overlay_config.subtitle_font_weight : (existing?.subtitle_font_weight || 'regular'),
+      subtitle_font_transform: overlay_config.subtitle_font_transform !== undefined ? overlay_config.subtitle_font_transform : (existing?.subtitle_font_transform || 'none'),
+      subtitle_letter_spacing: overlay_config.subtitle_letter_spacing !== undefined ? overlay_config.subtitle_letter_spacing : (existing?.subtitle_letter_spacing || 'normal'),
+      subtitle_color_hex: overlay_config.subtitle_color_hex !== undefined ? overlay_config.subtitle_color_hex : (existing?.subtitle_color_hex || '#FFFFFF'),
+      subtitle_x_percent: overlay_config.subtitle_x_percent !== undefined ? overlay_config.subtitle_x_percent : (existing?.subtitle_x_percent || 50),
+      subtitle_y_percent: overlay_config.subtitle_y_percent !== undefined ? overlay_config.subtitle_y_percent : (existing?.subtitle_y_percent || 80),
+      subtitle_text_anchor: overlay_config.subtitle_text_anchor !== undefined ? overlay_config.subtitle_text_anchor : (existing?.subtitle_text_anchor || 'middle'),
+      subtitle_max_width_percent: overlay_config.subtitle_max_width_percent !== undefined ? overlay_config.subtitle_max_width_percent : (existing?.subtitle_max_width_percent || 80),
+      subtitle_opacity: overlay_config.subtitle_opacity !== undefined ? overlay_config.subtitle_opacity : (existing?.subtitle_opacity !== undefined ? existing.subtitle_opacity : 0.9),
+      subtitle_font_size: overlay_config.subtitle_font_size !== undefined ? overlay_config.subtitle_font_size : existing?.subtitle_font_size,
+      subtitle_max_lines: overlay_config.subtitle_max_lines !== undefined ? overlay_config.subtitle_max_lines : (existing?.subtitle_max_lines || 3),
+      subtitle_overlay_background_type: overlay_config.subtitle_overlay_background_type !== undefined ? overlay_config.subtitle_overlay_background_type : existing?.subtitle_overlay_background_type,
+      subtitle_overlay_background_color: overlay_config.subtitle_overlay_background_color !== undefined ? overlay_config.subtitle_overlay_background_color : existing?.subtitle_overlay_background_color,
+      subtitle_overlay_background_opacity: overlay_config.subtitle_overlay_background_opacity !== undefined ? overlay_config.subtitle_overlay_background_opacity : existing?.subtitle_overlay_background_opacity,
+      subtitle_overlay_background_shape: overlay_config.subtitle_overlay_background_shape !== undefined ? overlay_config.subtitle_overlay_background_shape : existing?.subtitle_overlay_background_shape,
+      subtitle_overlay_background_padding: overlay_config.subtitle_overlay_background_padding !== undefined ? overlay_config.subtitle_overlay_background_padding : existing?.subtitle_overlay_background_padding
     };
 
     const finalImageUrl = await imageOverlayService.updateOverlay(

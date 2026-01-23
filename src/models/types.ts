@@ -32,40 +32,42 @@ export interface BrandDNA {
 export interface OverlayConfig {
   title: string;
   subtitle: string;
-  font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
-  font_weight: 'light' | 'regular' | 'bold';
-  font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
-  letter_spacing: 'normal' | 'wide';
-  text_color_hex: string; // Legacy: single color for both title and subtitle
-  title_color_hex?: string; // Separate color for title
-  subtitle_color_hex?: string; // Separate color for subtitle
-  // New: Pixel-based positioning (percentages 0-100)
-  x_percent?: number; // Horizontal position as percentage (0 = left, 100 = right) - legacy, applies to both
-  y_percent?: number; // Vertical position as percentage (0 = top, 100 = bottom) - legacy, applies to both
-  text_anchor?: 'start' | 'middle' | 'end'; // Horizontal alignment of text (legacy, applies to both)
-  title_text_anchor?: 'start' | 'middle' | 'end'; // Separate anchor for title
-  subtitle_text_anchor?: 'start' | 'middle' | 'end'; // Separate anchor for subtitle
-  // Separate positioning for title and subtitle
-  title_x_percent?: number;
-  title_y_percent?: number;
-  subtitle_x_percent?: number;
-  subtitle_y_percent?: number;
-  // Legacy: String-based position (for backward compatibility)
-  position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
-  max_width_percent: number;
-  opacity?: number;
+  // Title properties - completely separate
+  title_font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+  title_font_weight: 'light' | 'regular' | 'bold';
+  title_font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+  title_letter_spacing: 'normal' | 'wide';
+  title_color_hex: string;
+  title_x_percent: number;
+  title_y_percent: number;
+  title_text_anchor: 'start' | 'middle' | 'end';
+  title_max_width_percent: number;
+  title_opacity: number;
   title_font_size?: number;
-  subtitle_font_size?: number;
   title_max_lines?: number;
+  title_overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
+  title_overlay_background_color?: string;
+  title_overlay_background_opacity?: number;
+  title_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
+  title_overlay_background_padding?: number;
+  // Subtitle properties - completely separate
+  subtitle_font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+  subtitle_font_weight: 'light' | 'regular' | 'bold';
+  subtitle_font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+  subtitle_letter_spacing: 'normal' | 'wide';
+  subtitle_color_hex: string;
+  subtitle_x_percent: number;
+  subtitle_y_percent: number;
+  subtitle_text_anchor: 'start' | 'middle' | 'end';
+  subtitle_max_width_percent: number;
+  subtitle_opacity: number;
+  subtitle_font_size?: number;
   subtitle_max_lines?: number;
-  // Overlay background elements for improved text visibility
-  overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
-  overlay_background_color?: string; // hex color
-  overlay_background_opacity?: number; // 0-1
-  overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
-  overlay_background_padding?: number; // padding around text in pixels
-  // Legacy support
-  text?: string;
+  subtitle_overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
+  subtitle_overlay_background_color?: string;
+  subtitle_overlay_background_opacity?: number;
+  subtitle_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
+  subtitle_overlay_background_padding?: number;
 }
 
 export interface GeneratedAsset {

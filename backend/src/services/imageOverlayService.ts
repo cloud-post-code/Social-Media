@@ -20,71 +20,306 @@ const bufferToBase64 = (buffer: Buffer, mimeType: string = 'image/png'): string 
 
 /**
  * Get font family name for SVG
- * Using fonts that are installed on the Linux server via Dockerfile
- * Installed fonts: DejaVu Sans, DejaVu Serif, Liberation Sans, Liberation Serif, Noto Sans, Noto Serif
  */
-const getFontFamily = (family: OverlayConfig['font_family']): string => {
+const getFontFamily = (family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten'): string => {
   switch (family) {
     case 'serif':
-      // Use DejaVu Serif or Liberation Serif (both installed)
       return 'DejaVu Serif, Liberation Serif, serif';
     case 'cursive':
     case 'handwritten':
-      // Use serif fonts for cursive/handwritten (closest match with installed fonts)
       return 'DejaVu Serif, Liberation Serif, serif';
     case 'sans-serif':
     default:
-      // Use DejaVu Sans or Liberation Sans (both installed)
       return 'DejaVu Sans, Liberation Sans, sans-serif';
   }
 };
 
 /**
- * Calculate text position based on position string
+ * Strip markdown syntax from text
  */
-const calculatePosition = (
-  position: string | undefined,
+const stripMarkdown = (text: string): string => {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/~~(.*?)~~/g, '$1')
+    .replace(/`(.*?)`/g, '$1')
+    .trim();
+};
+
+/**
+ * Transform text based on transform type
+ */
+const transformText = (text: string, transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none'): string => {
+  const cleaned = stripMarkdown(text);
+  
+  if (transform === 'uppercase') {
+    return cleaned.toUpperCase();
+  } else if (transform === 'lowercase') {
+    return cleaned.toLowerCase();
+  } else if (transform === 'capitalize') {
+    return cleaned.split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join(' ');
+  }
+  return cleaned;
+};
+
+/**
+ * Process text into lines (respecting manual line breaks and auto-wrapping)
+ */
+const processTextLines = (
+  text: string,
+  fontSize: number,
+  maxWidth: number,
+  maxLines: number,
+  fontWeight: 'light' | 'regular' | 'bold'
+): string[] => {
+  // First, split by manual line breaks
+  const manualLines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  
+  // If we have manual line breaks, use them (but respect maxLines)
+  if (manualLines.length > 1) {
+    return manualLines.slice(0, maxLines);
+  }
+  
+  // Otherwise, auto-wrap the text
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  
+  const charWidthMultiplier = fontWeight === 'bold' ? 0.7 : 0.6;
+  
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const estimatedWidth = testLine.length * fontSize * charWidthMultiplier;
+    
+    if (estimatedWidth <= maxWidth || currentLine === '') {
+      currentLine = testLine;
+    } else {
+      if (lines.length < maxLines - 1) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        // Last line - add ellipsis if needed
+        const lastLine = currentLine + ' ' + word;
+        if (lastLine.length * fontSize * charWidthMultiplier > maxWidth) {
+          currentLine = currentLine + '...';
+        } else {
+          currentLine = lastLine;
+        }
+        break;
+      }
+    }
+  }
+  
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  
+  return lines.slice(0, maxLines);
+};
+
+/**
+ * Calculate text dimensions and position for a single text element
+ */
+const calculateTextElement = (
+  text: string,
+  config: {
+    fontFamily: string;
+    fontWeight: string;
+    fontSize: number;
+    maxWidthPercent: number;
+    maxLines: number;
+    xPercent: number;
+    yPercent: number;
+    textAnchor: 'start' | 'middle' | 'end';
+    fontWeightValue: 'light' | 'regular' | 'bold';
+  },
   imageWidth: number,
-  imageHeight: number,
-  textWidth: number,
-  textHeight: number,
-  maxWidth: number
-): { x: number; y: number } => {
-  const actualMaxWidth = (imageWidth * maxWidth) / 100;
-  const padding = 40;
+  imageHeight: number
+): {
+  lines: string[];
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  lineHeight: number;
+} => {
+  const maxWidth = (imageWidth * config.maxWidthPercent) / 100;
+  const lineHeight = config.fontSize * 1.2;
   
-  let x = 0;
-  let y = 0;
+  const lines = processTextLines(text, config.fontSize, maxWidth, config.maxLines, config.fontWeightValue);
+  const height = lines.length * lineHeight;
   
-  const pos = position || 'center-middle';
+  // Calculate width from longest line
+  const charWidthMultiplier = config.fontWeightValue === 'bold' ? 0.7 : 0.6;
+  const width = Math.max(...lines.map(line => line.length * config.fontSize * charWidthMultiplier));
   
-  // Horizontal positioning
-  if (pos.includes('left')) {
-    x = padding;
-  } else if (pos.includes('right')) {
-    x = imageWidth - Math.min(textWidth, actualMaxWidth) - padding;
-  } else if (pos.includes('center') || pos.includes('middle')) {
-    // center
-    x = (imageWidth - Math.min(textWidth, actualMaxWidth)) / 2;
+  // Calculate position
+  const requestedX = (imageWidth * config.xPercent) / 100;
+  const requestedY = (imageHeight * config.yPercent) / 100;
+  
+  const padding = Math.max(30, Math.min(imageWidth, imageHeight) * 0.03);
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  
+  // Clamp X position based on anchor
+  let x: number;
+  if (config.textAnchor === 'start') {
+    x = Math.max(padding, Math.min(requestedX, imageWidth - width - padding));
+  } else if (config.textAnchor === 'end') {
+    x = Math.max(width + padding, Math.min(requestedX, imageWidth - padding));
   } else {
-    // Default to center
-    x = (imageWidth - Math.min(textWidth, actualMaxWidth)) / 2;
+    x = Math.max(halfWidth + padding, Math.min(requestedX, imageWidth - halfWidth - padding));
   }
   
-  // Vertical positioning
-  if (pos.includes('top')) {
-    y = padding;
-  } else if (pos.includes('bottom')) {
-    y = imageHeight - textHeight - padding;
-  } else if (pos.includes('middle') || pos.includes('center')) {
-    // middle/center
-    y = (imageHeight - textHeight) / 2;
-  } else {
-    // Default to center
-    y = (imageHeight - textHeight) / 2;
+  // Clamp Y position
+  const y = Math.max(halfHeight + padding, Math.min(requestedY, imageHeight - halfHeight - padding));
+  
+  // Convert center Y to first line Y position
+  const firstLineY = y - (height / 2) + lineHeight;
+  
+  return {
+    lines,
+    x,
+    y: firstLineY,
+    width,
+    height,
+    lineHeight
+  };
+};
+
+/**
+ * Generate overlay background for a single text element
+ */
+const generateElementOverlayBackground = (
+  element: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    lineHeight: number;
+  },
+  config: {
+    overlayBackgroundType?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
+    overlayBackgroundColor?: string;
+    overlayBackgroundOpacity?: number;
+    overlayBackgroundShape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
+    overlayBackgroundPadding?: number;
+    textAnchor: 'start' | 'middle' | 'end';
+  },
+  imageWidth: number,
+  imageHeight: number
+): string => {
+  const overlayType = config.overlayBackgroundType || 'none';
+  if (overlayType === 'none' || !config.overlayBackgroundColor) {
+    return '';
   }
   
-  return { x, y };
+  const padding = config.overlayBackgroundPadding || 30;
+  const overlayWidth = Math.min(element.width + (padding * 2), imageWidth * 0.9);
+  const overlayHeight = element.height + (padding * 2);
+  
+  // Calculate overlay position
+  let overlayX: number;
+  if (config.textAnchor === 'start') {
+    overlayX = element.x - padding;
+  } else if (config.textAnchor === 'end') {
+    overlayX = element.x - overlayWidth + padding;
+  } else {
+    overlayX = element.x - (overlayWidth / 2);
+  }
+  
+  // Clamp overlay position
+  const imagePadding = Math.max(30, Math.min(imageWidth, imageHeight) * 0.03);
+  overlayX = Math.max(imagePadding, Math.min(overlayX, imageWidth - overlayWidth - imagePadding));
+  const centerY = element.y + (element.height / 2) - element.lineHeight;
+  const overlayY = centerY - (overlayHeight / 2);
+  const clampedOverlayY = Math.max(imagePadding, Math.min(overlayY, imageHeight - overlayHeight - imagePadding));
+  
+  const bgColor = config.overlayBackgroundColor;
+  const bgOpacity = config.overlayBackgroundOpacity !== undefined ? config.overlayBackgroundOpacity : 0.5;
+  const shape = config.overlayBackgroundShape || 'rounded';
+  
+  // Calculate corner radius
+  let rx = 0;
+  if (shape === 'rounded') {
+    rx = 12;
+  } else if (shape === 'pill') {
+    rx = overlayHeight / 2;
+  } else if (shape === 'circle') {
+    const size = Math.min(overlayWidth, overlayHeight);
+    return `<circle cx="${overlayX + overlayWidth / 2}" cy="${clampedOverlayY + overlayHeight / 2}" r="${size / 2}" fill="${bgColor}" opacity="${bgOpacity}"/>`;
+  }
+  
+  if (overlayType === 'gradient') {
+    const gradientId = `overlayGradient_${Math.random().toString(36).substr(2, 9)}`;
+    const gradientDef = `<defs>
+    <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:${bgColor};stop-opacity:${bgOpacity * 0.8}" />
+      <stop offset="100%" style="stop-color:${bgColor};stop-opacity:${bgOpacity}" />
+    </linearGradient>
+  </defs>`;
+    
+    return `${gradientDef}
+  <rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="url(#${gradientId})"/>`;
+  } else if (overlayType === 'blur') {
+    const blurFilterId = `overlayBlur_${Math.random().toString(36).substr(2, 9)}`;
+    const blurDef = `<defs>
+    <filter id="${blurFilterId}" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10"/>
+    </filter>
+  </defs>`;
+    return `${blurDef}
+  <rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="${bgColor}" opacity="${bgOpacity}" filter="url(#${blurFilterId})"/>`;
+  } else {
+    return `<rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="${bgColor}" opacity="${bgOpacity}"/>`;
+  }
+};
+
+/**
+ * Generate SVG text elements for lines
+ */
+const generateTextElements = (
+  lines: string[],
+  xPos: number,
+  startY: number,
+  fontSize: number,
+  lineHeight: number,
+  fontWeight: string,
+  opacity: number,
+  color: string,
+  anchor: 'start' | 'middle' | 'end',
+  fontFamily: string,
+  letterSpacing: string
+): string => {
+  const escapeXml = (text: string) => {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  };
+  
+  return lines.map((line, index) => {
+    const yPos = startY + (index * lineHeight);
+    const escapedLine = escapeXml(line);
+    return `<text
+    x="${xPos}"
+    y="${yPos}"
+    font-family="${fontFamily}"
+    font-size="${fontSize}"
+    font-weight="${fontWeight}"
+    fill="${color}"
+    text-anchor="${anchor}"
+    letter-spacing="${letterSpacing}"
+    opacity="${opacity}"
+    filter="url(#textShadow)"
+  >${escapedLine}</text>`;
+  }).join('\n  ');
 };
 
 /**
@@ -101,388 +336,152 @@ export const applyTextOverlay = async (
     const width = metadata.width || 1024;
     const height = metadata.height || 1024;
     
-    // Get title and subtitle (support legacy 'text' field for backward compatibility)
-    const title = overlayConfig.title || overlayConfig.text || '';
+    const title = overlayConfig.title || '';
     const subtitle = overlayConfig.subtitle || '';
     
-    if (!title) {
-      throw new Error('Title is required for overlay');
+    if (!title && !subtitle) {
+      throw new Error('At least one of title or subtitle is required');
     }
     
-    const fontFamily = getFontFamily(overlayConfig.font_family);
-    const fontWeight = overlayConfig.font_weight === 'bold' ? '700' : 
-                      overlayConfig.font_weight === 'light' ? '300' : '400';
-    // Use separate colors for title and subtitle, fallback to text_color_hex for backward compatibility
-    const titleColor = overlayConfig.title_color_hex || overlayConfig.text_color_hex;
-    const subtitleColor = overlayConfig.subtitle_color_hex || overlayConfig.text_color_hex;
-    const opacity = overlayConfig.opacity !== undefined ? overlayConfig.opacity : 1.0;
-    const letterSpacing = overlayConfig.letter_spacing === 'wide' ? '0.15em' : 'normal';
+    // Process title if present
+    let titleElement: {
+      lines: string[];
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      lineHeight: number;
+    } | null = null;
     
-    // Font sizes - use custom sizes if provided, otherwise auto-calculate
-    const titleFontSize = overlayConfig.title_font_size || Math.max(56, Math.min(width / 10, 120));
-    const subtitleFontSize = overlayConfig.subtitle_font_size || Math.max(32, Math.min(width / 16, 64));
-    const lineSpacing = subtitleFontSize * 0.3; // Space between title and subtitle
-    const titleLineHeight = titleFontSize * 1.2; // Line height for title
-    const subtitleLineHeight = subtitleFontSize * 1.2; // Line height for subtitle
-    
-    // Strip markdown syntax from text
-    const stripMarkdown = (text: string): string => {
-      return text
-        .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
-        .replace(/\*(.*?)\*/g, '$1')       // Remove *italic*
-        .replace(/__(.*?)__/g, '$1')       // Remove __bold__
-        .replace(/_(.*?)_/g, '$1')         // Remove _italic_
-        .replace(/~~(.*?)~~/g, '$1')       // Remove ~~strikethrough~~
-        .replace(/`(.*?)`/g, '$1')         // Remove `code`
-        .trim();
-    };
-    
-    // Handle text transform and strip markdown
-    const transformText = (text: string) => {
-      // First strip markdown syntax
-      let cleaned = stripMarkdown(text);
+    if (title) {
+      const titleText = transformText(title, overlayConfig.title_font_transform);
+      const titleFontSize = overlayConfig.title_font_size || Math.max(56, Math.min(width / 10, 120));
+      const titleFontFamily = getFontFamily(overlayConfig.title_font_family);
+      const titleFontWeight = overlayConfig.title_font_weight === 'bold' ? '700' : 
+                             overlayConfig.title_font_weight === 'light' ? '300' : '400';
+      const titleLetterSpacing = overlayConfig.title_letter_spacing === 'wide' ? '0.15em' : 'normal';
       
-      // Then apply text transform
-      if (overlayConfig.font_transform === 'uppercase') {
-        return cleaned.toUpperCase();
-      } else if (overlayConfig.font_transform === 'lowercase') {
-        return cleaned.toLowerCase();
-      } else if (overlayConfig.font_transform === 'capitalize') {
-        return cleaned.split(' ').map(word => 
-          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        ).join(' ');
-      }
-      return cleaned;
-    };
-    
-    const titleText = transformText(title);
-    const subtitleText = subtitle ? transformText(subtitle) : '';
-    
-    // Function to split text by manual line breaks (\n) and then wrap if needed
-    const processTextLines = (text: string, fontSize: number, maxWidth: number, maxLines: number): string[] => {
-      // First, split by manual line breaks
-      const manualLines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-      
-      // If we have manual line breaks, use them (but respect maxLines)
-      if (manualLines.length > 1) {
-        return manualLines.slice(0, maxLines);
-      }
-      
-      // Otherwise, auto-wrap the text
-      const words = text.split(' ');
-      const lines: string[] = [];
-      let currentLine = '';
-      
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        // Estimate width: approximate character width based on font size
-        const charWidthMultiplier = overlayConfig.font_weight === 'bold' ? 0.7 : 0.6;
-        const estimatedWidth = testLine.length * fontSize * charWidthMultiplier;
-        
-        if (estimatedWidth <= maxWidth || currentLine === '') {
-          currentLine = testLine;
-        } else {
-          if (lines.length < maxLines - 1) {
-            lines.push(currentLine);
-            currentLine = word;
-          } else {
-            // Last line - add ellipsis if needed
-            const lastLine = currentLine + ' ' + word;
-            if (lastLine.length * fontSize * charWidthMultiplier > maxWidth) {
-              currentLine = currentLine + '...';
-            } else {
-              currentLine = lastLine;
-            }
-            break;
-          }
-        }
-      }
-      
-      if (currentLine) {
-        lines.push(currentLine);
-      }
-      
-      return lines.slice(0, maxLines);
-    };
-    
-    // Process text into lines (respecting manual line breaks)
-    const maxTitleLines = overlayConfig.title_max_lines || 3; // Increased default to allow more lines
-    const maxSubtitleLines = overlayConfig.subtitle_max_lines || 3; // Increased default
-    const maxWidth = (width * overlayConfig.max_width_percent) / 100;
-    const titleLines = processTextLines(titleText, titleFontSize, maxWidth, maxTitleLines);
-    const subtitleLines = subtitleText ? processTextLines(subtitleText, subtitleFontSize, maxWidth, maxSubtitleLines) : [];
-    
-    // Calculate total text height including all lines
-    const titleHeight = titleLines.length * titleLineHeight;
-    const subtitleHeight = subtitleLines.length * subtitleLineHeight;
-    const totalTextHeight = titleHeight + (subtitleLines.length > 0 ? (lineSpacing + subtitleHeight) : 0);
-    
-    // Calculate position - estimate max text width from longest line
-    const charWidthMultiplier = overlayConfig.font_weight === 'bold' ? 0.7 : 0.6;
-    const maxTitleLineWidth = Math.max(...titleLines.map(line => line.length * titleFontSize * charWidthMultiplier));
-    const maxSubtitleLineWidth = subtitleLines.length > 0 
-      ? Math.max(...subtitleLines.map(line => line.length * subtitleFontSize * charWidthMultiplier))
-      : 0;
-    const maxTextWidth = Math.max(maxTitleLineWidth, maxSubtitleLineWidth);
-    const actualMaxWidth = Math.min(maxTextWidth, (width * overlayConfig.max_width_percent) / 100);
-    
-    // Use pixel-based positioning if provided, otherwise fall back to string-based
-    let titleX: number;
-    let titleY: number;
-    let subtitleX: number;
-    let subtitleY: number;
-    let textAnchor: 'start' | 'middle' | 'end';
-    let titleTextAnchor: 'start' | 'middle' | 'end';
-    let subtitleTextAnchor: 'start' | 'middle' | 'end';
-    
-    // Check if separate positions are provided for title and subtitle
-    const hasSeparatePositions = overlayConfig.title_x_percent !== undefined && 
-                                  overlayConfig.title_y_percent !== undefined &&
-                                  overlayConfig.subtitle_x_percent !== undefined && 
-                                  overlayConfig.subtitle_y_percent !== undefined;
-    
-    // Boundary validation helper
-    const padding = Math.max(30, Math.min(width, height) * 0.03);
-    const clampPosition = (requestedX: number, requestedY: number, textWidth: number, textHeight: number, anchor: 'start' | 'middle' | 'end') => {
-      const halfTextWidth = textWidth / 2;
-      const halfTextHeight = textHeight / 2;
-      
-      let clampedX: number;
-      if (anchor === 'start') {
-        clampedX = Math.max(padding, Math.min(requestedX, width - textWidth - padding));
-      } else if (anchor === 'end') {
-        clampedX = Math.max(textWidth + padding, Math.min(requestedX, width - padding));
-      } else {
-        clampedX = Math.max(halfTextWidth + padding, Math.min(requestedX, width - halfTextWidth - padding));
-      }
-      
-      const clampedY = Math.max(halfTextHeight + padding, Math.min(requestedY, height - halfTextHeight - padding));
-      return { x: clampedX, y: clampedY };
-    };
-    
-    if (hasSeparatePositions) {
-      // Use separate positions for title and subtitle
-      const titleRequestedX = (width * overlayConfig.title_x_percent!) / 100;
-      const titleRequestedY = (height * overlayConfig.title_y_percent!) / 100;
-      const subtitleRequestedX = (width * overlayConfig.subtitle_x_percent!) / 100;
-      const subtitleRequestedY = (height * overlayConfig.subtitle_y_percent!) / 100;
-      
-      titleTextAnchor = overlayConfig.title_text_anchor || overlayConfig.text_anchor || 'middle';
-      subtitleTextAnchor = overlayConfig.subtitle_text_anchor || overlayConfig.text_anchor || 'middle';
-      textAnchor = overlayConfig.text_anchor || 'middle';
-      
-      // Calculate title width and height for boundary validation
-      const titleMaxWidth = (width * overlayConfig.max_width_percent) / 100;
-      // titleY represents the center anchor point, convert to first line Y position
-      const titleCenterY = titleRequestedY;
-      const titleClamped = clampPosition(titleRequestedX, titleCenterY, Math.min(titleMaxWidth, maxTitleLineWidth), titleHeight, titleTextAnchor);
-      titleX = titleClamped.x;
-      // Convert center Y to first line Y position (center - half height + line height)
-      titleY = titleClamped.y - (titleHeight / 2) + titleLineHeight;
-      
-      // Calculate subtitle width and height for boundary validation
-      const subtitleMaxWidth = (width * overlayConfig.max_width_percent) / 100;
-      // subtitleY represents the center anchor point, convert to first line Y position
-      const subtitleCenterY = subtitleRequestedY;
-      const subtitleClamped = clampPosition(subtitleRequestedX, subtitleCenterY, Math.min(subtitleMaxWidth, maxSubtitleLineWidth), subtitleHeight, subtitleTextAnchor);
-      subtitleX = subtitleClamped.x;
-      // Convert center Y to first line Y position (center - half height + line height)
-      subtitleY = subtitleClamped.y - (subtitleHeight / 2) + subtitleLineHeight;
-    } else if (overlayConfig.x_percent !== undefined && overlayConfig.y_percent !== undefined) {
-      // Use legacy pixel-based positioning (single position for both)
-      const requestedX = (width * overlayConfig.x_percent) / 100;
-      const requestedY = (height * overlayConfig.y_percent) / 100;
-      textAnchor = overlayConfig.text_anchor || 'middle';
-      titleTextAnchor = overlayConfig.title_text_anchor || overlayConfig.text_anchor || 'middle';
-      subtitleTextAnchor = overlayConfig.subtitle_text_anchor || overlayConfig.text_anchor || 'middle';
-      
-      const halfTextWidth = actualMaxWidth / 2;
-      const halfTextHeight = totalTextHeight / 2;
-      
-      // Adjust X based on title text anchor (primary anchor) to keep text within bounds
-      const anchorForBounds = titleTextAnchor;
-      if (anchorForBounds === 'start') {
-        titleX = Math.max(padding, Math.min(requestedX, width - actualMaxWidth - padding));
-      } else if (anchorForBounds === 'end') {
-        titleX = Math.max(actualMaxWidth + padding, Math.min(requestedX, width - padding));
-      } else {
-        titleX = Math.max(halfTextWidth + padding, Math.min(requestedX, width - halfTextWidth - padding));
-      }
-      
-      // Use same X for subtitle
-      subtitleX = titleX;
-      
-      // Adjust Y to keep text within bounds
-      const y = Math.max(halfTextHeight + padding, Math.min(requestedY, height - halfTextHeight - padding));
-      
-      // Position title and subtitle relative to the anchor point
-      titleY = y - (totalTextHeight / 2) + titleLineHeight;
-      subtitleY = titleY + titleHeight + lineSpacing + subtitleLineHeight;
-    } else {
-      // Fall back to string-based positioning (legacy)
-      const positionResult = calculatePosition(
-        overlayConfig.position || 'center-middle',
+      titleElement = calculateTextElement(
+        titleText,
+        {
+          fontFamily: titleFontFamily,
+          fontWeight: titleFontWeight,
+          fontSize: titleFontSize,
+          maxWidthPercent: overlayConfig.title_max_width_percent,
+          maxLines: overlayConfig.title_max_lines || 3,
+          xPercent: overlayConfig.title_x_percent,
+          yPercent: overlayConfig.title_y_percent,
+          textAnchor: overlayConfig.title_text_anchor,
+          fontWeightValue: overlayConfig.title_font_weight
+        },
         width,
-        height,
-        maxTextWidth,
-        totalTextHeight,
-        overlayConfig.max_width_percent
+        height
       );
-      titleX = positionResult.x;
-      subtitleX = positionResult.x;
-      
-      if (overlayConfig.position === 'floating-center') {
-        titleX = width / 2;
-        subtitleX = width / 2;
-      }
-      
-      textAnchor = overlayConfig.position?.includes('right') 
-        ? 'end' 
-        : overlayConfig.position?.includes('left') 
-        ? 'start' 
-        : 'middle';
-      titleTextAnchor = overlayConfig.title_text_anchor || textAnchor;
-      subtitleTextAnchor = overlayConfig.subtitle_text_anchor || textAnchor;
-      
-      const y = overlayConfig.position === 'floating-center' ? height / 2 : positionResult.y;
-      
-      // Calculate Y positions based on position string
-      const position = overlayConfig.position || 'center-middle';
-      if (position.includes('top')) {
-        titleY = y + titleLineHeight;
-        subtitleY = titleY + titleHeight + lineSpacing + subtitleLineHeight;
-      } else if (position.includes('bottom')) {
-        subtitleY = y - subtitleHeight + subtitleLineHeight;
-        titleY = subtitleY - lineSpacing - titleHeight + titleLineHeight;
-      } else {
-        // Center - position title in middle, subtitle below
-        const centerY = position === 'floating-center' ? height / 2 : y;
-        titleY = centerY - (subtitleLines.length > 0 ? (lineSpacing + subtitleHeight) / 2 : 0) - titleHeight / 2 + titleLineHeight;
-        subtitleY = titleY + titleHeight + lineSpacing + subtitleLineHeight;
-      }
     }
     
-    // Calculate Y positions for title and subtitle (accounting for multiple lines)
-    // titleY and subtitleY are now the anchor points (middle of first line)
-    let titleStartY = titleY;
-    let subtitleStartY = subtitleY;
+    // Process subtitle if present
+    let subtitleElement: {
+      lines: string[];
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      lineHeight: number;
+    } | null = null;
     
-    // Escape XML special characters
-    const escapeXml = (text: string) => {
-      return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-    };
+    if (subtitle) {
+      const subtitleText = transformText(subtitle, overlayConfig.subtitle_font_transform);
+      const subtitleFontSize = overlayConfig.subtitle_font_size || Math.max(32, Math.min(width / 16, 64));
+      const subtitleFontFamily = getFontFamily(overlayConfig.subtitle_font_family);
+      const subtitleFontWeight = overlayConfig.subtitle_font_weight === 'bold' ? '700' : 
+                                 overlayConfig.subtitle_font_weight === 'light' ? '300' : '400';
+      const subtitleLetterSpacing = overlayConfig.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal';
+      
+      subtitleElement = calculateTextElement(
+        subtitleText,
+        {
+          fontFamily: subtitleFontFamily,
+          fontWeight: subtitleFontWeight,
+          fontSize: subtitleFontSize,
+          maxWidthPercent: overlayConfig.subtitle_max_width_percent,
+          maxLines: overlayConfig.subtitle_max_lines || 3,
+          xPercent: overlayConfig.subtitle_x_percent,
+          yPercent: overlayConfig.subtitle_y_percent,
+          textAnchor: overlayConfig.subtitle_text_anchor,
+          fontWeightValue: overlayConfig.subtitle_font_weight
+        },
+        width,
+        height
+      );
+    }
     
-    // Escape each line
-    const escapedTitleLines = titleLines.map(line => escapeXml(line));
-    const escapedSubtitleLines = subtitleLines.map(line => escapeXml(line));
+    // Generate overlay backgrounds independently
+    const titleBackground = titleElement ? generateElementOverlayBackground(
+      titleElement,
+      {
+        overlayBackgroundType: overlayConfig.title_overlay_background_type,
+        overlayBackgroundColor: overlayConfig.title_overlay_background_color,
+        overlayBackgroundOpacity: overlayConfig.title_overlay_background_opacity,
+        overlayBackgroundShape: overlayConfig.title_overlay_background_shape,
+        overlayBackgroundPadding: overlayConfig.title_overlay_background_padding,
+        textAnchor: overlayConfig.title_text_anchor
+      },
+      width,
+      height
+    ) : '';
     
-    // Generate overlay background elements if configured
-    const generateOverlayBackground = (): string => {
-      const overlayType = overlayConfig.overlay_background_type || 'none';
-      if (overlayType === 'none' || !overlayConfig.overlay_background_color) {
-        return '';
-      }
-      
-      // Calculate text bounding box
-      const padding = overlayConfig.overlay_background_padding || 30;
-      const charWidthMultiplier = overlayConfig.font_weight === 'bold' ? 0.7 : 0.6;
-      const maxTitleLineWidth = Math.max(...titleLines.map(line => line.length * titleFontSize * charWidthMultiplier));
-      const maxSubtitleLineWidth = subtitleLines.length > 0 
-        ? Math.max(...subtitleLines.map(line => line.length * subtitleFontSize * charWidthMultiplier))
-        : 0;
-      const textWidth = Math.max(maxTitleLineWidth, maxSubtitleLineWidth);
-      const textHeight = totalTextHeight;
-      
-      // Calculate overlay dimensions
-      const overlayWidth = Math.min(textWidth + (padding * 2), width * 0.9);
-      const overlayHeight = textHeight + (padding * 2);
-      
-      // Calculate overlay position (centered on text)
-      let overlayX: number;
-      if (titleTextAnchor === 'start') {
-        overlayX = titleX - padding;
-      } else if (titleTextAnchor === 'end') {
-        overlayX = titleX - overlayWidth + padding;
-      } else {
-        overlayX = titleX - (overlayWidth / 2);
-      }
-      
-      // Ensure overlay stays within image bounds
-      overlayX = Math.max(padding, Math.min(overlayX, width - overlayWidth - padding));
-      const overlayY = Math.min(titleStartY, subtitleStartY || titleStartY) - padding - (textHeight / 2);
-      const clampedOverlayY = Math.max(padding, Math.min(overlayY, height - overlayHeight - padding));
-      
-      const bgColor = overlayConfig.overlay_background_color;
-      const bgOpacity = overlayConfig.overlay_background_opacity !== undefined ? overlayConfig.overlay_background_opacity : 0.5;
-      const shape = overlayConfig.overlay_background_shape || 'rounded';
-      
-      // Calculate corner radius based on shape
-      let rx = 0;
-      if (shape === 'rounded') {
-        rx = 12;
-      } else if (shape === 'pill') {
-        rx = overlayHeight / 2;
-      } else if (shape === 'circle') {
-        const size = Math.min(overlayWidth, overlayHeight);
-        return `<circle cx="${overlayX + overlayWidth / 2}" cy="${clampedOverlayY + overlayHeight / 2}" r="${size / 2}" fill="${bgColor}" opacity="${bgOpacity}"/>`;
-      }
-      
-      if (overlayType === 'gradient') {
-        // Create gradient definition
-        const gradientId = 'overlayGradient';
-        const gradientDef = `<defs>
-    <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:${bgColor};stop-opacity:${bgOpacity * 0.8}" />
-      <stop offset="100%" style="stop-color:${bgColor};stop-opacity:${bgOpacity}" />
-    </linearGradient>
-  </defs>`;
-        
-        return `${gradientDef}
-  <rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="url(#${gradientId})"/>`;
-      } else if (overlayType === 'blur') {
-        // For blur, we'll use a semi-transparent background with a filter
-        const blurFilterId = 'overlayBlur';
-        const blurDef = `<defs>
-    <filter id="${blurFilterId}" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="10"/>
-    </filter>
-  </defs>`;
-        return `${blurDef}
-  <rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="${bgColor}" opacity="${bgOpacity}" filter="url(#${blurFilterId})"/>`;
-      } else {
-        // Solid or shape
-        return `<rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="${bgColor}" opacity="${bgOpacity}"/>`;
-      }
-    };
+    const subtitleBackground = subtitleElement ? generateElementOverlayBackground(
+      subtitleElement,
+      {
+        overlayBackgroundType: overlayConfig.subtitle_overlay_background_type,
+        overlayBackgroundColor: overlayConfig.subtitle_overlay_background_color,
+        overlayBackgroundOpacity: overlayConfig.subtitle_overlay_background_opacity,
+        overlayBackgroundShape: overlayConfig.subtitle_overlay_background_shape,
+        overlayBackgroundPadding: overlayConfig.subtitle_overlay_background_padding,
+        textAnchor: overlayConfig.subtitle_text_anchor
+      },
+      width,
+      height
+    ) : '';
     
-    // Generate SVG text elements for each line
-    const generateTextElements = (lines: string[], xPos: number, startY: number, fontSize: number, lineHeight: number, fontWeight: string, opacity: number, color: string, anchor: 'start' | 'middle' | 'end') => {
-      return lines.map((line, index) => {
-        const yPos = startY + (index * lineHeight);
-        return `<text
-    x="${xPos}"
-    y="${yPos}"
-    font-family="${fontFamily}"
-    font-size="${fontSize}"
-    font-weight="${fontWeight}"
-    fill="${color}"
-    text-anchor="${anchor}"
-    letter-spacing="${letterSpacing}"
-    opacity="${opacity}"
-    filter="url(#textShadow)"
-  >${line}</text>`;
-      }).join('\n  ');
-    };
+    // Generate text elements
+    const titleFontFamily = titleElement ? getFontFamily(overlayConfig.title_font_family) : '';
+    const titleFontWeight = titleElement ? (overlayConfig.title_font_weight === 'bold' ? '700' : 
+                                            overlayConfig.title_font_weight === 'light' ? '300' : '400') : '';
+    const titleLetterSpacing = titleElement ? (overlayConfig.title_letter_spacing === 'wide' ? '0.15em' : 'normal') : '';
+    const titleTextElements = titleElement ? generateTextElements(
+      titleElement.lines,
+      titleElement.x,
+      titleElement.y,
+      overlayConfig.title_font_size || Math.max(56, Math.min(width / 10, 120)),
+      titleElement.lineHeight,
+      titleFontWeight,
+      overlayConfig.title_opacity,
+      overlayConfig.title_color_hex,
+      overlayConfig.title_text_anchor,
+      titleFontFamily,
+      titleLetterSpacing
+    ) : '';
     
-    // Generate overlay background
-    const overlayBackground = generateOverlayBackground();
+    const subtitleFontFamily = subtitleElement ? getFontFamily(overlayConfig.subtitle_font_family) : '';
+    const subtitleFontWeight = subtitleElement ? (overlayConfig.subtitle_font_weight === 'bold' ? '700' : 
+                                                  overlayConfig.subtitle_font_weight === 'light' ? '300' : '400') : '';
+    const subtitleLetterSpacing = subtitleElement ? (overlayConfig.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal') : '';
+    const subtitleTextElements = subtitleElement ? generateTextElements(
+      subtitleElement.lines,
+      subtitleElement.x,
+      subtitleElement.y,
+      overlayConfig.subtitle_font_size || Math.max(32, Math.min(width / 16, 64)),
+      subtitleElement.lineHeight,
+      subtitleFontWeight,
+      overlayConfig.subtitle_opacity,
+      overlayConfig.subtitle_color_hex,
+      overlayConfig.subtitle_text_anchor,
+      subtitleFontFamily,
+      subtitleLetterSpacing
+    ) : '';
     
-    // Create SVG with overlay background (if any), then title and subtitle (multiple lines)
+    // Create SVG
     const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -497,48 +496,22 @@ export const applyTextOverlay = async (
       </feMerge>
     </filter>
   </defs>
-  ${overlayBackground}
-  ${generateTextElements(escapedTitleLines, titleX, titleStartY, titleFontSize, titleLineHeight, fontWeight, opacity, titleColor, titleTextAnchor)}
-  ${subtitleLines.length > 0 ? generateTextElements(escapedSubtitleLines, subtitleX, subtitleStartY, subtitleFontSize, subtitleLineHeight, fontWeight === '700' ? '400' : fontWeight, opacity * 0.9, subtitleColor, subtitleTextAnchor) : ''}
+  ${titleBackground}
+  ${subtitleBackground}
+  ${titleTextElements}
+  ${subtitleTextElements}
 </svg>`;
     
-    // Debug logging
-    console.log('Applying overlay:', {
-      title: titleText,
-      subtitle: subtitleText,
-      titleLines: titleLines.length,
-      subtitleLines: subtitleLines.length,
-      titleLinesText: titleLines,
-      subtitleLinesText: subtitleLines,
-      fontFamily,
-      fontWeight,
-      position: overlayConfig.position,
-      color: overlayConfig.text_color_hex,
-      titleFontSize,
-      subtitleFontSize,
-      titleX,
-      titleY,
-      subtitleX,
-      subtitleY,
-      titleStartY,
-      subtitleStartY,
-      imageSize: `${width}x${height}`
-    });
-    
-    // Render SVG to PNG buffer first, then composite
-    // This ensures the SVG is properly rendered
-    // Use higher density for better text quality
+    // Render SVG to PNG buffer
     const svgBuffer = Buffer.from(svgText);
     
     try {
-      // Try rendering SVG with density first
       const svgImage = sharp(svgBuffer, { density: 300 });
       const svgRendered = await svgImage
         .resize(width, height, { fit: 'fill' })
         .png()
         .toBuffer();
       
-      // Composite the rendered SVG onto the image
       const outputBuffer = await image
         .composite([
           {
@@ -554,7 +527,6 @@ export const applyTextOverlay = async (
       return bufferToBase64(outputBuffer);
     } catch (svgError) {
       console.warn('SVG rendering with density failed, trying direct composite:', svgError);
-      // Fallback: try direct SVG composite
       const outputBuffer = await image
         .composite([
           {
@@ -586,4 +558,3 @@ export const updateOverlay = async (
 ): Promise<string> => {
   return applyTextOverlay(baseImageBase64, newOverlayConfig);
 };
-

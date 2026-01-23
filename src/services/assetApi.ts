@@ -34,29 +34,42 @@ export const assetApi = {
   updateOverlay: (id: string, overlayConfig: {
     title?: string;
     subtitle?: string;
-    font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
-    font_weight?: 'light' | 'regular' | 'bold';
-    font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
-    letter_spacing?: 'normal' | 'wide';
-    text_color_hex?: string;
+    // Title properties - completely separate
+    title_font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+    title_font_weight?: 'light' | 'regular' | 'bold';
+    title_font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+    title_letter_spacing?: 'normal' | 'wide';
     title_color_hex?: string;
-    subtitle_color_hex?: string;
-    position?: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
-    max_width_percent?: number;
-    opacity?: number;
-    title_font_size?: number;
-    subtitle_font_size?: number;
-    title_max_lines?: number;
-    subtitle_max_lines?: number;
-    title_text_anchor?: 'start' | 'middle' | 'end';
-    subtitle_text_anchor?: 'start' | 'middle' | 'end';
-    x_percent?: number;
-    y_percent?: number;
     title_x_percent?: number;
     title_y_percent?: number;
+    title_text_anchor?: 'start' | 'middle' | 'end';
+    title_max_width_percent?: number;
+    title_opacity?: number;
+    title_font_size?: number;
+    title_max_lines?: number;
+    title_overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
+    title_overlay_background_color?: string;
+    title_overlay_background_opacity?: number;
+    title_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
+    title_overlay_background_padding?: number;
+    // Subtitle properties - completely separate
+    subtitle_font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+    subtitle_font_weight?: 'light' | 'regular' | 'bold';
+    subtitle_font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+    subtitle_letter_spacing?: 'normal' | 'wide';
+    subtitle_color_hex?: string;
     subtitle_x_percent?: number;
     subtitle_y_percent?: number;
-    text_anchor?: 'start' | 'middle' | 'end';
+    subtitle_text_anchor?: 'start' | 'middle' | 'end';
+    subtitle_max_width_percent?: number;
+    subtitle_opacity?: number;
+    subtitle_font_size?: number;
+    subtitle_max_lines?: number;
+    subtitle_overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
+    subtitle_overlay_background_color?: string;
+    subtitle_overlay_background_opacity?: number;
+    subtitle_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
+    subtitle_overlay_background_padding?: number;
   }) => api.put<GeneratedAsset>(`/assets/${id}/overlay`, { overlay_config: overlayConfig }),
   
   delete: (id: string) => api.delete<void>(`/assets/${id}`),
