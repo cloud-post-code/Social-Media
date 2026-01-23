@@ -49,6 +49,7 @@ export interface OverlayConfig {
   title_overlay_background_opacity?: number;
   title_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
   title_overlay_background_padding?: number;
+  title_lines?: string[]; // Pre-calculated line breaks for exact frontend match
   // Subtitle properties - completely separate
   subtitle_font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
   subtitle_font_weight: 'light' | 'regular' | 'bold';
@@ -66,6 +67,7 @@ export interface OverlayConfig {
   subtitle_overlay_background_opacity?: number;
   subtitle_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
   subtitle_overlay_background_padding?: number;
+  subtitle_lines?: string[]; // Pre-calculated line breaks for exact frontend match
 }
 
 export interface GeneratedAsset {

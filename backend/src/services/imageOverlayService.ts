@@ -20,17 +20,21 @@ const bufferToBase64 = (buffer: Buffer, mimeType: string = 'image/png'): string 
 
 /**
  * Get font family name for SVG
+ * Maps frontend font family choices to server-available fonts that match browser defaults
  */
 const getFontFamily = (family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten'): string => {
   switch (family) {
     case 'serif':
-      return 'DejaVu Serif, Liberation Serif, serif';
+      // Match browser default serif fonts (Times New Roman, Times)
+      return 'DejaVu Serif, Liberation Serif, Times New Roman, Times, serif';
     case 'cursive':
     case 'handwritten':
+      // Use a script/cursive font, fallback to serif
       return 'DejaVu Serif, Liberation Serif, serif';
     case 'sans-serif':
     default:
-      return 'DejaVu Sans, Liberation Sans, sans-serif';
+      // Match browser default sans-serif fonts (Arial, Helvetica)
+      return 'DejaVu Sans, Liberation Sans, Arial, Helvetica, sans-serif';
   }
 };
 
@@ -159,7 +163,8 @@ const calculateTextElement = (
     fontWeightValue: 'light' | 'regular' | 'bold';
   },
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
+  preCalculatedLines?: string[]
 ): {
   lines: string[];
   x: number;
@@ -171,7 +176,10 @@ const calculateTextElement = (
   const maxWidth = (imageWidth * config.maxWidthPercent) / 100;
   const lineHeight = config.fontSize * 1.2;
   
-  const lines = processTextLines(text, config.fontSize, maxWidth, config.fontWeightValue);
+  // Use pre-calculated lines if provided (from frontend Canvas API), otherwise calculate
+  const lines = preCalculatedLines && preCalculatedLines.length > 0
+    ? preCalculatedLines
+    : processTextLines(text, config.fontSize, maxWidth, config.fontWeightValue);
   const height = lines.length * lineHeight;
     
   // Calculate width from longest line
@@ -389,6 +397,11 @@ export const applyTextOverlay = async (
                              overlayConfig.title_font_weight === 'light' ? '300' : '400';
       const titleLetterSpacing = overlayConfig.title_letter_spacing === 'wide' ? '0.15em' : 'normal';
       
+      // Use pre-calculated lines from frontend if available, otherwise calculate
+      const titleLines = overlayConfig.title_lines && overlayConfig.title_lines.length > 0
+        ? overlayConfig.title_lines.map(line => transformText(line, overlayConfig.title_font_transform))
+        : undefined;
+      
       titleElement = calculateTextElement(
         titleText,
         {
@@ -402,7 +415,8 @@ export const applyTextOverlay = async (
           fontWeightValue: overlayConfig.title_font_weight
         },
         width,
-        height
+        height,
+        titleLines
       );
     }
     
@@ -424,6 +438,11 @@ export const applyTextOverlay = async (
                                  overlayConfig.subtitle_font_weight === 'light' ? '300' : '400';
       const subtitleLetterSpacing = overlayConfig.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal';
       
+      // Use pre-calculated lines from frontend if available, otherwise calculate
+      const subtitleLines = overlayConfig.subtitle_lines && overlayConfig.subtitle_lines.length > 0
+        ? overlayConfig.subtitle_lines.map(line => transformText(line, overlayConfig.subtitle_font_transform))
+        : undefined;
+      
       subtitleElement = calculateTextElement(
         subtitleText,
         {
@@ -437,7 +456,8 @@ export const applyTextOverlay = async (
           fontWeightValue: overlayConfig.subtitle_font_weight
         },
         width,
-        height
+        height,
+        subtitleLines
       );
     }
     

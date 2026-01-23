@@ -51,6 +51,7 @@ export const assetApi = {
     title_overlay_background_opacity?: number;
     title_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
     title_overlay_background_padding?: number;
+    title_lines?: string[];
     // Subtitle properties - completely separate
     subtitle_font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
     subtitle_font_weight?: 'light' | 'regular' | 'bold';
@@ -68,6 +69,7 @@ export const assetApi = {
     subtitle_overlay_background_opacity?: number;
     subtitle_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
     subtitle_overlay_background_padding?: number;
+    subtitle_lines?: string[];
   }) => api.put<GeneratedAsset>(`/assets/${id}/overlay`, { overlay_config: overlayConfig }),
   
   delete: (id: string) => api.delete<void>(`/assets/${id}`),

@@ -271,6 +271,186 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     const percent = Math.min(maxWidthPercent || 80, 95);
     return `${(dims.displayWidth * percent) / 100}px`;
   };
+
+  // Get numeric pixel value from getMaxWidthPixels for calculations
+  const getMaxWidthPixelsNumeric = (maxWidthPercent: number | undefined): number => {
+    const dims = getDisplayedImageDimensions();
+    if (!dims) {
+      return 0;
+    }
+    const percent = Math.min(maxWidthPercent || 80, 95);
+    return (dims.displayWidth * percent) / 100;
+  };
+
+  // Get numeric font size for calculations
+  const getFontSizeNumeric = (baseFontSize: number | undefined, isTitle: boolean): number => {
+    if (!imageDimensions) {
+      return isTitle ? 56 : 32;
+    }
+    
+    if (baseFontSize) {
+      return baseFontSize;
+    }
+    
+    if (isTitle) {
+      return Math.max(56, Math.min(imageDimensions.width / 10, 120));
+    } else {
+      return Math.max(32, Math.min(imageDimensions.width / 16, 64));
+    }
+  };
+
+  // Map font family choice to font stack that matches server-side rendering
+  // Server uses DejaVu fonts, so we use Arial/Times which have similar metrics
+  const getFontStackForMeasurement = (family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten'): string => {
+    switch (family) {
+      case 'serif':
+        // Times New Roman has similar metrics to DejaVu Serif
+        return 'Times New Roman, Times, serif';
+      case 'cursive':
+      case 'handwritten':
+        // Use serif fallback for cursive/handwritten
+        return 'Times New Roman, Times, serif';
+      case 'sans-serif':
+      default:
+        // Arial has similar metrics to DejaVu Sans
+        return 'Arial, Helvetica, sans-serif';
+    }
+  };
+
+  // Calculate text lines using Canvas API for exact measurement
+  const calculateTextLinesWithCanvas = async (
+    text: string,
+    maxWidthPx: number,
+    fontSize: number,
+    fontFamily: string,
+    fontWeight: string,
+    letterSpacing: string
+  ): Promise<string[]> => {
+    if (!text.trim()) {
+      return [];
+    }
+
+    // Wait for fonts to load
+    await document.fonts.ready;
+
+    // Create canvas for measurement
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      // Fallback to simple word wrapping if canvas not available
+      const words = text.split(' ');
+      const lines: string[] = [];
+      let currentLine = '';
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        if (testLine.length * fontSize * 0.6 <= maxWidthPx || currentLine === '') {
+          currentLine = testLine;
+        } else {
+          lines.push(currentLine);
+          currentLine = word;
+        }
+      }
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      return lines;
+    }
+
+    // Map font family to font stack that matches server-side rendering
+    // Convert generic names (sans-serif, serif) to specific font stacks
+    let measurementFontFamily: string;
+    if (fontFamily === 'sans-serif' || fontFamily === 'serif' || fontFamily === 'cursive' || fontFamily === 'handwritten') {
+      measurementFontFamily = getFontStackForMeasurement(fontFamily as 'sans-serif' | 'serif' | 'cursive' | 'handwritten');
+    } else {
+      // If a specific font is provided, use it as-is
+      measurementFontFamily = fontFamily;
+    }
+
+    // Build font string matching server-side rendering
+    const fontWeightValue = fontWeight === 'bold' ? 'bold' : fontWeight === 'light' ? '300' : 'normal';
+    const fontString = `${fontWeightValue} ${fontSize}px ${measurementFontFamily}`;
+    ctx.font = fontString;
+    
+    // Canvas API doesn't support letterSpacing directly, so we'll approximate
+    // For 'wide' spacing, we'll add extra space between characters
+    // This is an approximation - actual CSS letter-spacing may vary slightly
+    const letterSpacingValue = letterSpacing === 'wide' ? fontSize * 0.15 : 0;
+
+    // First, handle manual line breaks (\n)
+    const manualSections = text.split('\n');
+    const allLines: string[] = [];
+
+    for (const section of manualSections) {
+      if (!section.trim()) {
+        continue; // Skip empty sections
+      }
+
+      const words = section.trim().split(/\s+/);
+      let currentLine = '';
+
+      for (const word of words) {
+        // Measure word with letter spacing adjustment
+        let wordWidth = ctx.measureText(word).width;
+        if (letterSpacingValue > 0 && word.length > 1) {
+          wordWidth += letterSpacingValue * (word.length - 1);
+        }
+        
+        if (wordWidth > maxWidthPx) {
+          // Word is too long - break it into characters
+          if (currentLine) {
+            allLines.push(currentLine.trim());
+            currentLine = '';
+          }
+          
+          // Break long word character by character
+          let wordChunk = '';
+          for (const char of word) {
+            const testChunk = wordChunk + char;
+            let chunkWidth = ctx.measureText(testChunk).width;
+            if (letterSpacingValue > 0 && testChunk.length > 1) {
+              chunkWidth += letterSpacingValue * (testChunk.length - 1);
+            }
+            if (chunkWidth <= maxWidthPx) {
+              wordChunk = testChunk;
+            } else {
+              if (wordChunk) {
+                allLines.push(wordChunk);
+              }
+              wordChunk = char;
+            }
+          }
+          if (wordChunk) {
+            currentLine = wordChunk;
+          }
+        } else {
+          // Word fits - try to add it to current line
+          const separator = currentLine ? ' ' : '';
+          const testLine = currentLine ? `${currentLine}${separator}${word}` : word;
+          let testWidth = ctx.measureText(testLine).width;
+          // Add letter spacing adjustment for the entire line
+          if (letterSpacingValue > 0 && testLine.length > 1) {
+            testWidth += letterSpacingValue * (testLine.length - 1);
+          }
+          
+          if (testWidth <= maxWidthPx || currentLine === '') {
+            currentLine = testLine;
+          } else {
+            // Current line is full - start new line with this word
+            if (currentLine) {
+              allLines.push(currentLine.trim());
+            }
+            currentLine = word;
+          }
+        }
+      }
+
+      if (currentLine) {
+        allLines.push(currentLine.trim());
+      }
+    }
+
+    return allLines.filter(line => line.length > 0);
+  };
   
   // Render resize handles for text blocks
   const renderResizeHandles = (element: 'title' | 'subtitle') => {
@@ -768,7 +948,94 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     setLoading(true);
     setStatusText('Updating overlay...');
     try {
-      const updated = await assetApi.updateOverlay(currentAsset.id, overlayEdit);
+      // Calculate line breaks using Canvas API for exact match
+      const overlayConfigToSend = { ...overlayEdit };
+      
+      // Get current text values
+      const titleText = overlayEdit.title !== undefined 
+        ? overlayEdit.title 
+        : (displayAsset?.overlayConfig?.title || '');
+      const subtitleText = overlayEdit.subtitle !== undefined 
+        ? overlayEdit.subtitle 
+        : (displayAsset?.overlayConfig?.subtitle || '');
+
+      // Calculate title lines if title exists
+      if (titleText) {
+        const titleMaxWidthPercent = overlayEdit.title_max_width_percent !== undefined
+          ? overlayEdit.title_max_width_percent
+          : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+        const titleMaxWidthPx = getMaxWidthPixelsNumeric(titleMaxWidthPercent);
+        
+        const titleFontSize = getFontSizeNumeric(
+          overlayEdit.title_font_size !== undefined 
+            ? overlayEdit.title_font_size 
+            : displayAsset?.overlayConfig?.title_font_size,
+          true
+        );
+        
+        const titleFontFamily = overlayEdit.title_font_family || 
+          displayAsset?.overlayConfig?.title_font_family || 
+          'sans-serif';
+        const titleFontWeight = overlayEdit.title_font_weight === 'bold' 
+          ? 'bold' 
+          : overlayEdit.title_font_weight === 'light' 
+            ? '300' 
+            : 'normal';
+        const titleLetterSpacing = overlayEdit.title_letter_spacing === 'wide' 
+          ? '0.15em' 
+          : 'normal';
+        
+        const titleLines = await calculateTextLinesWithCanvas(
+          titleText,
+          titleMaxWidthPx,
+          titleFontSize,
+          titleFontFamily,
+          titleFontWeight,
+          titleLetterSpacing
+        );
+        
+        overlayConfigToSend.title_lines = titleLines;
+      }
+
+      // Calculate subtitle lines if subtitle exists
+      if (subtitleText) {
+        const subtitleMaxWidthPercent = overlayEdit.subtitle_max_width_percent !== undefined
+          ? overlayEdit.subtitle_max_width_percent
+          : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80);
+        const subtitleMaxWidthPx = getMaxWidthPixelsNumeric(subtitleMaxWidthPercent);
+        
+        const subtitleFontSize = getFontSizeNumeric(
+          overlayEdit.subtitle_font_size !== undefined 
+            ? overlayEdit.subtitle_font_size 
+            : displayAsset?.overlayConfig?.subtitle_font_size,
+          false
+        );
+        
+        const subtitleFontFamily = overlayEdit.subtitle_font_family || 
+          displayAsset?.overlayConfig?.subtitle_font_family || 
+          'sans-serif';
+        const subtitleFontWeight = overlayEdit.subtitle_font_weight === 'bold' 
+          ? 'bold' 
+          : overlayEdit.subtitle_font_weight === 'light' 
+            ? '300' 
+            : 'normal';
+        const subtitleLetterSpacing = overlayEdit.subtitle_letter_spacing === 'wide' 
+          ? '0.15em' 
+          : 'normal';
+        
+        const subtitleLines = await calculateTextLinesWithCanvas(
+          subtitleText,
+          subtitleMaxWidthPx,
+          subtitleFontSize,
+          subtitleFontFamily,
+          subtitleFontWeight,
+          subtitleLetterSpacing
+        );
+        
+        overlayConfigToSend.subtitle_lines = subtitleLines;
+      }
+
+      const updated = await assetApi.updateOverlay(currentAsset.id, overlayConfigToSend);
       const frontendAsset: GeneratedAsset = {
         ...updated,
         imageUrl: updated.image_url,
@@ -1720,54 +1987,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         </div>
                       </div>
 
-                      {/* Position - 9-Grid Preset Layout */}
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                          Position (Drag text on image or click a preset)
-                        </label>
-                        <div className="grid grid-cols-3 gap-2 mb-3">
-                        {[
-                          // Top row: y=15% to leave room for text height
-                          { label: 'TL', x: 15, y: 15, anchor: 'start' as const, name: 'Top Left' },
-                          { label: 'TC', x: 50, y: 15, anchor: 'middle' as const, name: 'Top Center' },
-                          { label: 'TR', x: 85, y: 15, anchor: 'end' as const, name: 'Top Right' },
-                          // Center row: y=50% (middle)
-                          { label: 'CL', x: 15, y: 50, anchor: 'start' as const, name: 'Center Left' },
-                          { label: 'C', x: 50, y: 50, anchor: 'middle' as const, name: 'Center' },
-                          { label: 'CR', x: 85, y: 50, anchor: 'end' as const, name: 'Center Right' },
-                          // Bottom row: y=85% to leave room for text height
-                          { label: 'BL', x: 15, y: 85, anchor: 'start' as const, name: 'Bottom Left' },
-                          { label: 'BC', x: 50, y: 85, anchor: 'middle' as const, name: 'Bottom Center' },
-                          { label: 'BR', x: 85, y: 85, anchor: 'end' as const, name: 'Bottom Right' },
-                        ].map((preset) => {
-                            const isSelected = overlayEdit.x_percent === preset.x && 
-                                             overlayEdit.y_percent === preset.y && 
-                                             (overlayEdit.text_anchor || 'middle') === preset.anchor;
-                            return (
-                              <button
-                                key={preset.label}
-                                onClick={() => setOverlayEdit({
-                                  ...overlayEdit,
-                                  x_percent: preset.x,
-                                  y_percent: preset.y,
-                                  text_anchor: preset.anchor
-                                })}
-                                className={`p-3 rounded-lg border-2 transition-all font-bold text-xs ${
-                                  isSelected
-                                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                                    : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50/50'
-                                }`}
-                                title={preset.name}
-                              >
-                                {preset.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <p className="text-xs text-slate-400">
-                          💡 Drag the text on the image to position it, or click a preset above.
-                        </p>
-                      </div>
 
                     </div>
 
