@@ -1712,43 +1712,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             )}
           </div>
 
-          {/* Strategy & Feedback Chat */}
-          <div className="lg:col-span-6 flex flex-col gap-8">
-            <div className="bg-white p-12 rounded-[3rem] border border-slate-200 shadow-sm flex-1">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black italic">CD</div>
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Director's Rationale</h3>
-              </div>
-              <div className="space-y-8">
-                <p className="text-slate-700 italic leading-relaxed text-2xl font-semibold">
-                  "{displayAsset.strategy?.step_1_image_generation?.reasoning || 
-                    displayAsset.strategy?.step_1_visual_strategy?.reasoning || 
-                    displayAsset.strategy?.step_1_visual_concept?.visual_metaphor_reasoning || 
-                    "Campaign coordinated sequence focusing on multi-touch narrative."}"
-                </p>
-                {displayAsset.type === 'product' && displayAsset.strategy?.step_2_title_subtitle && (
-                  <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Title & Subtitle</p>
-                    <p className="text-lg font-black text-indigo-900 mb-1">{displayAsset.strategy.step_2_title_subtitle.title}</p>
-                    {displayAsset.strategy.step_2_title_subtitle.subtitle && (
-                      <p className="text-sm font-medium text-indigo-700">{displayAsset.strategy.step_2_title_subtitle.subtitle}</p>
-                    )}
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visual Tone</p>
-                    <p className="text-sm font-black text-slate-800">{activeBrand.visual_identity.font_vibe}</p>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Composition</p>
-                    <p className="text-sm font-black text-slate-800">{displayAsset.strategy?.step_1_image_generation?.composition_notes || displayAsset.strategy?.step_1_visual_strategy?.composition_notes || 'Metaphorical'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Chat Box for Feedback */}
+          {/* Feedback Chat */}
+          <div className="lg:col-span-6">
             <div className="bg-slate-950 p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden flex flex-col gap-6">
               <div className="relative z-10">
                 <h3 className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-6">Feedback Loop</h3>

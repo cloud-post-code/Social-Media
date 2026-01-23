@@ -53,19 +53,19 @@ const stripMarkdown = (text: string): string => {
  */
 const transformText = (text: string, transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none'): string => {
   const cleaned = stripMarkdown(text);
-  
+      
   if (transform === 'uppercase') {
-    return cleaned.toUpperCase();
+        return cleaned.toUpperCase();
   } else if (transform === 'lowercase') {
-    return cleaned.toLowerCase();
+        return cleaned.toLowerCase();
   } else if (transform === 'capitalize') {
-    return cleaned.split(' ').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    ).join(' ');
-  }
-  return cleaned;
-};
-
+        return cleaned.split(' ').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+      }
+      return cleaned;
+    };
+    
 /**
  * Process text into lines (respecting manual line breaks and auto-wrapping)
  */
@@ -76,53 +76,54 @@ const processTextLines = (
   maxLines: number,
   fontWeight: 'light' | 'regular' | 'bold'
 ): string[] => {
-  // First, split by manual line breaks
-  const manualLines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-  
-  // If we have manual line breaks, use them (but respect maxLines)
-  if (manualLines.length > 1) {
-    return manualLines.slice(0, maxLines);
-  }
-  
-  // Otherwise, auto-wrap the text
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let currentLine = '';
+      // First, split by manual line breaks
+      const manualLines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      
+      // If we have manual line breaks, use them (but respect maxLines)
+      if (manualLines.length > 1) {
+        return manualLines.slice(0, maxLines);
+      }
+      
+      // Otherwise, auto-wrap the text
+      const words = text.split(' ');
+      const lines: string[] = [];
+      let currentLine = '';
   
   const charWidthMultiplier = fontWeight === 'bold' ? 0.7 : 0.6;
-  
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const estimatedWidth = testLine.length * fontSize * charWidthMultiplier;
-    
-    if (estimatedWidth <= maxWidth || currentLine === '') {
-      currentLine = testLine;
-    } else {
-      if (lines.length < maxLines - 1) {
-        lines.push(currentLine);
-        currentLine = word;
-      } else {
-        // Last line - add ellipsis if needed
-        const lastLine = currentLine + ' ' + word;
-        if (lastLine.length * fontSize * charWidthMultiplier > maxWidth) {
-          currentLine = currentLine + '...';
+      
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const estimatedWidth = testLine.length * fontSize * charWidthMultiplier;
+        
+        if (estimatedWidth <= maxWidth || currentLine === '') {
+          currentLine = testLine;
         } else {
-          currentLine = lastLine;
+          if (lines.length < maxLines - 1) {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            // Last line - add ellipsis if needed
+            const lastLine = currentLine + ' ' + word;
+            if (lastLine.length * fontSize * charWidthMultiplier > maxWidth) {
+              currentLine = currentLine + '...';
+            } else {
+              currentLine = lastLine;
+            }
+            break;
+          }
         }
-        break;
       }
-    }
-  }
-  
-  if (currentLine) {
-    lines.push(currentLine);
-  }
-  
-  return lines.slice(0, maxLines);
-};
-
+      
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      
+      return lines.slice(0, maxLines);
+    };
+    
 /**
  * Calculate text dimensions and position for a single text element
+ * Matches frontend simple percentage-based positioning
  */
 const calculateTextElement = (
   text: string,
@@ -152,34 +153,38 @@ const calculateTextElement = (
   
   const lines = processTextLines(text, config.fontSize, maxWidth, config.maxLines, config.fontWeightValue);
   const height = lines.length * lineHeight;
-  
+    
   // Calculate width from longest line
   const charWidthMultiplier = config.fontWeightValue === 'bold' ? 0.7 : 0.6;
   const width = Math.max(...lines.map(line => line.length * config.fontSize * charWidthMultiplier));
   
-  // Calculate position
-  const requestedX = (imageWidth * config.xPercent) / 100;
-  const requestedY = (imageHeight * config.yPercent) / 100;
+  // Simple percentage-based positioning (matching frontend)
+  // Frontend uses: left = offsetX + (displayWidth * xPercent / 100) with translate(-50%, -50%)
+  // The div is centered at xPercent, yPercent, and text-align controls alignment within the div
+  // For SVG, we position at the center and use text-anchor to match text-align behavior
+  const centerX = (imageWidth * config.xPercent) / 100;
+  const centerY = (imageHeight * config.yPercent) / 100;
   
-  const padding = Math.max(30, Math.min(imageWidth, imageHeight) * 0.03);
-  const halfWidth = width / 2;
-  const halfHeight = height / 2;
-  
-  // Clamp X position based on anchor
+  // Calculate x position based on text-anchor
+  // For middle: x is at center (matches text-align: center)
+  // For start: x is at center - half width (so text starts at left edge of centered div)
+  // For end: x is at center + half width (so text ends at right edge of centered div)
   let x: number;
   if (config.textAnchor === 'start') {
-    x = Math.max(padding, Math.min(requestedX, imageWidth - width - padding));
+    // Position so text starts at the left edge of the centered area
+    // The centered area is at centerX, so left edge is centerX - maxWidth/2
+    x = centerX - (maxWidth / 2);
   } else if (config.textAnchor === 'end') {
-    x = Math.max(width + padding, Math.min(requestedX, imageWidth - padding));
+    // Position so text ends at the right edge of the centered area
+    x = centerX + (maxWidth / 2);
   } else {
-    x = Math.max(halfWidth + padding, Math.min(requestedX, imageWidth - halfWidth - padding));
+    // Middle: text centered at centerX
+    x = centerX;
   }
   
-  // Clamp Y position
-  const y = Math.max(halfHeight + padding, Math.min(requestedY, imageHeight - halfHeight - padding));
-  
-  // Convert center Y to first line Y position
-  const firstLineY = y - (height / 2) + lineHeight;
+  // For y, we need to position the center of the text block at centerY
+  // First line Y = center Y - (height / 2) + lineHeight
+  const firstLineY = centerY - (height / 2) + lineHeight;
   
   return {
     lines,
@@ -215,70 +220,73 @@ const generateElementOverlayBackground = (
 ): string => {
   const overlayType = config.overlayBackgroundType || 'none';
   if (overlayType === 'none' || !config.overlayBackgroundColor) {
-    return '';
-  }
-  
+        return '';
+      }
+      
   const padding = config.overlayBackgroundPadding || 30;
   const overlayWidth = Math.min(element.width + (padding * 2), imageWidth * 0.9);
   const overlayHeight = element.height + (padding * 2);
+      
+  // Calculate overlay position (centered on text, matching frontend)
+  // element.x is the center X position, element.y is first line baseline
+  // Center Y of text = element.y - lineHeight + (height / 2)
+  const centerY = element.y - element.lineHeight + (element.height / 2);
   
-  // Calculate overlay position
   let overlayX: number;
   if (config.textAnchor === 'start') {
+    // For start anchor, element.x is the start position
     overlayX = element.x - padding;
   } else if (config.textAnchor === 'end') {
+    // For end anchor, element.x is the end position
     overlayX = element.x - overlayWidth + padding;
   } else {
+    // For middle anchor, element.x is the center position
     overlayX = element.x - (overlayWidth / 2);
   }
   
-  // Clamp overlay position
-  const imagePadding = Math.max(30, Math.min(imageWidth, imageHeight) * 0.03);
-  overlayX = Math.max(imagePadding, Math.min(overlayX, imageWidth - overlayWidth - imagePadding));
-  const centerY = element.y + (element.height / 2) - element.lineHeight;
+  // Position overlay centered vertically on text
   const overlayY = centerY - (overlayHeight / 2);
-  const clampedOverlayY = Math.max(imagePadding, Math.min(overlayY, imageHeight - overlayHeight - imagePadding));
-  
+      
   const bgColor = config.overlayBackgroundColor;
   const bgOpacity = config.overlayBackgroundOpacity !== undefined ? config.overlayBackgroundOpacity : 0.5;
   const shape = config.overlayBackgroundShape || 'rounded';
-  
+      
   // Calculate corner radius
-  let rx = 0;
-  if (shape === 'rounded') {
-    rx = 12;
-  } else if (shape === 'pill') {
-    rx = overlayHeight / 2;
-  } else if (shape === 'circle') {
-    const size = Math.min(overlayWidth, overlayHeight);
-    return `<circle cx="${overlayX + overlayWidth / 2}" cy="${clampedOverlayY + overlayHeight / 2}" r="${size / 2}" fill="${bgColor}" opacity="${bgOpacity}"/>`;
-  }
-  
-  if (overlayType === 'gradient') {
+      let rx = 0;
+      if (shape === 'rounded') {
+        rx = 12;
+      } else if (shape === 'pill') {
+        rx = overlayHeight / 2;
+      } else if (shape === 'circle') {
+        const size = Math.min(overlayWidth, overlayHeight);
+        return `<circle cx="${overlayX + overlayWidth / 2}" cy="${overlayY + overlayHeight / 2}" r="${size / 2}" fill="${bgColor}" opacity="${bgOpacity}"/>`;
+      }
+      
+      if (overlayType === 'gradient') {
     const gradientId = `overlayGradient_${Math.random().toString(36).substr(2, 9)}`;
-    const gradientDef = `<defs>
+        const gradientDef = `<defs>
     <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" style="stop-color:${bgColor};stop-opacity:${bgOpacity * 0.8}" />
       <stop offset="100%" style="stop-color:${bgColor};stop-opacity:${bgOpacity}" />
     </linearGradient>
   </defs>`;
-    
-    return `${gradientDef}
-  <rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="url(#${gradientId})"/>`;
-  } else if (overlayType === 'blur') {
+        
+        return `${gradientDef}
+  <rect x="${overlayX}" y="${overlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="url(#${gradientId})"/>`;
+      } else if (overlayType === 'blur') {
     const blurFilterId = `overlayBlur_${Math.random().toString(36).substr(2, 9)}`;
-    const blurDef = `<defs>
+        const blurDef = `<defs>
     <filter id="${blurFilterId}" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur in="SourceGraphic" stdDeviation="10"/>
     </filter>
   </defs>`;
-    return `${blurDef}
-  <rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="${bgColor}" opacity="${bgOpacity}" filter="url(#${blurFilterId})"/>`;
-  } else {
-    return `<rect x="${overlayX}" y="${clampedOverlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="${bgColor}" opacity="${bgOpacity}"/>`;
-  }
-};
-
+        return `${blurDef}
+  <rect x="${overlayX}" y="${overlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="${bgColor}" opacity="${bgOpacity}" filter="url(#${blurFilterId})"/>`;
+      } else {
+        return `<rect x="${overlayX}" y="${overlayY}" width="${overlayWidth}" height="${overlayHeight}" rx="${rx}" fill="${bgColor}" opacity="${bgOpacity}"/>`;
+      }
+    };
+    
 /**
  * Generate SVG text elements for lines
  */
@@ -304,10 +312,10 @@ const generateTextElements = (
       .replace(/'/g, '&apos;');
   };
   
-  return lines.map((line, index) => {
-    const yPos = startY + (index * lineHeight);
+      return lines.map((line, index) => {
+        const yPos = startY + (index * lineHeight);
     const escapedLine = escapeXml(line);
-    return `<text
+        return `<text
     x="${xPos}"
     y="${yPos}"
     font-family="${fontFamily}"
@@ -319,9 +327,9 @@ const generateTextElements = (
     opacity="${opacity}"
     filter="url(#textShadow)"
   >${escapedLine}</text>`;
-  }).join('\n  ');
-};
-
+      }).join('\n  ');
+    };
+    
 /**
  * Apply text overlay to an image
  */
