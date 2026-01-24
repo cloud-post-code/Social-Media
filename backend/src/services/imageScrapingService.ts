@@ -1,5 +1,4 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
-import * as vm from 'vm';
 
 /**
  * Extract simplified DOM structure from a website for Gemini analysis
@@ -126,7 +125,7 @@ export async function getWebsiteStructure(url: string): Promise<string> {
 }
 
 /**
- * Execute Gemini-generated scraping code in a sandboxed VM
+ * Execute Gemini-generated scraping code directly (not in VM to avoid Puppeteer context issues)
  * The code should return an object with logo_url and image_urls
  */
 export async function executeScrapingCode(
@@ -138,6 +137,7 @@ export async function executeScrapingCode(
   try {
     console.log(`[Scraping Service] Executing scraping code for: ${url}`);
     console.log(`[Scraping Service] Code length: ${code.length} characters`);
+    console.log(`[Scraping Service] Code preview (first 500 chars):`, code.substring(0, 500));
     
     // Launch browser
     browser = await puppeteer.launch({
@@ -164,35 +164,33 @@ export async function executeScrapingCode(
     // Wait for content to load
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Create sandboxed VM context
-    const vmContext = vm.createContext({
-      page: page,
-      browser: browser,
-      // Provide safe console
-      console: {
-        log: (...args: any[]) => console.log('[Scraped Code]', ...args),
-        error: (...args: any[]) => console.error('[Scraped Code]', ...args),
-        warn: (...args: any[]) => console.warn('[Scraped Code]', ...args)
-      },
-      // Provide URL helper
-      URL: URL,
-      // Provide setTimeout/setInterval for async operations
-      setTimeout: setTimeout,
-      setInterval: setInterval,
-      clearTimeout: clearTimeout,
-      clearInterval: clearInterval,
-      // Provide Promise for async/await
-      Promise: Promise
-    });
+    // Create a console object for the scraping code to use
+    const logConsole = {
+      log: (...args: any[]) => console.log('[Scraped Code]', ...args),
+      error: (...args: any[]) => console.error('[Scraped Code]', ...args),
+      warn: (...args: any[]) => console.warn('[Scraped Code]', ...args)
+    };
     
-    // Wrap code in async function and execute
+    // Execute code directly using Function constructor
+    // The code from Gemini should be executable code that uses 'page' variable
+    // We pass 'page', 'URL', and 'console' as parameters that will be available in the code's scope
+    // Wrap the code in an async IIFE so it executes immediately
+    // Note: The code from Gemini should end with something like: return await scrapeImages(page);
     const wrappedCode = `
-      (async function() {
-        ${code}
-      })()
+      ${code}
     `;
     
-    // Execute in VM with timeout
+    // Create the scraping function
+    // Note: Using Function constructor allows the code to access 'page', 'URL', and 'console' parameters
+    // This is necessary because Puppeteer page objects don't work in VM contexts
+    // The code will execute in a closure where 'page', 'URL', and 'console' are available
+    const scrapingFunction = new Function('page', 'URL', 'console', `
+      return (async function() {
+        ${wrappedCode}
+      })();
+    `);
+    
+    // Execute with timeout
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => {
         reject(new Error('Scraping code execution timeout (30s)'));
@@ -201,11 +199,13 @@ export async function executeScrapingCode(
     
     const executePromise = (async () => {
       try {
-        const script = new vm.Script(wrappedCode);
-        const result = script.runInContext(vmContext);
-        // If result is a Promise, await it; otherwise return directly
-        return result instanceof Promise ? await result : result;
+        console.log(`[Scraping Service] About to execute scraping function...`);
+        const result = await scrapingFunction(page, URL, logConsole);
+        console.log(`[Scraping Service] Scraping function completed, result type:`, typeof result);
+        return result;
       } catch (error: any) {
+        console.error(`[Scraping Service] Code execution error:`, error);
+        console.error(`[Scraping Service] Error stack:`, error.stack);
         throw new Error(`Code execution error: ${error.message}`);
       }
     })();
@@ -215,12 +215,15 @@ export async function executeScrapingCode(
     
     console.log(`[Scraping Service] Code execution result:`, {
       hasLogo: !!result?.logo_url,
-      imageCount: result?.image_urls?.length || 0
+      imageCount: result?.image_urls?.length || 0,
+      resultType: typeof result,
+      resultKeys: result ? Object.keys(result) : []
     });
     
     // Validate result format
     if (!result || typeof result !== 'object') {
-      throw new Error('Scraping code did not return a valid object');
+      console.error(`[Scraping Service] Invalid result format:`, result);
+      throw new Error(`Scraping code did not return a valid object. Got: ${typeof result}`);
     }
     
     // Ensure logo_url is a non-empty string or undefined
@@ -229,7 +232,7 @@ export async function executeScrapingCode(
       : undefined;
     
 
-      // Ensure image_urls is an array and validate URLs
+    // Ensure image_urls is an array and validate URLs
     const image_urls = Array.isArray(result.image_urls) 
       ? result.image_urls
           .filter((url: any) => typeof url === 'string' && url.trim().length > 0)
@@ -259,12 +262,19 @@ export async function executeScrapingCode(
       }
     }
     
+    console.log(`[Scraping Service] Final validated result:`, {
+      logo_url: validated_logo_url ? `${validated_logo_url.substring(0, 50)}...` : 'none',
+      image_count: image_urls.length,
+      image_urls_preview: image_urls.slice(0, 3).map((u: string) => u.substring(0, 50))
+    });
+    
     return {
       logo_url: validated_logo_url,
       image_urls: image_urls.length > 0 ? image_urls : undefined
     };
   } catch (error: any) {
     console.error(`[Scraping Service] Error executing scraping code:`, error.message);
+    console.error(`[Scraping Service] Error stack:`, error.stack);
     throw new Error(`Failed to execute scraping code: ${error.message}`);
   } finally {
     if (browser) {

@@ -305,9 +305,24 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         timestamp: initialAsset.created_at ? new Date(initialAsset.created_at).getTime() : initialAsset.timestamp || Date.now()
       };
       setCurrentAsset(frontendAsset);
+      // Reset all editing state when switching to a new asset to prevent state bleeding between assets
+      setOverlayEdit({});
+      setEditingTextElement(null);
+      setEyedropperActive(null);
+      setIsDragging(false);
+      setDraggingElement(null);
+      setIsResizing(false);
+      setResizeHandle(null);
     } else if (initialAsset === null) {
       // Reset when explicitly set to null
       setCurrentAsset(null);
+      setOverlayEdit({});
+      setEditingTextElement(null);
+      setEyedropperActive(null);
+      setIsDragging(false);
+      setDraggingElement(null);
+      setIsResizing(false);
+      setResizeHandle(null);
     }
   }, [initialAsset]);
 

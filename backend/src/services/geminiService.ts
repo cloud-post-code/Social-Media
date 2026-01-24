@@ -863,6 +863,7 @@ export const extractBrandImages = async (url: string): Promise<{ logoUrl?: strin
     if (codeResponse.reasoning) {
       console.log(`[Gemini Service] Reasoning: ${codeResponse.reasoning}`);
     }
+    console.log(`[Gemini Service] Generated scraping code (first 1000 chars):`, codeResponse.scraping_code.substring(0, 1000));
     
     // Step 3: Execute the generated scraping code
     console.log(`[Gemini Service] Step 3/4: Executing scraping code...`);
