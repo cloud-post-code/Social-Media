@@ -15,9 +15,9 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
   
-  // Progress tracking
-  const [currentPost, setCurrentPost] = useState(0);
-  const [totalPosts, setTotalPosts] = useState(1);
+  // Progress tracking - now tracks steps across all items
+  const [currentStep, setCurrentStep] = useState(0);
+  const [totalSteps, setTotalSteps] = useState(1);
   const [startTime, setStartTime] = useState<number | null>(null);
   
   const [productFocus, setProductFocus] = useState<string[]>([]);
@@ -94,20 +94,30 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
       if (option === 'product') {
         // Use productImages array - if empty, use empty array (will generate without reference)
         const imagesToProcess = productImages.length > 0 ? productImages : [null];
-        const total = imagesToProcess.length;
-        setTotalPosts(total);
-        setCurrentPost(0);
+        const totalImages = imagesToProcess.length;
+        
+        // Each image goes through 4 steps: image generation -> text generation -> overlay design -> final output
+        const stepsPerImage = 4;
+        const total = totalImages * stepsPerImage;
+        setTotalSteps(total);
+        setCurrentStep(0);
         
         const dimensions = getImageDimensions();
+        let stepCounter = 0;
         
         // Process each photo sequentially - each goes through full independent process
         for (let i = 0; i < imagesToProcess.length; i++) {
           const photoIndex = i + 1;
-          setStatusText(`Processing photo ${photoIndex} of ${total} independently...`);
-          setCurrentPost(i + 0.1); // Start of this photo
           
-          setStatusText(`Generating product image ${photoIndex} of ${total} (with its own text)...`);
-          setCurrentPost(i + 0.2); // 20% - generating image
+          // Step 1: Starting image generation
+          setStatusText(`Processing image ${photoIndex} of ${totalImages}...`);
+          setCurrentStep(stepCounter);
+          stepCounter++;
+          
+          // Step 2: Image generation
+          setStatusText(`Generating image ${photoIndex}...`);
+          setCurrentStep(stepCounter);
+          stepCounter++;
           
           const generatedAsset = await assetApi.generateProduct({
             brandId: activeBrand.id,
@@ -117,10 +127,14 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             height: dimensions.height
           });
           
-          // Each image gets its own text generated based on that specific image
-          // The backend processes: image generation -> text generation -> overlay design -> final output
-          setStatusText(`Finalizing asset ${photoIndex} with readable text overlay...`);
-          setCurrentPost(i + 0.9); // 90% - applying overlay
+          // Step 3: Text and overlay processing complete
+          setStatusText(`Finalizing asset ${photoIndex}...`);
+          setCurrentStep(stepCounter);
+          stepCounter++;
+          
+          // Step 4: Asset complete
+          setCurrentStep(stepCounter);
+          stepCounter++;
           
           // Immediately convert backend format to frontend format
           const frontendAsset: GeneratedAsset = {
@@ -137,27 +151,40 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
           
           // Immediately call onAssetCreated - don't wait for batch to complete
           onAssetCreated(frontendAsset);
-          
-          setCurrentPost(i + 1); // 100% - this photo complete
         }
         
         setStatusText('All photos processed!');
-        setCurrentPost(total);
+        setCurrentStep(total);
         
         // Reset loading state
         setLoading(false);
         setStatusText('');
-        setCurrentPost(0);
+        setCurrentStep(0);
         setStartTime(null);
         return;
       } else {
         // Handle batch generation for non-product posts
+        // Each non-product post goes through 3 steps: strategy -> image generation -> final output
+        const stepsPerPost = 3;
+        const total = postCount * stepsPerPost;
+        setTotalSteps(total);
+        setCurrentStep(0);
+        
+        let stepCounter = 0;
         const assetsToCreate: GeneratedAsset[] = [];
         
         for (let i = 0; i < postCount; i++) {
           const postNumber = i + 1;
-          setStatusText(`Generating post ${postNumber} of ${postCount}...`);
-          setCurrentPost(i + 0.1); // Start of this post
+          
+          // Step 1: Strategy generation
+          setStatusText(`Generating strategy for post ${postNumber} of ${postCount}...`);
+          setCurrentStep(stepCounter);
+          stepCounter++;
+          
+          // Step 2: Image generation
+          setStatusText(`Generating image for post ${postNumber}...`);
+          setCurrentStep(stepCounter);
+          stepCounter++;
           
           const asset = await assetApi.generateNonProduct({
           brandId: activeBrand.id,
@@ -166,6 +193,11 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             logoUrl: useExactLogo && logo ? logo.image_url : undefined,
             brandImageUrls: brandImages.length > 0 ? brandImages.map(img => img.image_url) : undefined
           });
+          
+          // Step 3: Final output
+          setStatusText(`Finalizing post ${postNumber}...`);
+          setCurrentStep(stepCounter);
+          stepCounter++;
           
           // Convert backend format to frontend format
           const frontendAsset: GeneratedAsset = {
@@ -181,10 +213,10 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
           };
           
           assetsToCreate.push(frontendAsset);
-          setCurrentPost(postNumber); // Update progress
         }
         
         setStatusText('Finalizing...');
+        setCurrentStep(total);
         
         // Call onAssetCreated for each generated asset
         for (const asset of assetsToCreate) {
@@ -193,7 +225,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         
         setLoading(false);
         setStatusText('');
-        setCurrentPost(0);
+        setCurrentStep(0);
         setStartTime(null);
         return;
       }
@@ -389,8 +421,8 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                 {loading && startTime !== null && (
                   <div key="product-progress" className="p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
                     <GenerationProgressBar
-                      current={currentPost}
-                      total={totalPosts}
+                      current={currentStep}
+                      total={totalSteps}
                       statusText={statusText || 'Generating...'}
                       startTime={startTime}
                     />
@@ -487,8 +519,8 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
               {loading && startTime !== null && (
                 <div key="non-product-progress" className="p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
                   <GenerationProgressBar
-                    current={currentPost}
-                    total={totalPosts}
+                    current={currentStep}
+                    total={totalSteps}
                     statusText={statusText || 'Generating...'}
                     startTime={startTime}
                   />
