@@ -1208,17 +1208,26 @@ export const generateProductTitleSubtitle = async (
 
   const prompt = `
 You are a Lead Copywriter for a luxury brand.
-Goal: Write a title and subtitle that fits the *visual mood* established in the Brand DNA.
+Goal: Write a title and subtitle that fits the *visual mood* of the product image and the Brand DNA.
 
 ### INPUT DATA
 Brand Voice: ${JSON.stringify(brandVoiceContext)}
 Product Focus: ${productFocus}
 
+### IMAGE ANALYSIS
+You have been provided with the product image that the text will be overlaid on. Analyze the image to understand:
+- The visual mood and atmosphere (e.g., soft/cozy, sleek/modern, rugged/outdoor, elegant/luxury)
+- The product's characteristics visible in the image
+- The overall composition and feeling the image conveys
+- Any visual elements that should influence the tone of your copy
+
+Use this visual analysis to inform your title and subtitle choices. The text should complement and enhance the visual story told by the image.
+
 ### INSTRUCTIONS
-- **Title (max 5 words):** Punchy, attention-grabbing, emotion-driven. This is the hero text.
-- **Subtitle (max 15 words):** Supporting detail that expands on the title. Can include benefit or feature.
+- **Title (max 5 words):** Punchy, attention-grabbing, emotion-driven. This is the hero text. Match the visual mood of the image.
+- **Subtitle (max 15 words):** Supporting detail that expands on the title. Can include benefit or feature. Should complement both the image and the title.
 - **Less is More:** High-end brands use fewer words.
-- **Visual Connection:** If the product is soft/cozy, the words should feel soft. If the product is sleek/hard, the words should be punchy.
+- **Visual Connection:** Analyze the image - if the product appears soft/cozy, the words should feel soft. If it appears sleek/hard, the words should be punchy. Match the energy and mood you see in the image.
 - **Voice Check:** Ensure the tone matches: ${brandDNA.brand_voice.tone_adjectives.join(', ')}.
 - **Writing Style:** ${brandDNA.brand_voice.writing_style}
 - **Keywords to use:** ${brandDNA.brand_voice.keywords_to_use.join(', ')}
@@ -1234,7 +1243,15 @@ Return ONLY:
 CRITICAL: Return plain text only. Do NOT use markdown formatting (no **, no *, no _, no backticks). Just plain text strings.
   `;
 
-  const parts = [{ text: prompt }];
+  // Extract base64 data (handle data URI format)
+  const base64Data = productImageBase64.includes(',') 
+    ? productImageBase64.split(',')[1] 
+    : productImageBase64;
+
+  const parts = [
+    { text: prompt },
+    { inlineData: { mimeType: "image/png", data: base64Data } }
+  ];
 
   const response = await ai.models.generateContent({
     model,
