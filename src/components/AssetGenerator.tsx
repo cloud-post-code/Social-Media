@@ -92,6 +92,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [editingTextBlock, setEditingTextBlock] = useState<'title' | 'subtitle' | null>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   
+  // Store calculated line breaks for preview display
+  const [calculatedTitleLines, setCalculatedTitleLines] = useState<string[]>([]);
+  const [calculatedSubtitleLines, setCalculatedSubtitleLines] = useState<string[]>([]);
+  
   // Compute display asset and image URL from current asset
   const displayAsset = currentAsset;
   const imageUrl = currentAsset?.imageUrl || currentAsset?.image_url || '';
@@ -131,6 +135,119 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       img.src = imageUrl;
     }
   }, [imageUrl]);
+
+  // Recalculate line breaks in real-time when text or font properties change
+  useEffect(() => {
+    if (!editingOverlay || !imageDimensions) return;
+
+    const recalculateLines = async () => {
+      // Calculate title lines
+      const titleText = overlayEdit.title !== undefined 
+        ? overlayEdit.title 
+        : (displayAsset?.overlayConfig?.title || '');
+      
+      if (titleText) {
+        const titleMaxWidthPercent = overlayEdit.title_max_width_percent !== undefined
+          ? overlayEdit.title_max_width_percent
+          : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+        const titleMaxWidthPx = getMaxWidthPixelsNumeric(titleMaxWidthPercent);
+        
+        const titleFontSize = getFontSizeNumeric(
+          overlayEdit.title_font_size !== undefined 
+            ? overlayEdit.title_font_size 
+            : displayAsset?.overlayConfig?.title_font_size,
+          true
+        );
+        
+        const titleFontFamily = overlayEdit.title_font_family || 
+          displayAsset?.overlayConfig?.title_font_family || 
+          'sans-serif';
+        const titleFontWeight = overlayEdit.title_font_weight === 'bold' 
+          ? 'bold' 
+          : overlayEdit.title_font_weight === 'light' 
+            ? '300' 
+            : 'normal';
+        const titleLetterSpacing = overlayEdit.title_letter_spacing === 'wide' 
+          ? '0.15em' 
+          : 'normal';
+        
+        const titleLines = await calculateTextLinesWithCanvas(
+          titleText,
+          titleMaxWidthPx,
+          titleFontSize,
+          titleFontFamily,
+          titleFontWeight,
+          titleLetterSpacing
+        );
+        
+        setCalculatedTitleLines(titleLines);
+      } else {
+        setCalculatedTitleLines([]);
+      }
+
+      // Calculate subtitle lines
+      const subtitleText = overlayEdit.subtitle !== undefined 
+        ? overlayEdit.subtitle 
+        : (displayAsset?.overlayConfig?.subtitle || '');
+      
+      if (subtitleText) {
+        const subtitleMaxWidthPercent = overlayEdit.subtitle_max_width_percent !== undefined
+          ? overlayEdit.subtitle_max_width_percent
+          : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80);
+        const subtitleMaxWidthPx = getMaxWidthPixelsNumeric(subtitleMaxWidthPercent);
+        
+        const subtitleFontSize = getFontSizeNumeric(
+          overlayEdit.subtitle_font_size !== undefined 
+            ? overlayEdit.subtitle_font_size 
+            : displayAsset?.overlayConfig?.subtitle_font_size,
+          false
+        );
+        
+        const subtitleFontFamily = overlayEdit.subtitle_font_family || 
+          displayAsset?.overlayConfig?.subtitle_font_family || 
+          'sans-serif';
+        const subtitleFontWeight = overlayEdit.subtitle_font_weight === 'bold' 
+          ? 'bold' 
+          : overlayEdit.subtitle_font_weight === 'light' 
+            ? '300' 
+            : 'normal';
+        const subtitleLetterSpacing = overlayEdit.subtitle_letter_spacing === 'wide' 
+          ? '0.15em' 
+          : 'normal';
+        
+        const subtitleLines = await calculateTextLinesWithCanvas(
+          subtitleText,
+          subtitleMaxWidthPx,
+          subtitleFontSize,
+          subtitleFontFamily,
+          subtitleFontWeight,
+          subtitleLetterSpacing
+        );
+        
+        setCalculatedSubtitleLines(subtitleLines);
+      } else {
+        setCalculatedSubtitleLines([]);
+      }
+    };
+
+    recalculateLines();
+  }, [
+    editingOverlay,
+    imageDimensions,
+    overlayEdit.title,
+    overlayEdit.subtitle,
+    overlayEdit.title_font_family,
+    overlayEdit.title_font_weight,
+    overlayEdit.title_font_size,
+    overlayEdit.title_letter_spacing,
+    overlayEdit.title_max_width_percent,
+    overlayEdit.subtitle_font_family,
+    overlayEdit.subtitle_font_weight,
+    overlayEdit.subtitle_font_size,
+    overlayEdit.subtitle_letter_spacing,
+    overlayEdit.subtitle_max_width_percent,
+    displayAsset?.overlayConfig
+  ]);
   
   // Calculate scale factor for font sizes to match preview with actual rendering
   const getFontScale = () => {
@@ -1322,7 +1439,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             padding: '0.5rem',
                             color: overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF',
                             opacity: overlayEdit.title_opacity !== undefined ? overlayEdit.title_opacity : (displayAsset.overlayConfig.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1),
-                            fontFamily: overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif',
+                            fontFamily: getFontStackForMeasurement((overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif') as 'sans-serif' | 'serif' | 'cursive' | 'handwritten'),
                             fontWeight: overlayEdit.title_font_weight === 'bold' ? 'bold' : overlayEdit.title_font_weight === 'light' ? '300' : 'normal',
                             fontSize: getFontSize(titleFontSize, true),
                             letterSpacing: overlayEdit.title_letter_spacing === 'wide' ? '0.15em' : 'normal',
@@ -1387,7 +1504,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         >
                           {renderResizeHandles('title')}
                           <div style={{ whiteSpace: 'pre-wrap', pointerEvents: editingTextBlock === 'title' ? 'auto' : 'none', wordBreak: 'normal', overflowWrap: 'break-word', width: '100%' }}>
-                            {overlayEdit.title || displayAsset.overlayConfig.title || ''}
+                            {calculatedTitleLines.length > 0 
+                              ? calculatedTitleLines.join('\n')
+                              : (overlayEdit.title || displayAsset.overlayConfig.title || '')}
                           </div>
                         </div>
                       );
@@ -1418,7 +1537,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             padding: '0.5rem',
                             color: overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF',
                             opacity: overlayEdit.subtitle_opacity !== undefined ? overlayEdit.subtitle_opacity : (displayAsset.overlayConfig.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9),
-                            fontFamily: overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif',
+                            fontFamily: getFontStackForMeasurement((overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif') as 'sans-serif' | 'serif' | 'cursive' | 'handwritten'),
                             fontWeight: overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal',
                             fontSize: getFontSize(subtitleFontSize, false),
                             letterSpacing: overlayEdit.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal',
@@ -1483,7 +1602,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         >
                           {renderResizeHandles('subtitle')}
                           <div style={{ whiteSpace: 'pre-wrap', pointerEvents: editingTextBlock === 'subtitle' ? 'auto' : 'none', wordBreak: 'normal', overflowWrap: 'break-word', width: '100%' }}>
-                            {overlayEdit.subtitle || displayAsset.overlayConfig.subtitle}
+                            {calculatedSubtitleLines.length > 0 
+                              ? calculatedSubtitleLines.join('\n')
+                              : (overlayEdit.subtitle || displayAsset.overlayConfig.subtitle || '')}
                           </div>
                         </div>
                       );
@@ -1594,6 +1715,13 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           subtitle_overlay_background_shape: displayAsset.overlayConfig?.subtitle_overlay_background_shape,
                           subtitle_overlay_background_padding: displayAsset.overlayConfig?.subtitle_overlay_background_padding
                         });
+                        // Initialize calculated lines from saved config if available
+                        if (displayAsset.overlayConfig?.title_lines) {
+                          setCalculatedTitleLines(displayAsset.overlayConfig.title_lines);
+                        }
+                        if (displayAsset.overlayConfig?.subtitle_lines) {
+                          setCalculatedSubtitleLines(displayAsset.overlayConfig.subtitle_lines);
+                        }
                       }
                     }}
                     className="text-xs font-black text-indigo-600 hover:text-indigo-700"
@@ -1748,6 +1876,35 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             placeholder="Auto"
                           />
                           <span className="text-sm font-bold text-slate-500">px</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Family</label>
+                          <select
+                            value={overlayEdit.title_font_family || displayAsset.overlayConfig?.title_font_family || 'sans-serif'}
+                            onChange={e => setOverlayEdit({...overlayEdit, title_font_family: e.target.value as any})}
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                          >
+                            <option value="sans-serif">Sans-serif</option>
+                            <option value="serif">Serif</option>
+                            <option value="cursive">Cursive</option>
+                            <option value="handwritten">Handwritten</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Weight</label>
+                          <select
+                            value={overlayEdit.title_font_weight || displayAsset.overlayConfig?.title_font_weight || 'bold'}
+                            onChange={e => setOverlayEdit({...overlayEdit, title_font_weight: e.target.value as any})}
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                          >
+                            <option value="light">Light</option>
+                            <option value="regular">Regular</option>
+                            <option value="bold">Bold</option>
+                          </select>
                         </div>
                       </div>
 
@@ -1917,6 +2074,35 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         </div>
                       </div>
 
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Family</label>
+                          <select
+                            value={overlayEdit.subtitle_font_family || displayAsset.overlayConfig?.subtitle_font_family || 'sans-serif'}
+                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_font_family: e.target.value as any})}
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                          >
+                            <option value="sans-serif">Sans-serif</option>
+                            <option value="serif">Serif</option>
+                            <option value="cursive">Cursive</option>
+                            <option value="handwritten">Handwritten</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Weight</label>
+                          <select
+                            value={overlayEdit.subtitle_font_weight || displayAsset.overlayConfig?.subtitle_font_weight || 'regular'}
+                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_font_weight: e.target.value as any})}
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
+                          >
+                            <option value="light">Light</option>
+                            <option value="regular">Regular</option>
+                            <option value="bold">Bold</option>
+                          </select>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Text Alignment</label>
                         <div className="flex gap-2">
@@ -1952,42 +2138,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           </button>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Shared Settings */}
-                    <div className="space-y-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                      <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider">Shared Settings</h3>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font</label>
-                          <select
-                            value={overlayEdit.font_family || 'sans-serif'}
-                            onChange={e => setOverlayEdit({...overlayEdit, font_family: e.target.value as any})}
-                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                          >
-                            <option value="sans-serif">Sans-serif</option>
-                            <option value="serif">Serif</option>
-                            <option value="cursive">Cursive</option>
-                            <option value="handwritten">Handwritten</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Weight</label>
-                          <select
-                            value={overlayEdit.font_weight || 'bold'}
-                            onChange={e => setOverlayEdit({...overlayEdit, font_weight: e.target.value as any})}
-                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                          >
-                            <option value="light">Light</option>
-                            <option value="regular">Regular</option>
-                            <option value="bold">Bold</option>
-                          </select>
-                        </div>
-                      </div>
-
-
                     </div>
 
                     <button
