@@ -201,9 +201,9 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
       return res.status(404).json({ error: { message: 'Asset not found' } });
     }
 
-    if (asset.type !== 'product') {
+    if (asset.type !== 'product' && asset.type !== 'non-product') {
       return res.status(400).json({ 
-        error: { message: 'This endpoint is only for product assets' } 
+        error: { message: 'This endpoint is only for product and non-product assets' } 
       });
     }
 
@@ -300,15 +300,77 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
       throw new Error('Strategy generation failed to provide a prompt');
     }
 
-    const imageUrl = await geminiService.generateImage(
+    const baseImageUrl = await geminiService.generateImage(
       strategy.step_1_visual_concept.imagen_prompt_final
+    );
+
+    // Convert strategy message into overlay_config (similar to product posts)
+    const messageStrategy = strategy.step_2_message_strategy;
+    const designInstructions = messageStrategy?.design_instructions || {};
+    const suggestedPosition = designInstructions.suggested_position || 'Center-Middle';
+    
+    // Parse position to get x/y percentages (matching product post logic)
+    let titleXPercent = 50;
+    let titleYPercent = 30;
+    let textAnchor: 'start' | 'middle' | 'end' = 'middle';
+    
+    if (suggestedPosition.toLowerCase().includes('left')) {
+      titleXPercent = 20;
+      textAnchor = 'start';
+    } else if (suggestedPosition.toLowerCase().includes('right')) {
+      titleXPercent = 80;
+      textAnchor = 'end';
+    }
+    
+    if (suggestedPosition.toLowerCase().includes('top')) {
+      titleYPercent = 30;
+    } else if (suggestedPosition.toLowerCase().includes('bottom')) {
+      titleYPercent = 80;
+    }
+
+    const subtitleYPercent = suggestedPosition.toLowerCase().includes('top') ? 70 : 80;
+
+    // Create overlay config from strategy
+    const overlayConfig: OverlayConfig = {
+      title: stripMarkdown(messageStrategy?.headline_text || ''),
+      subtitle: stripMarkdown(messageStrategy?.body_caption_draft || ''),
+      // Title properties
+      title_font_family: 'sans-serif',
+      title_font_weight: 'bold',
+      title_font_transform: 'none',
+      title_letter_spacing: 'normal',
+      title_color_hex: designInstructions.suggested_text_color || '#FFFFFF',
+      title_x_percent: titleXPercent,
+      title_y_percent: titleYPercent,
+      title_text_anchor: textAnchor,
+      title_max_width_percent: 80,
+      title_opacity: 1.0,
+      // Subtitle properties
+      subtitle_font_family: 'sans-serif',
+      subtitle_font_weight: 'regular',
+      subtitle_font_transform: 'none',
+      subtitle_letter_spacing: 'normal',
+      subtitle_color_hex: designInstructions.suggested_text_color || '#FFFFFF',
+      subtitle_x_percent: titleXPercent,
+      subtitle_y_percent: subtitleYPercent,
+      subtitle_text_anchor: textAnchor,
+      subtitle_max_width_percent: 80,
+      subtitle_opacity: 0.9
+    };
+
+    // Apply overlay to image (same as product posts)
+    const finalImageUrl = await imageOverlayService.applyTextOverlay(
+      baseImageUrl,
+      overlayConfig
     );
 
     const asset = await assetService.createAsset({
       id: Date.now().toString(),
       brand_id: brandId,
       type: 'non-product',
-      image_url: imageUrl,
+      image_url: finalImageUrl,
+      base_image_url: baseImageUrl,
+      overlay_config: overlayConfig,
       strategy,
       user_prompt: userPurpose
     });

@@ -311,6 +311,67 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     }
   }, [initialAsset]);
 
+  // Initialize overlay_config from strategy for non-product posts if missing (backward compatibility)
+  useEffect(() => {
+    if (currentAsset && currentAsset.type === 'non-product' && !currentAsset.overlayConfig && currentAsset.strategy?.step_2_message_strategy) {
+      const messageStrategy = currentAsset.strategy.step_2_message_strategy;
+      const designInstructions = messageStrategy?.design_instructions || {};
+      const suggestedPosition = designInstructions.suggested_position || 'Center-Middle';
+      
+      // Parse position (matching backend logic)
+      let titleXPercent = 50;
+      let titleYPercent = 30;
+      let textAnchor: 'start' | 'middle' | 'end' = 'middle';
+      
+      if (suggestedPosition.toLowerCase().includes('left')) {
+        titleXPercent = 20;
+        textAnchor = 'start';
+      } else if (suggestedPosition.toLowerCase().includes('right')) {
+        titleXPercent = 80;
+        textAnchor = 'end';
+      }
+      
+      if (suggestedPosition.toLowerCase().includes('top')) {
+        titleYPercent = 30;
+      } else if (suggestedPosition.toLowerCase().includes('bottom')) {
+        titleYPercent = 80;
+      }
+
+      const subtitleYPercent = suggestedPosition.toLowerCase().includes('top') ? 70 : 80;
+
+      const overlayConfig = {
+        title: stripMarkdown(messageStrategy?.headline_text || ''),
+        subtitle: stripMarkdown(messageStrategy?.body_caption_draft || ''),
+        title_font_family: 'sans-serif',
+        title_font_weight: 'bold' as const,
+        title_font_transform: 'none' as const,
+        title_letter_spacing: 'normal' as const,
+        title_color_hex: designInstructions.suggested_text_color || '#FFFFFF',
+        title_x_percent: titleXPercent,
+        title_y_percent: titleYPercent,
+        title_text_anchor: textAnchor,
+        title_max_width_percent: 80,
+        title_opacity: 1.0,
+        subtitle_font_family: 'sans-serif',
+        subtitle_font_weight: 'regular' as const,
+        subtitle_font_transform: 'none' as const,
+        subtitle_letter_spacing: 'normal' as const,
+        subtitle_color_hex: designInstructions.suggested_text_color || '#FFFFFF',
+        subtitle_x_percent: titleXPercent,
+        subtitle_y_percent: subtitleYPercent,
+        subtitle_text_anchor: textAnchor,
+        subtitle_max_width_percent: 80,
+        subtitle_opacity: 0.9
+      };
+
+      setCurrentAsset({
+        ...currentAsset,
+        overlayConfig,
+        overlay_config: overlayConfig
+      });
+    }
+  }, [currentAsset]);
+
   // Get actual image dimensions for accurate font scaling and aspect ratio
   useEffect(() => {
     if (imageUrl) {
@@ -346,6 +407,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   // Recalculate line breaks in real-time when text or font properties change
   useEffect(() => {
     if (!imageDimensions || !displayAsset?.overlayConfig) return;
+    if (displayAsset.type !== 'product' && displayAsset.type !== 'non-product') return;
 
     const recalculateLines = async () => {
       // Calculate title lines
@@ -1547,7 +1609,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 )}
                 
                 {/* Two Separate Text Overlays - Title and Subtitle */}
-                {displayAsset.type === 'product' && displayAsset.overlayConfig && (
+                {(displayAsset.type === 'product' || displayAsset.type === 'non-product') && displayAsset.overlayConfig && (
                   <>
                     {/* Title Text Block */}
                     {(overlayEdit.title !== undefined ? overlayEdit.title : displayAsset.overlayConfig.title) && (() => {
@@ -1823,35 +1885,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   </>
                 )}
               </div>
-              
-              {/* For non-product assets, show CSS overlay if needed */}
-              {displayAsset.type !== 'product' && (
-                <div className={`absolute inset-0 flex flex-col p-16 pointer-events-none
-                  ${(displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_position || 'center-middle')
-                     .toLowerCase().includes('top') ? 'justify-start' : 
-                     (displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_position || 'center-middle')
-                     .toLowerCase().includes('bottom') ? 'justify-end' : 'justify-center'}
-                  ${(displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_position || 'center-middle')
-                     .toLowerCase().includes('left') ? 'items-start text-left' : 
-                     (displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_position || 'center-middle')
-                     .toLowerCase().includes('right') ? 'items-end text-right' : 'items-center text-center'}
-                `}>
-                  <h1 
-                    className="text-4xl md:text-5xl lg:text-6xl font-black leading-[1.05] drop-shadow-2xl"
-                    style={{
-                      color: displayAsset.strategy?.step_2_message_strategy?.design_instructions?.suggested_text_color || 'white',
-                      maxWidth: '90%'
-                    }}
-                  >
-                    {displayAsset.strategy?.step_2_message_strategy?.headline_text}
-                  </h1>
-                  {displayAsset.strategy?.step_2_message_strategy?.body_caption_draft && (
-                     <p className="mt-6 text-xl font-bold opacity-90 drop-shadow-xl text-white max-w-md">
-                        {displayAsset.strategy?.step_2_message_strategy?.body_caption_draft}
-                     </p>
-                  )}
-                </div>
-              )}
             </div>
 
             {displayAsset.type === 'campaign' && campaignImages.length > 0 && (
@@ -1868,8 +1901,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               </div>
             )}
 
-            {/* Overlay Info for Product Assets */}
-            {displayAsset.type === 'product' && displayAsset.overlayConfig && (
+            {/* Overlay Info for Product and Non-Product Assets */}
+            {(displayAsset.type === 'product' || displayAsset.type === 'non-product') && displayAsset.overlayConfig && (
               <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Text Overlay</h3>
