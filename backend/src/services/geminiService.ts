@@ -1039,6 +1039,9 @@ ${referenceImageBase64 ? `
 ### CRITICAL: REFERENCE IMAGE ANALYSIS (MUST COMPLETE FIRST)
 A reference image has been provided. You MUST analyze it FIRST before creating the prompt. This is the MOST IMPORTANT step to prevent hallucination.
 
+**CUSTOMER ACCURACY REQUIREMENT:**
+This image will be used for marketing. Customers will purchase the ACTUAL product shown in the reference image. If the generated image shows a different product (different colors, textures, details, or finish), customers will be disappointed, request returns, and lose trust in the brand. This is both a legal requirement (truth in advertising) and an ethical requirement. The product in the generated image MUST be photographically accurate to the reference.
+
 **STEP 1: VISUAL INVENTORY - Extract EXACT attributes from the reference image:**
 1. **Product Shape & Form:** Describe the exact silhouette, dimensions, proportions, and structural elements visible
 2. **Material Texture:** Identify the SPECIFIC texture visible (e.g., "distressed painted metal", "smooth matte ceramic", "woven fabric"). Be precise.
@@ -1117,7 +1120,7 @@ ${referenceImageBase64 ? `
   "includes_person": boolean,
   "composition_notes": "Notes about composition and placement",
   "hallucination_check": "Explicit statement: I am preserving [list specific attributes from reference_verification] from the reference image and NOT inventing [list things you cannot see]. The generated product will match the reference in: [colors, textures, details, finish].",
-  "imagen_prompt_final": "A prompt following this strict structure: [REFERENCE ANCHOR: Match the EXACT material texture, colors, and structural details from the reference image. Preserve: [list specific details from step_1_analysis.reference_verification]. DO NOT invent features not visible in reference.] + [SUBJECT DEFINITION: detailed description of ${productFocus} EXACTLY matching the reference image. Include: exact colors per part, exact texture, exact structural details, exact finish condition.] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + [COMPOSITION: Create negative space areas (top/bottom/sides) with simpler backgrounds suitable for text overlays - use depth of field or lighting to separate product from background zones] + [LIGHTING: Specific lighting to highlight material quality and create contrast in background areas] + [TECH SPECS: 8k, macro details, commercial photography, depth of field] + [NEGATIVE PROMPT: DO NOT add features not in reference image, DO NOT change material texture from reference, DO NOT invent colors/patterns not visible, DO NOT add decorative elements that do not exist, DO NOT modify structure, DO NOT change finish condition, NO text, NO watermark, NO branding, NO logos]. Clean image only. Ensure background areas where text will be placed have simpler, less busy compositions."
+  "imagen_prompt_final": "A prompt following this strict structure: [CRITICAL: CUSTOMER ACCURACY REQUIREMENT - The product in this image MUST match the reference product EXACTLY. Customers will receive the actual product shown in the reference, so any differences will cause disappointment and returns. This is a legal and ethical requirement for accurate product representation.] + [REFERENCE ANCHOR: Match the EXACT material texture, colors, and structural details from the reference image. Preserve: [list specific details from step_1_analysis.reference_verification]. DO NOT invent features not visible in reference. DO NOT change any product attributes.] + [SUBJECT DEFINITION: detailed description of ${productFocus} EXACTLY matching the reference image. Include: exact colors per part (match hex values if possible), exact texture (match surface finish precisely), exact structural details (same cutouts, patterns, decorative elements in same positions), exact finish condition (same level of wear/distress/aging). The product shape, proportions, and all visible features must be IDENTICAL to the reference.] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero. Background and setting can vary, but the PRODUCT itself must be unchanged.] + [COMPOSITION: Create negative space areas (top/bottom/sides) with simpler backgrounds suitable for text overlays - use depth of field or lighting to separate product from background zones] + [LIGHTING: Specific lighting to highlight material quality and create contrast in background areas. Lighting should reveal the product accurately, not alter its appearance.] + [TECH SPECS: 8k, macro details, commercial photography, depth of field] + [NEGATIVE PROMPT: DO NOT add features not in reference image, DO NOT change material texture from reference, DO NOT invent colors/patterns not visible, DO NOT add decorative elements that do not exist, DO NOT modify structure, DO NOT change finish condition, DO NOT alter product proportions, DO NOT change product shape, DO NOT add or remove details, NO text, NO watermark, NO branding, NO logos]. Clean image only. Ensure background areas where text will be placed have simpler, less busy compositions. REMEMBER: The product must be photographically accurate - customers will compare what they receive to this image."
 }
 ` : `
 {
@@ -1143,15 +1146,23 @@ ${referenceImageBase64 ? `
       : referenceImageBase64;
     
     parts.push({ 
-      text: `CRITICAL: You have been provided a REFERENCE IMAGE of the actual product. 
-      This is the MOST IMPORTANT input. You MUST:
-      1. Analyze this image FIRST before creating your prompt
-      2. Extract ALL visible details: colors, textures, structural elements, finish condition
-      3. Preserve these EXACT details in your final prompt
-      4. DO NOT invent details that are not visible in the reference image
-      5. Match colors, textures, and finish EXACTLY as shown
+      text: `CRITICAL: You have been provided a REFERENCE IMAGE of the ACTUAL PRODUCT that customers will receive.
       
-      The reference image shows the REAL product. Your generated image must match it closely.`
+      CUSTOMER ACCURACY REQUIREMENT:
+      - Customers will purchase the exact product shown in the reference image
+      - If your generated image shows a different product, customers will be disappointed and request returns
+      - This is a legal requirement (truth in advertising) and ethical requirement
+      - The product in your generated image MUST be photographically accurate to the reference
+      
+      You MUST:
+      1. Analyze this reference image FIRST before creating your prompt
+      2. Extract ALL visible details: colors (exact shades), textures (exact surface), structural elements (exact positions), finish condition (exact state)
+      3. Preserve these EXACT details in your final prompt - NO changes allowed
+      4. DO NOT invent details that are not visible in the reference image
+      5. DO NOT change colors, textures, details, or finish - they must match EXACTLY
+      6. DO NOT alter proportions, shape, or structural elements
+      
+      The reference image shows the REAL product customers will receive. Your generated image must match it EXACTLY.`
     });
     parts.push({ inlineData: { mimeType: "image/png", data: base64Data } });
   }
@@ -1651,5 +1662,132 @@ export const editImage = async (originalImageBase64: string, feedback: string): 
     }
   }
   throw new Error("Failed to edit image");
+};
+
+/**
+ * Verify that generated product image matches the reference image
+ * This ensures customers receive exactly what they see in marketing images
+ */
+export const verifyProductImageMatch = async (
+  generatedImageBase64: string,
+  referenceImageBase64: string,
+  productFocus: string,
+  expectedAttributes?: {
+    texture?: string;
+    colors?: string[];
+    details?: string[];
+    finish?: string;
+  }
+): Promise<{
+  matches: boolean;
+  matchScore: number; // 0-100
+  discrepancies: string[];
+  recommendations: string[];
+  confidence: 'high' | 'medium' | 'low';
+}> => {
+  const ai = getAIClient();
+  const model = 'gemini-3-pro-preview';
+
+  const genBase64Data = generatedImageBase64.includes(',') 
+    ? generatedImageBase64.split(',')[1] 
+    : generatedImageBase64;
+  
+  const refBase64Data = referenceImageBase64.includes(',') 
+    ? referenceImageBase64.split(',')[1] 
+    : referenceImageBase64;
+
+  const prompt = `
+You are a Quality Assurance Specialist for e-commerce product photography.
+Your job is to ensure that customers receive EXACTLY what they see in marketing images.
+
+### CRITICAL TASK: PRODUCT ACCURACY VERIFICATION
+Compare the REFERENCE IMAGE (the actual product) with the GENERATED IMAGE (marketing image).
+
+**Product Description:** ${productFocus}
+${expectedAttributes ? `
+**Expected Attributes from Reference:**
+- Texture: ${expectedAttributes.texture || 'Not specified'}
+- Colors: ${expectedAttributes.colors?.join(', ') || 'Not specified'}
+- Key Details: ${expectedAttributes.details?.join(', ') || 'Not specified'}
+- Finish: ${expectedAttributes.finish || 'Not specified'}
+` : ''}
+
+### VERIFICATION CHECKLIST
+Analyze these critical aspects:
+
+1. **Product Shape & Form:**
+   - Does the generated product have the same silhouette as the reference?
+   - Are proportions accurate (width, height, depth)?
+   - Are structural elements (handles, openings, attachments) in the same positions?
+
+2. **Material & Texture:**
+   - Does the material texture match (smooth, rough, woven, etc.)?
+   - Is the surface finish the same (glossy, matte, distressed, etc.)?
+   - Are any visible patterns or textures consistent?
+
+3. **Color Accuracy:**
+   - Do colors match part-by-part?
+   - Are color variations/distress patterns preserved?
+   - Is the overall color tone consistent?
+
+4. **Structural Details:**
+   - Are all visible details present (cutouts, patterns, decorative elements)?
+   - Are details in the correct positions?
+   - Is the level of detail appropriate (not missing, not added)?
+
+5. **Finish Condition:**
+   - Does the finish match (pristine, distressed, weathered, etc.)?
+   - Are wear patterns consistent?
+   - Is the overall condition accurate?
+
+### OUTPUT FORMAT (JSON)
+Return ONLY:
+{
+  "matches": boolean,
+  "matchScore": number (0-100, where 100 is perfect match),
+  "discrepancies": [
+    "List specific differences found (e.g., 'Generated image shows smooth finish but reference shows distressed finish', 'Color on head is brighter yellow in generated vs antique yellow in reference')"
+  ],
+  "recommendations": [
+    "Specific recommendations to improve accuracy (e.g., 'Make the finish more distressed to match reference', 'Adjust head color to match antique yellow from reference')"
+  ],
+  "confidence": "high|medium|low - how confident you are in this assessment"
+}
+
+### CRITICAL RULES:
+- Be STRICT: Even small differences matter if they would surprise a customer
+- Focus on PRODUCT ACCURACY: Background/lifestyle differences are OK, but product must match exactly
+- If matchScore is below 85, the image needs regeneration
+- List ALL discrepancies, even minor ones
+- Provide actionable recommendations for improvement
+`;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: {
+      parts: [
+        { text: prompt },
+        { 
+          text: 'REFERENCE IMAGE (Actual Product):',
+          inlineData: { mimeType: "image/png", data: refBase64Data }
+        },
+        { 
+          text: 'GENERATED IMAGE (Marketing Image):',
+          inlineData: { mimeType: "image/png", data: genBase64Data }
+        }
+      ]
+    },
+    config: { responseMimeType: "application/json" }
+  });
+
+  const result = safeJsonParse(response.text || '{}');
+  
+  return {
+    matches: result.matches === true,
+    matchScore: result.matchScore || 0,
+    discrepancies: result.discrepancies || [],
+    recommendations: result.recommendations || [],
+    confidence: result.confidence || 'medium'
+  };
 };
 

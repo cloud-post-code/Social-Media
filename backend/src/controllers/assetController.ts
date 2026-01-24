@@ -67,11 +67,63 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
       throw new Error('Image prompt generation failed');
     }
 
-    const baseImageUrl = await geminiService.generateImage(
+    let baseImageUrl = await geminiService.generateImage(
       imagePromptResult.imagen_prompt_final,
       width || 1080,
       height || 1080
     );
+
+    // Step 1.5: Verify product accuracy if reference image provided
+    let verificationResult = null;
+    if (referenceImageBase64) {
+      const expectedAttributes = imagePromptResult.step_1_analysis?.reference_verification;
+      verificationResult = await geminiService.verifyProductImageMatch(
+        baseImageUrl,
+        referenceImageBase64,
+        productFocus,
+        expectedAttributes ? {
+          texture: expectedAttributes.extracted_texture,
+          colors: expectedAttributes.extracted_colors,
+          details: expectedAttributes.extracted_details,
+          finish: expectedAttributes.extracted_finish
+        } : undefined
+      );
+
+      // If match score is below 85, regenerate with enhanced prompt
+      if (verificationResult.matchScore < 85 && verificationResult.recommendations.length > 0) {
+        console.log(`[Product Verification] Match score ${verificationResult.matchScore} below threshold. Regenerating with improvements...`);
+        console.log(`[Product Verification] Discrepancies: ${verificationResult.discrepancies.join('; ')}`);
+        console.log(`[Product Verification] Recommendations: ${verificationResult.recommendations.join('; ')}`);
+
+        // Enhance the prompt with specific recommendations
+        const enhancedPrompt = `${imagePromptResult.imagen_prompt_final}\n\nCRITICAL CORRECTIONS NEEDED:\n${verificationResult.recommendations.map((rec, i) => `${i + 1}. ${rec}`).join('\n')}\n\nYou MUST address ALL these corrections. The product must match the reference exactly.`;
+
+        baseImageUrl = await geminiService.generateImage(
+          enhancedPrompt,
+          width || 1080,
+          height || 1080
+        );
+
+        // Verify again
+        verificationResult = await geminiService.verifyProductImageMatch(
+          baseImageUrl,
+          referenceImageBase64,
+          productFocus,
+          expectedAttributes ? {
+            texture: expectedAttributes.extracted_texture,
+            colors: expectedAttributes.extracted_colors,
+            details: expectedAttributes.extracted_details,
+            finish: expectedAttributes.extracted_finish
+          } : undefined
+        );
+
+        console.log(`[Product Verification] After regeneration - Match score: ${verificationResult.matchScore}`);
+      }
+
+      if (verificationResult.matchScore < 70) {
+        console.warn(`[Product Verification] WARNING: Match score ${verificationResult.matchScore} is still low. Product may not match reference accurately.`);
+      }
+    }
 
     // Step 2: Generate title and subtitle
     const titleSubtitle = await geminiService.generateProductTitleSubtitle(
@@ -155,6 +207,13 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
         composition_notes: imagePromptResult.composition_notes,
         imagen_prompt_final: imagePromptResult.imagen_prompt_final
       },
+      step_1_5_verification: verificationResult ? {
+        matches: verificationResult.matches,
+        matchScore: verificationResult.matchScore,
+        discrepancies: verificationResult.discrepancies,
+        recommendations: verificationResult.recommendations,
+        confidence: verificationResult.confidence
+      } : null,
       step_2_title_subtitle: {
         title: titleSubtitle.title,
         subtitle: titleSubtitle.subtitle
