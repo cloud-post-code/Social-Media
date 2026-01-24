@@ -89,6 +89,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const titleTextRef = useRef<HTMLDivElement>(null);
   const subtitleTextRef = useRef<HTMLDivElement>(null);
+  const isProcessingEditRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const { uploadAsset } = useBrandAssets(activeBrand?.id);
@@ -244,9 +245,33 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     try {
       setSaving(true);
       
+      // Ensure any editing is finished and get latest text from DOM
+      let latestOverlayEdit = { ...overlayEdit };
+      
+      // If title is being edited, get the latest text from the DOM
+      if (editingTextElement === 'title' && titleTextRef.current) {
+        const titleText = titleTextRef.current.textContent || '';
+        latestOverlayEdit.title = titleText;
+        // Blur the element to finish editing
+        titleTextRef.current.blur();
+        setEditingTextElement(null);
+      }
+      
+      // If subtitle is being edited, get the latest text from the DOM
+      if (editingTextElement === 'subtitle' && subtitleTextRef.current) {
+        const subtitleText = subtitleTextRef.current.textContent || '';
+        latestOverlayEdit.subtitle = subtitleText;
+        // Blur the element to finish editing
+        subtitleTextRef.current.blur();
+        setEditingTextElement(null);
+      }
+      
+      // Wait a bit for blur handlers to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // First, save any pending overlay changes using saveOverlay
       // This will update the asset with the latest overlay config and regenerate the image
-      const updatedAsset = await saveOverlay(overlayEdit);
+      const updatedAsset = await saveOverlay(latestOverlayEdit);
       
       if (!updatedAsset) {
         alert('Failed to save overlay changes. Please try again.');
@@ -1423,13 +1448,16 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     }
   };
 
-  const saveOverlay = async (updates?: Partial<typeof overlayEdit>): Promise<GeneratedAsset | undefined> => {
+  const saveOverlay = async (updates?: Partial<typeof overlayEdit>, skipSavingState?: boolean): Promise<GeneratedAsset | undefined> => {
     if (!currentAsset || (currentAsset.type !== 'product' && currentAsset.type !== 'non-product')) return undefined;
     
     const configToSave = updates ? { ...overlayEdit, ...updates } : overlayEdit;
     
     try {
-      setSaving(true);
+      // Only set saving state if not already set (to avoid conflicts with handleSave)
+      if (!skipSavingState) {
+        setSaving(true);
+      }
       // Calculate line breaks using Canvas API for exact match
       const overlayConfigToSend: any = { ...configToSave };
       
@@ -1556,7 +1584,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       // Don't show alert for auto-save failures, just log
       return undefined;
     } finally {
-      setSaving(false);
+      // Only reset saving state if we set it
+      if (!skipSavingState) {
+        setSaving(false);
+      }
     }
   };
 
@@ -1566,7 +1597,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     const latestOverlayEdit = overlayEditRef.current;
     // Merge updates with current overlayEdit state
     const mergedUpdates = updates ? { ...latestOverlayEdit, ...updates } : latestOverlayEdit;
-    saveOverlay(mergedUpdates);
+    // Skip saving state for auto-save to avoid conflicts
+    saveOverlay(mergedUpdates, true);
   }, []);
 
   // Ref to track latest overlayEdit for auto-save
@@ -1718,7 +1750,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       
                       return (
                         <div
-                          key={`title-${titleFontFamilyRaw}-${overlayEdit.title_font_size || displayAsset.overlayConfig.title_font_size || ''}`}
+                          key={`title-${displayAsset.id || 'default'}`}
                           ref={titleTextRef}
                           className={`absolute select-none border-2 ${isEditing ? 'border-dashed border-indigo-400' : 'border-transparent'} ${isEditing ? 'bg-indigo-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'}`}
                           style={{
@@ -1745,17 +1777,37 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                               e.stopPropagation();
                               e.preventDefault();
                               
+                              // Prevent rapid double-clicks
+                              if (isProcessingEditRef.current) {
+                                return;
+                              }
+                              
+                              isProcessingEditRef.current = true;
+                              
                               // Use functional update to avoid stale closure issues and race conditions
                               setEditingTextElement(prev => {
-                                // If already editing this element, stop editing
+                                // If already editing this element, blur it first then stop editing
                                 if (prev === 'title') {
+                                  // Blur the element first to ensure contentEditable transition is clean
+                                  const element = titleTextRef.current;
+                                  if (element && element.contentEditable === 'true') {
+                                    element.blur();
+                                  }
+                                  // Use requestAnimationFrame to ensure DOM is ready
+                                  requestAnimationFrame(() => {
+                                    isProcessingEditRef.current = false;
+                                  });
                                   return null;
                                 }
                                 // Otherwise, start editing this element
+                                requestAnimationFrame(() => {
+                                  isProcessingEditRef.current = false;
+                                });
                                 return 'title';
                               });
                             } catch (error) {
                               console.error('Error in title double-click handler:', error);
+                              isProcessingEditRef.current = false;
                               // Reset state on error
                               setEditingTextElement(null);
                             }
@@ -1767,13 +1819,15 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                                 setOverlayEdit(prev => ({ ...prev, title: newText }));
                                 autoSaveOverlay({ title: newText });
                               }
-                              // Use setTimeout to avoid state updates during DOM manipulation
-                              setTimeout(() => {
+                              // Use requestAnimationFrame to ensure DOM is stable before state update
+                              requestAnimationFrame(() => {
                                 setEditingTextElement(null);
-                              }, 0);
+                                isProcessingEditRef.current = false;
+                              });
                             } catch (error) {
                               console.error('Error in title blur handler:', error);
                               setEditingTextElement(null);
+                              isProcessingEditRef.current = false;
                             }
                           }}
                           onKeyDown={(e) => {
@@ -1834,7 +1888,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                               }
                             }
                           }}
-                          contentEditable={isEditing}
+                          contentEditable={isEditing && !isProcessingEditRef.current}
                           suppressContentEditableWarning={true}
                         >
                           {isEditing && renderResizeHandles('title')}
@@ -1870,7 +1924,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       
                       return (
                         <div
-                          key={`subtitle-${subtitleFontFamilyRaw}-${overlayEdit.subtitle_font_size || displayAsset.overlayConfig.subtitle_font_size || ''}`}
+                          key={`subtitle-${displayAsset.id || 'default'}`}
                           ref={subtitleTextRef}
                           className={`absolute select-none border-2 ${isEditing ? 'border-dashed border-blue-400' : 'border-transparent'} ${isEditing ? 'bg-blue-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'}`}
                           style={{
@@ -1897,17 +1951,37 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                               e.stopPropagation();
                               e.preventDefault();
                               
+                              // Prevent rapid double-clicks
+                              if (isProcessingEditRef.current) {
+                                return;
+                              }
+                              
+                              isProcessingEditRef.current = true;
+                              
                               // Use functional update to avoid stale closure issues and race conditions
                               setEditingTextElement(prev => {
-                                // If already editing this element, stop editing
+                                // If already editing this element, blur it first then stop editing
                                 if (prev === 'subtitle') {
+                                  // Blur the element first to ensure contentEditable transition is clean
+                                  const element = subtitleTextRef.current;
+                                  if (element && element.contentEditable === 'true') {
+                                    element.blur();
+                                  }
+                                  // Use requestAnimationFrame to ensure DOM is ready
+                                  requestAnimationFrame(() => {
+                                    isProcessingEditRef.current = false;
+                                  });
                                   return null;
                                 }
                                 // Otherwise, start editing this element
+                                requestAnimationFrame(() => {
+                                  isProcessingEditRef.current = false;
+                                });
                                 return 'subtitle';
                               });
                             } catch (error) {
                               console.error('Error in subtitle double-click handler:', error);
+                              isProcessingEditRef.current = false;
                               // Reset state on error
                               setEditingTextElement(null);
                             }
@@ -1919,13 +1993,15 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                                 setOverlayEdit(prev => ({ ...prev, subtitle: newText }));
                                 autoSaveOverlay({ subtitle: newText });
                               }
-                              // Use setTimeout to avoid state updates during DOM manipulation
-                              setTimeout(() => {
+                              // Use requestAnimationFrame to ensure DOM is stable before state update
+                              requestAnimationFrame(() => {
                                 setEditingTextElement(null);
-                              }, 0);
+                                isProcessingEditRef.current = false;
+                              });
                             } catch (error) {
                               console.error('Error in subtitle blur handler:', error);
                               setEditingTextElement(null);
+                              isProcessingEditRef.current = false;
                             }
                           }}
                           onKeyDown={(e) => {
@@ -1986,7 +2062,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                               }
                             }
                           }}
-                          contentEditable={isEditing}
+                          contentEditable={isEditing && !isProcessingEditRef.current}
                           suppressContentEditableWarning={true}
                         >
                           {isEditing && renderResizeHandles('subtitle')}
