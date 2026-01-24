@@ -1249,8 +1249,8 @@ CRITICAL: Return plain text only. Do NOT use markdown formatting (no **, no *, n
     : productImageBase64;
 
   const parts = [
-    { text: prompt },
-    { inlineData: { mimeType: "image/png", data: base64Data } }
+    { inlineData: { mimeType: "image/png", data: base64Data } },
+    { text: prompt }
   ];
 
   const response = await ai.models.generateContent({
