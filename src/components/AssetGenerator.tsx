@@ -1756,28 +1756,33 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       
                       return (
                         <div
-                          key={`title-${currentAsset?.id || displayAsset?.id || 'default'}`}
-                          ref={titleTextRef}
-                          className={`absolute select-none border-2 ${isEditing ? 'border-dashed border-indigo-400' : 'border-transparent'} ${isEditing ? 'bg-indigo-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'}`}
+                          key={`title-wrapper-${currentAsset?.id || displayAsset?.id || 'default'}`}
+                          className="absolute"
                           style={{
                             ...getOverlayPosition(titleXPercent, titleYPercent),
-                            textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'end' ? 'right' : 'center',
                             width: getMaxWidthPixels(overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset.overlayConfig.title_max_width_percent || 80)),
                             maxWidth: getMaxWidthPixels(overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset.overlayConfig.title_max_width_percent || 80)),
-                            padding: '0.5rem',
-                            color: overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF',
-                            opacity: overlayEdit.title_opacity !== undefined ? overlayEdit.title_opacity : (displayAsset.overlayConfig.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1),
-                            fontFamily: titleFontFamily,
-                            fontWeight: overlayEdit.title_font_weight === 'bold' ? 'bold' : overlayEdit.title_font_weight === 'light' ? '300' : 'normal',
-                            fontSize: getFontSize(titleFontSize, true),
-                            letterSpacing: overlayEdit.title_letter_spacing === 'wide' ? '0.15em' : 'normal',
-                            textTransform: getEffectiveTransform('title'),
-                            pointerEvents: 'all',
-                            zIndex: isDragging || isEditing ? 20 : 10,
-                            wordWrap: 'break-word',
-                            overflowWrap: 'break-word',
-                            wordBreak: 'normal'
                           }}
+                        >
+                          <div
+                            ref={titleTextRef}
+                            className={`select-none border-2 ${isEditing ? 'border-dashed border-indigo-400' : 'border-transparent'} ${isEditing ? 'bg-indigo-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'} relative`}
+                            style={{
+                              textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                              padding: '0.5rem',
+                              color: overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF',
+                              opacity: overlayEdit.title_opacity !== undefined ? overlayEdit.title_opacity : (displayAsset.overlayConfig.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1),
+                              fontFamily: titleFontFamily,
+                              fontWeight: overlayEdit.title_font_weight === 'bold' ? 'bold' : overlayEdit.title_font_weight === 'light' ? '300' : 'normal',
+                              fontSize: getFontSize(titleFontSize, true),
+                              letterSpacing: overlayEdit.title_letter_spacing === 'wide' ? '0.15em' : 'normal',
+                              textTransform: getEffectiveTransform('title'),
+                              pointerEvents: 'all',
+                              zIndex: isDragging || isEditing ? 20 : 10,
+                              wordWrap: 'break-word',
+                              overflowWrap: 'break-word',
+                              wordBreak: 'normal'
+                            }}
                           onDoubleClick={(e) => {
                             try {
                             e.stopPropagation();
@@ -1874,10 +1879,17 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           }}
                           suppressContentEditableWarning={true}
                         >
-                          {isEditing && renderResizeHandles('title')}
                           {calculatedTitleLines.length > 0 
                             ? calculatedTitleLines.join('\n')
                             : titleText}
+                        </div>
+                        {isEditing && (
+                          <div className="absolute inset-0 z-30" style={{ pointerEvents: 'none' }}>
+                            <div style={{ pointerEvents: 'auto' }}>
+                              {renderResizeHandles('title')}
+                            </div>
+                          </div>
+                        )}
                         </div>
                       );
                     })()}
@@ -1907,28 +1919,33 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       
                       return (
                         <div
-                          key={`subtitle-${currentAsset?.id || displayAsset?.id || 'default'}`}
-                          ref={subtitleTextRef}
-                          className={`absolute select-none border-2 ${isEditing ? 'border-dashed border-blue-400' : 'border-transparent'} ${isEditing ? 'bg-blue-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'}`}
+                          key={`subtitle-wrapper-${currentAsset?.id || displayAsset?.id || 'default'}`}
+                          className="absolute"
                           style={{
                             ...getOverlayPosition(subtitleXPercent, subtitleYPercent),
-                            textAlign: (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'end' ? 'right' : 'center',
                             width: getMaxWidthPixels(overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset.overlayConfig.subtitle_max_width_percent || 80)),
                             maxWidth: getMaxWidthPixels(overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset.overlayConfig.subtitle_max_width_percent || 80)),
-                            padding: '0.5rem',
-                            color: overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF',
-                            opacity: overlayEdit.subtitle_opacity !== undefined ? overlayEdit.subtitle_opacity : (displayAsset.overlayConfig.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9),
-                            fontFamily: subtitleFontFamily,
-                            fontWeight: overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal',
-                            fontSize: getFontSize(subtitleFontSize, false),
-                            letterSpacing: overlayEdit.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal',
-                            textTransform: getEffectiveTransform('subtitle'),
-                            pointerEvents: 'all',
-                            zIndex: isDragging || isEditing ? 20 : 10,
-                            wordWrap: 'break-word',
-                            overflowWrap: 'break-word',
-                            wordBreak: 'normal'
                           }}
+                        >
+                          <div
+                            ref={subtitleTextRef}
+                            className={`select-none border-2 ${isEditing ? 'border-dashed border-blue-400' : 'border-transparent'} ${isEditing ? 'bg-blue-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'} relative`}
+                            style={{
+                              textAlign: (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                              padding: '0.5rem',
+                              color: overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF',
+                              opacity: overlayEdit.subtitle_opacity !== undefined ? overlayEdit.subtitle_opacity : (displayAsset.overlayConfig.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9),
+                              fontFamily: subtitleFontFamily,
+                              fontWeight: overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal',
+                              fontSize: getFontSize(subtitleFontSize, false),
+                              letterSpacing: overlayEdit.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal',
+                              textTransform: getEffectiveTransform('subtitle'),
+                              pointerEvents: 'all',
+                              zIndex: isDragging || isEditing ? 20 : 10,
+                              wordWrap: 'break-word',
+                              overflowWrap: 'break-word',
+                              wordBreak: 'normal'
+                            }}
                           onDoubleClick={(e) => {
                             try {
                             e.stopPropagation();
@@ -2025,10 +2042,17 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                           }}
                           suppressContentEditableWarning={true}
                         >
-                          {isEditing && renderResizeHandles('subtitle')}
                           {calculatedSubtitleLines.length > 0 
                             ? calculatedSubtitleLines.join('\n')
                             : subtitleText}
+                        </div>
+                        {isEditing && (
+                          <div className="absolute inset-0 z-30" style={{ pointerEvents: 'none' }}>
+                            <div style={{ pointerEvents: 'auto' }}>
+                              {renderResizeHandles('subtitle')}
+                            </div>
+                          </div>
+                        )}
                         </div>
                       );
                     })()}
