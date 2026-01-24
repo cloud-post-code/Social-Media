@@ -1741,16 +1741,40 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             wordBreak: 'normal'
                           }}
                           onDoubleClick={(e) => {
-                            e.stopPropagation();
-                            setEditingTextElement(isEditing ? null : 'title');
+                            try {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              
+                              // Use functional update to avoid stale closure issues and race conditions
+                              setEditingTextElement(prev => {
+                                // If already editing this element, stop editing
+                                if (prev === 'title') {
+                                  return null;
+                                }
+                                // Otherwise, start editing this element
+                                return 'title';
+                              });
+                            } catch (error) {
+                              console.error('Error in title double-click handler:', error);
+                              // Reset state on error
+                              setEditingTextElement(null);
+                            }
                           }}
                           onBlur={(e) => {
-                            const newText = e.currentTarget.textContent || '';
-                            if (newText !== titleText) {
-                              setOverlayEdit(prev => ({ ...prev, title: newText }));
-                              autoSaveOverlay({ title: newText });
+                            try {
+                              const newText = e.currentTarget.textContent || '';
+                              if (newText !== titleText) {
+                                setOverlayEdit(prev => ({ ...prev, title: newText }));
+                                autoSaveOverlay({ title: newText });
+                              }
+                              // Use setTimeout to avoid state updates during DOM manipulation
+                              setTimeout(() => {
+                                setEditingTextElement(null);
+                              }, 0);
+                            } catch (error) {
+                              console.error('Error in title blur handler:', error);
+                              setEditingTextElement(null);
                             }
-                            setEditingTextElement(null);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Escape') {
@@ -1869,16 +1893,40 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             wordBreak: 'normal'
                           }}
                           onDoubleClick={(e) => {
-                            e.stopPropagation();
-                            setEditingTextElement(isEditing ? null : 'subtitle');
+                            try {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              
+                              // Use functional update to avoid stale closure issues and race conditions
+                              setEditingTextElement(prev => {
+                                // If already editing this element, stop editing
+                                if (prev === 'subtitle') {
+                                  return null;
+                                }
+                                // Otherwise, start editing this element
+                                return 'subtitle';
+                              });
+                            } catch (error) {
+                              console.error('Error in subtitle double-click handler:', error);
+                              // Reset state on error
+                              setEditingTextElement(null);
+                            }
                           }}
                           onBlur={(e) => {
-                            const newText = e.currentTarget.textContent || '';
-                            if (newText !== subtitleText) {
-                              setOverlayEdit(prev => ({ ...prev, subtitle: newText }));
-                              autoSaveOverlay({ subtitle: newText });
+                            try {
+                              const newText = e.currentTarget.textContent || '';
+                              if (newText !== subtitleText) {
+                                setOverlayEdit(prev => ({ ...prev, subtitle: newText }));
+                                autoSaveOverlay({ subtitle: newText });
+                              }
+                              // Use setTimeout to avoid state updates during DOM manipulation
+                              setTimeout(() => {
+                                setEditingTextElement(null);
+                              }, 0);
+                            } catch (error) {
+                              console.error('Error in subtitle blur handler:', error);
+                              setEditingTextElement(null);
                             }
-                            setEditingTextElement(null);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Escape') {
