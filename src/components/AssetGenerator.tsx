@@ -137,14 +137,25 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     await document.fonts.ready;
 
     const container = imageContainerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    
+    // Calculate scale factor to render at full image resolution
+    const scaleFactor = Math.max(
+      imageDimensions.width / containerRect.width,
+      imageDimensions.height / containerRect.height,
+      1
+    );
     
     // Temporarily hide editing borders and resize handles
     const editingElements = container.querySelectorAll('[contenteditable="true"]');
     const originalBorders: string[] = [];
+    const originalOutlines: string[] = [];
     editingElements.forEach((el) => {
       const htmlEl = el as HTMLElement;
       originalBorders.push(htmlEl.style.border);
+      originalOutlines.push(htmlEl.style.outline);
       htmlEl.style.border = 'none';
+      htmlEl.style.outline = 'none';
     });
 
     // Hide resize handles if visible
@@ -155,11 +166,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     });
 
     try {
-      // Capture the container with html2canvas - this captures the exact CSS rendering
+      // Capture the container with html2canvas - use scale to render at full resolution
       const canvas = await html2canvas(container, {
-        width: imageDimensions.width,
-        height: imageDimensions.height,
-        scale: 1,
+        width: containerRect.width,
+        height: containerRect.height,
+        scale: scaleFactor,
         useCORS: true,
         allowTaint: false,
         backgroundColor: null,
@@ -168,12 +179,25 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         removeContainer: false,
       });
 
+      // Resize canvas to exact image dimensions if needed
+      if (canvas.width !== imageDimensions.width || canvas.height !== imageDimensions.height) {
+        const resizedCanvas = document.createElement('canvas');
+        resizedCanvas.width = imageDimensions.width;
+        resizedCanvas.height = imageDimensions.height;
+        const ctx = resizedCanvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(canvas, 0, 0, imageDimensions.width, imageDimensions.height);
+          return resizedCanvas.toDataURL('image/png', 1.0);
+        }
+      }
+
       return canvas.toDataURL('image/png', 1.0);
     } finally {
-      // Restore original borders
+      // Restore original borders and outlines
       editingElements.forEach((el, index) => {
         const htmlEl = el as HTMLElement;
         htmlEl.style.border = originalBorders[index] || '';
+        htmlEl.style.outline = originalOutlines[index] || '';
       });
       
       // Restore resize handles
