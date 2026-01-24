@@ -1197,12 +1197,21 @@ export const generateProductTitleSubtitle = async (
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
 
+  // Only include brand voice information, not the entire brand DNA
+  // This prevents duplication and over-emphasis of brand elements
+  const brandVoiceContext = {
+    tone_adjectives: brandDNA.brand_voice.tone_adjectives,
+    writing_style: brandDNA.brand_voice.writing_style,
+    keywords_to_use: brandDNA.brand_voice.keywords_to_use,
+    taboo_words: brandDNA.brand_voice.taboo_words
+  };
+
   const prompt = `
 You are a Lead Copywriter for a luxury brand.
 Goal: Write a title and subtitle that fits the *visual mood* established in the Brand DNA.
 
 ### INPUT DATA
-Brand DNA: ${JSON.stringify(brandDNA)}
+Brand Voice: ${JSON.stringify(brandVoiceContext)}
 Product Focus: ${productFocus}
 
 ### INSTRUCTIONS
