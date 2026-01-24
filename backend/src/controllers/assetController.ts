@@ -632,7 +632,7 @@ export const editAssetImage = async (req: Request, res: Response, next: NextFunc
           brand,
           asset.user_prompt || '',
           feedback,
-          undefined // TODO: Get reference image from original generation if available
+          baseImageForAnalysis // Pass current base image as reference to maintain consistency
         );
 
         console.log('[Feedback Loop] Regenerating image...');
@@ -641,7 +641,7 @@ export const editAssetImage = async (req: Request, res: Response, next: NextFunc
           feedback,
           imageWidth,
           imageHeight,
-          undefined // TODO: Get reference image from original generation if available
+          baseImageForAnalysis // Pass current base image as reference to maintain consistency
         );
 
         // Update strategy
@@ -738,7 +738,7 @@ export const editAssetImage = async (req: Request, res: Response, next: NextFunc
           feedback,
           imageWidth,
           imageHeight,
-          undefined // TODO: Get reference image from original generation if available
+          baseImageForAnalysis // Pass current base image as reference to maintain consistency
         );
 
         // Cascade: Regenerate text with new image
