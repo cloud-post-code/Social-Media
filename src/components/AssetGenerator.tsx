@@ -92,6 +92,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const titleTextRef = useRef<HTMLDivElement>(null);
   const subtitleTextRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
+  const [fontsLoaded, setFontsLoaded] = useState(false);
   
   // Store calculated line breaks for preview display
   const [calculatedTitleLines, setCalculatedTitleLines] = useState<string[]>([]);
@@ -101,6 +102,19 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const displayAsset = currentAsset;
   // Use base image URL (without overlays) so we can render our own overlay on top
   const imageUrl = currentAsset?.baseImageUrl || currentAsset?.base_image_url || currentAsset?.imageUrl || currentAsset?.image_url || '';
+  // For download, use the final image_url with overlays applied (from backend)
+  const finalImageUrl = currentAsset?.imageUrl || currentAsset?.image_url || imageUrl;
+  
+  // Download handler
+  const handleDownload = () => {
+    if (!finalImageUrl) return;
+    const link = document.createElement('a');
+    link.href = finalImageUrl;
+    link.download = `asset-${currentAsset?.id || Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
   
   // Load initial asset when provided
   useEffect(() => {
@@ -280,6 +294,41 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     overlayEdit.subtitle_max_width_percent,
     displayAsset?.overlayConfig
   ]);
+
+  // Load fonts when they change and force re-render when loaded
+  useEffect(() => {
+    const loadFonts = async () => {
+      if (!displayAsset?.overlayConfig) {
+        setFontsLoaded(true);
+        return;
+      }
+      
+      setFontsLoaded(false);
+      
+      const titleFontFamilyRaw = overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif';
+      const titleFontFamilyMapped = FONT_MAPPING[titleFontFamilyRaw] || titleFontFamilyRaw;
+      const titleIsGoogleFont = GOOGLE_FONTS.some(f => f.family === titleFontFamilyMapped);
+      
+      const subtitleFontFamilyRaw = overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif';
+      const subtitleFontFamilyMapped = FONT_MAPPING[subtitleFontFamilyRaw] || subtitleFontFamilyRaw;
+      const subtitleIsGoogleFont = GOOGLE_FONTS.some(f => f.family === subtitleFontFamilyMapped);
+      
+      const loadPromises: Promise<void>[] = [];
+      
+      if (titleIsGoogleFont) {
+        loadPromises.push(loadGoogleFont(titleFontFamilyMapped).catch(() => {}));
+      }
+      
+      if (subtitleIsGoogleFont) {
+        loadPromises.push(loadGoogleFont(subtitleFontFamilyMapped).catch(() => {}));
+      }
+      
+      await Promise.all(loadPromises);
+      setFontsLoaded(true);
+    };
+    
+    loadFonts();
+  }, [overlayEdit.title_font_family, overlayEdit.subtitle_font_family, displayAsset?.overlayConfig]);
   
   // Calculate scale factor for font sizes to match preview with actual rendering
   const getFontScale = () => {
@@ -467,7 +516,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     // Check if it's a Google Font
     const isGoogleFont = GOOGLE_FONTS.some(f => f.family === mappedFamily);
     if (isGoogleFont) {
-      // Load font if not already loaded
+      // Load font synchronously - it will be loaded by useEffect before render
+      // But ensure it's loaded here too for immediate updates
       loadGoogleFont(mappedFamily).catch(() => {});
       return getFontFamilyString(mappedFamily);
     }
@@ -1562,9 +1612,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         ? overlayEdit.title 
                         : (displayAsset.overlayConfig.title || '');
                       
+                      // Get font family and ensure it's loaded
+                      const titleFontFamilyRaw = overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif';
+                      const titleFontFamilyMapped = FONT_MAPPING[titleFontFamilyRaw] || titleFontFamilyRaw;
+                      const titleFontFamily = getFontStackForMeasurement(titleFontFamilyRaw);
+                      
                       return (
                         <div
-                          key={`title-${overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif'}-${overlayEdit.title_font_size || displayAsset.overlayConfig.title_font_size || ''}`}
+                          key={`title-${titleFontFamilyRaw}-${overlayEdit.title_font_size || displayAsset.overlayConfig.title_font_size || ''}`}
                           ref={titleTextRef}
                           className={`absolute select-none border-2 ${isEditing ? 'border-dashed border-indigo-400' : 'border-transparent'} ${isEditing ? 'bg-indigo-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'}`}
                           style={{
@@ -1575,7 +1630,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             padding: '0.5rem',
                             color: overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF',
                             opacity: overlayEdit.title_opacity !== undefined ? overlayEdit.title_opacity : (displayAsset.overlayConfig.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1),
-                            fontFamily: getFontStackForMeasurement(overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif'),
+                            fontFamily: titleFontFamily,
                             fontWeight: overlayEdit.title_font_weight === 'bold' ? 'bold' : overlayEdit.title_font_weight === 'light' ? '300' : 'normal',
                             fontSize: getFontSize(titleFontSize, true),
                             letterSpacing: overlayEdit.title_letter_spacing === 'wide' ? '0.15em' : 'normal',
@@ -1686,9 +1741,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         ? overlayEdit.subtitle 
                         : (displayAsset.overlayConfig.subtitle || '');
                       
+                      // Get font family and ensure it's loaded
+                      const subtitleFontFamilyRaw = overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif';
+                      const subtitleFontFamilyMapped = FONT_MAPPING[subtitleFontFamilyRaw] || subtitleFontFamilyRaw;
+                      const subtitleFontFamily = getFontStackForMeasurement(subtitleFontFamilyRaw);
+                      
                       return (
                         <div
-                          key={`subtitle-${overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif'}-${overlayEdit.subtitle_font_size || displayAsset.overlayConfig.subtitle_font_size || ''}`}
+                          key={`subtitle-${subtitleFontFamilyRaw}-${overlayEdit.subtitle_font_size || displayAsset.overlayConfig.subtitle_font_size || ''}`}
                           ref={subtitleTextRef}
                           className={`absolute select-none border-2 ${isEditing ? 'border-dashed border-blue-400' : 'border-transparent'} ${isEditing ? 'bg-blue-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'}`}
                           style={{
@@ -1699,7 +1759,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             padding: '0.5rem',
                             color: overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF',
                             opacity: overlayEdit.subtitle_opacity !== undefined ? overlayEdit.subtitle_opacity : (displayAsset.overlayConfig.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9),
-                            fontFamily: getFontStackForMeasurement(overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif'),
+                            fontFamily: subtitleFontFamily,
                             fontWeight: overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal',
                             fontSize: getFontSize(subtitleFontSize, false),
                             letterSpacing: overlayEdit.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal',
@@ -1860,9 +1920,20 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Text Overlay</h3>
-                  {saving && (
-                    <span className="text-xs font-medium text-indigo-600">Saving...</span>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {saving && (
+                      <span className="text-xs font-medium text-indigo-600">Saving...</span>
+                    )}
+                    <button
+                      onClick={handleDownload}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-3">

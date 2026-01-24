@@ -20,20 +20,36 @@ const bufferToBase64 = (buffer: Buffer, mimeType: string = 'image/png'): string 
 
 /**
  * Get font family name for SVG
- * Maps frontend font family choices to server-available fonts that match browser defaults
+ * Maps frontend font family choices (including Google Fonts) to server-available fonts
  */
-const getFontFamily = (family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten'): string => {
+const getFontFamily = (family: string): string => {
+  // Map Google Fonts to categories based on their type
+  // Serif fonts
+  const serifFonts = ['Merriweather', 'Roboto Slab', 'Playfair Display', 'Lora', 'Bitter'];
+  // Handwriting/Cursive fonts
+  const handwritingFonts = ['Dancing Script', 'Pacifico', 'Kalam', 'Permanent Marker', 'Caveat', 
+    'Indie Flower', 'Shadows Into Light', 'Great Vibes', 'Sacramento', 'Satisfy'];
+  // Display fonts (usually sans-serif)
+  const displayFonts = ['Amatic SC', 'Press Start 2P', 'Bangers', 'Creepster', 'Metal Mania', 'Monoton'];
+  
+  // Check if it's a Google Font and map to category
+  if (serifFonts.includes(family)) {
+    return 'DejaVu Serif, Liberation Serif, Times New Roman, Times, serif';
+  }
+  if (handwritingFonts.includes(family)) {
+    return 'DejaVu Serif, Liberation Serif, serif';
+  }
+  
+  // Map old font names
   switch (family) {
     case 'serif':
-      // Match browser default serif fonts (Times New Roman, Times)
       return 'DejaVu Serif, Liberation Serif, Times New Roman, Times, serif';
     case 'cursive':
     case 'handwritten':
-      // Use a script/cursive font, fallback to serif
       return 'DejaVu Serif, Liberation Serif, serif';
     case 'sans-serif':
     default:
-      // Match browser default sans-serif fonts (Arial, Helvetica)
+      // Default to sans-serif for all other fonts (including Google Fonts like Roboto, Open Sans, etc.)
       return 'DejaVu Sans, Liberation Sans, Arial, Helvetica, sans-serif';
   }
 };
