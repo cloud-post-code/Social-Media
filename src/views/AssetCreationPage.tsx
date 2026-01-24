@@ -22,7 +22,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
   
   const [productFocus, setProductFocus] = useState('');
   const [userPurpose, setUserPurpose] = useState('');
-  const [productImage, setProductImage] = useState<string | null>(null);
+  const [productImages, setProductImages] = useState<string[]>([]);
   
   // Non-product specific state
   const [useExactLogo, setUseExactLogo] = useState(false);
@@ -37,12 +37,27 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
   const [customHeight, setCustomHeight] = useState<number>(1080);
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => setProductImage(ev.target?.result as string);
-      reader.readAsDataURL(file);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      const readers = fileArray.map(file => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+      });
+      
+      Promise.all(readers).then((base64Images) => {
+        setProductImages(prev => [...prev, ...base64Images]);
+      });
     }
+    // Reset input so same files can be selected again
+    e.target.value = '';
+  };
+
+  const removeProductImage = (index: number) => {
+    setProductImages(prev => prev.filter((_, i) => i !== index));
   };
 
   // Helper function to get image dimensions based on preset
@@ -65,31 +80,63 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
     setStartTime(Date.now());
     
     try {
-      let asset: GeneratedAsset;
-      const total = option === 'product' ? 1 : postCount;
-      setTotalPosts(total);
-      setCurrentPost(0);
-
       if (option === 'product') {
-        setStatusText('Creative Director is mapping the vision...');
-        setCurrentPost(0.2); // 20% - starting
+        // Use productImages array - if empty, use empty array (will generate without reference)
+        const imagesToProcess = productImages.length > 0 ? productImages : [null];
+        const total = imagesToProcess.length;
+        setTotalPosts(total);
+        setCurrentPost(0);
         
         const dimensions = getImageDimensions();
-        setStatusText('Generating product image...');
-        setCurrentPost(0.3); // 30% - generating image
         
-        asset = await assetApi.generateProduct({
-          brandId: activeBrand.id,
-          productFocus,
-          referenceImageBase64: productImage || undefined,
-          width: dimensions.width,
-          height: dimensions.height
-        });
+        // Process each photo sequentially
+        for (let i = 0; i < imagesToProcess.length; i++) {
+          const photoIndex = i + 1;
+          setStatusText(`Processing photo ${photoIndex} of ${total}...`);
+          setCurrentPost(i + 0.1); // Start of this photo
+          
+          setStatusText(`Generating product image ${photoIndex} of ${total}...`);
+          setCurrentPost(i + 0.3); // 30% - generating image
+          
+          const generatedAsset = await assetApi.generateProduct({
+            brandId: activeBrand.id,
+            productFocus,
+            referenceImageBase64: imagesToProcess[i] || undefined,
+            width: dimensions.width,
+            height: dimensions.height
+          });
+          
+          setStatusText(`Applying text overlay for photo ${photoIndex}...`);
+          setCurrentPost(i + 0.9); // 90% - applying overlay
+          
+          // Immediately convert backend format to frontend format
+          const frontendAsset: GeneratedAsset = {
+            ...generatedAsset,
+            imageUrl: generatedAsset.image_url,
+            brandId: generatedAsset.brand_id,
+            campaignImages: generatedAsset.campaign_images,
+            overlayConfig: generatedAsset.overlay_config,
+            baseImageUrl: generatedAsset.base_image_url,
+            userPrompt: generatedAsset.user_prompt,
+            feedbackHistory: generatedAsset.feedback_history,
+            timestamp: generatedAsset.created_at ? new Date(generatedAsset.created_at).getTime() : Date.now()
+          };
+          
+          // Immediately call onAssetCreated - don't wait for batch to complete
+          onAssetCreated(frontendAsset);
+          
+          setCurrentPost(i + 1); // 100% - this photo complete
+        }
         
-        setStatusText('Applying text overlay...');
-        setCurrentPost(0.9); // 90% - applying overlay
-        setStatusText('Finalizing...');
-        setCurrentPost(1); // 100% - complete
+        setStatusText('All photos processed!');
+        setCurrentPost(total);
+        
+        // Reset loading state
+        setLoading(false);
+        setStatusText('');
+        setCurrentPost(0);
+        setStartTime(null);
+        return;
       } else {
         // Handle batch generation for non-product posts
         const assetsToCreate: GeneratedAsset[] = [];
@@ -137,21 +184,6 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         setStartTime(null);
         return;
       }
-
-      // Convert backend format to frontend format for display
-      const frontendAsset: GeneratedAsset = {
-        ...asset,
-        imageUrl: asset.image_url,
-        brandId: asset.brand_id,
-        campaignImages: asset.campaign_images,
-        overlayConfig: asset.overlay_config,
-        baseImageUrl: asset.base_image_url,
-        userPrompt: asset.user_prompt,
-        feedbackHistory: asset.feedback_history,
-        timestamp: asset.created_at ? new Date(asset.created_at).getTime() : Date.now()
-      };
-
-      onAssetCreated(frontendAsset);
     } catch (err) {
       console.error(err);
       alert('Generation failed: ' + (err as Error).message);
@@ -216,26 +248,55 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
           {option === 'product' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
               <div className="lg:col-span-4 space-y-4">
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Reference Hero Image</label>
-                <div className="aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
-                  {productImage ? (
-                    <>
-                      <img src={productImage} className="w-full h-full object-cover" />
-                      <button onClick={(e) => { e.stopPropagation(); setProductImage(null); }} className="absolute top-6 right-6 bg-white/95 p-3 rounded-2xl shadow-2xl opacity-0 group-hover:opacity-100 transition-all hover:scale-110">
-                         <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                      </button>
-                    </>
-                  ) : (
-                    <label className="cursor-pointer text-center p-12 w-full h-full flex flex-col items-center justify-center">
-                      <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl text-indigo-600 group-hover:scale-110 transition">
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
-                      </div>
-                      <span className="text-sm font-black text-slate-500">Add Product Reference</span>
-                      <p className="text-xs text-slate-400 mt-2 font-medium">PNG, JPG up to 10MB</p>
-                      <input type="file" className="hidden" accept="image/*" onChange={handleProductImageUpload} />
-                    </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Reference Hero Images</label>
+                  {productImages.length > 0 && (
+                    <span className="text-xs font-bold text-slate-500">{productImages.length} photo{productImages.length !== 1 ? 's' : ''} selected</span>
                   )}
                 </div>
+                {productImages.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      {productImages.map((image, index) => (
+                        <div key={index} className="aspect-square bg-slate-50 border-2 border-slate-200 rounded-2xl relative overflow-hidden group">
+                          <img src={image} className="w-full h-full object-cover" alt={`Product reference ${index + 1}`} />
+                          <button
+                            onClick={() => removeProductImage(index)}
+                            className="absolute top-2 right-2 bg-white/95 p-2 rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
+                          >
+                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                          <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded">
+                            {index + 1}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <label className="block aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
+                      <div className="bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-xl text-indigo-600 group-hover:scale-110 transition">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                        </svg>
+                      </div>
+                      <span className="text-xs font-black text-slate-500 mt-3">Add More</span>
+                      <input type="file" className="hidden" accept="image/*" multiple onChange={handleProductImageUpload} />
+                    </label>
+                  </div>
+                ) : (
+                  <label className="block aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
+                    <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl text-indigo-600 group-hover:scale-110 transition">
+                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-black text-slate-500">Add Product References</span>
+                    <p className="text-xs text-slate-400 mt-2 font-medium">PNG, JPG up to 10MB</p>
+                    <p className="text-xs text-slate-400 mt-1 font-medium">Select multiple photos</p>
+                    <input type="file" className="hidden" accept="image/*" multiple onChange={handleProductImageUpload} />
+                  </label>
+                )}
               </div>
               <div className="lg:col-span-8 flex flex-col justify-center space-y-8">
                 <div className="space-y-3">
