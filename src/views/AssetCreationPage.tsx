@@ -20,7 +20,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
   const [totalPosts, setTotalPosts] = useState(1);
   const [startTime, setStartTime] = useState<number | null>(null);
   
-  const [productFocus, setProductFocus] = useState('');
+  const [productFocus, setProductFocus] = useState<string[]>([]);
   const [userPurpose, setUserPurpose] = useState('');
   const [productImages, setProductImages] = useState<string[]>([]);
   
@@ -50,6 +50,8 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
       
       Promise.all(readers).then((base64Images) => {
         setProductImages(prev => [...prev, ...base64Images]);
+        // Initialize empty product focus for each new image
+        setProductFocus(prev => [...prev, ...new Array(base64Images.length).fill('')]);
       });
     }
     // Reset input so same files can be selected again
@@ -58,6 +60,15 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
 
   const removeProductImage = (index: number) => {
     setProductImages(prev => prev.filter((_, i) => i !== index));
+    setProductFocus(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateProductFocus = (index: number, value: string) => {
+    setProductFocus(prev => {
+      const newFocus = [...prev];
+      newFocus[index] = value;
+      return newFocus;
+    });
   };
 
   // Helper function to get image dimensions based on preset
@@ -100,7 +111,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
           
           const generatedAsset = await assetApi.generateProduct({
             brandId: activeBrand.id,
-            productFocus,
+            productFocus: productFocus[i] || '',
             referenceImageBase64: imagesToProcess[i] || undefined,
             width: dimensions.width,
             height: dimensions.height
@@ -257,10 +268,10 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                   )}
                 </div>
                 {productImages.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      {productImages.map((image, index) => (
-                        <div key={index} className="aspect-square bg-slate-50 border-2 border-slate-200 rounded-2xl relative overflow-hidden group">
+                  <div className="space-y-6">
+                    {productImages.map((image, index) => (
+                      <div key={index} className="space-y-3">
+                        <div className="aspect-square bg-slate-50 border-2 border-slate-200 rounded-2xl relative overflow-hidden group">
                           <img src={image} className="w-full h-full object-cover" alt={`Product reference ${index + 1}`} />
                           <button
                             onClick={() => removeProductImage(index)}
@@ -274,8 +285,17 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                             {index + 1}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        <div className="space-y-2">
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">What are we selling today?</label>
+                          <textarea 
+                            value={productFocus[index] || ''}
+                            onChange={e => updateProductFocus(index, e.target.value)}
+                            placeholder="Describe the product context, features, or seasonal vibe..."
+                            className="w-full h-32 p-4 bg-slate-50 border-2 border-slate-100 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-50/50 focus:border-indigo-500 transition-all text-sm font-medium leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                    ))}
                     <label className="block aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
                       <div className="bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-xl text-indigo-600 group-hover:scale-110 transition">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -301,16 +321,6 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                 )}
               </div>
               <div className="lg:col-span-8 flex flex-col justify-center space-y-8">
-                <div className="space-y-3">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">What are we selling today?</label>
-                  <textarea 
-                    value={productFocus}
-                    onChange={e => setProductFocus(e.target.value)}
-                    placeholder="Describe the product context, features, or seasonal vibe..."
-                    className="w-full h-52 p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] outline-none focus:bg-white focus:ring-4 focus:ring-indigo-50/50 focus:border-indigo-500 transition-all text-xl font-medium leading-relaxed"
-                  />
-                </div>
-                
                 {/* Image Size Selector */}
                 <div className="space-y-3">
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Image Size</label>
@@ -389,7 +399,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                 
                 <button 
                   onClick={handleGenerate}
-                  disabled={loading || !productFocus}
+                  disabled={loading || productImages.length === 0 || productFocus.some(focus => !focus || focus.trim() === '')}
                   className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
                 >
                   {loading ? 'Generating...' : 'Draft Product Masterpiece'}
