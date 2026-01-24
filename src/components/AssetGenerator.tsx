@@ -126,15 +126,248 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   // For download, use the final image_url with overlays applied (from backend)
   const finalImageUrl = currentAsset?.imageUrl || currentAsset?.image_url || imageUrl;
   
-  // Download handler - downloads the final image with overlays in exact size
-  const handleDownload = () => {
-    if (!finalImageUrl) return;
-    const link = document.createElement('a');
-    link.href = finalImageUrl;
-    link.download = `asset-${currentAsset?.id || Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Generate image from frontend preview (exact match)
+  const generateImageFromPreview = async (): Promise<string> => {
+    if (!imageUrl || !imageDimensions) {
+      throw new Error('Image not loaded');
+    }
+
+    // Wait for fonts to load
+    await document.fonts.ready;
+
+    // Create canvas with actual image dimensions
+    const canvas = document.createElement('canvas');
+    canvas.width = imageDimensions.width;
+    canvas.height = imageDimensions.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not get canvas context');
+
+    // Load and draw base image
+    const img = new Image();
+    img.crossOrigin = imageUrl.startsWith('data:') ? undefined : 'anonymous';
+    
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = imageUrl;
+    });
+
+    // Get overlay config values
+    const titleText = overlayEdit.title !== undefined 
+      ? overlayEdit.title 
+      : (displayAsset?.overlayConfig?.title || '');
+    const subtitleText = overlayEdit.subtitle !== undefined 
+      ? overlayEdit.subtitle 
+      : (displayAsset?.overlayConfig?.subtitle || '');
+
+    // Draw title if exists
+    if (titleText) {
+      const titleXPercent = overlayEdit.title_x_percent !== undefined 
+        ? overlayEdit.title_x_percent 
+        : (displayAsset.overlayConfig.title_x_percent !== undefined 
+          ? displayAsset.overlayConfig.title_x_percent 
+          : 50);
+      const titleYPercent = overlayEdit.title_y_percent !== undefined 
+        ? overlayEdit.title_y_percent 
+        : (displayAsset.overlayConfig.title_y_percent !== undefined 
+          ? displayAsset.overlayConfig.title_y_percent 
+          : 30);
+      
+      const titleFontSize = getFontSizeNumeric(
+        overlayEdit.title_font_size !== undefined 
+          ? overlayEdit.title_font_size 
+          : displayAsset?.overlayConfig?.title_font_size,
+        true
+      );
+      
+      const titleFontFamilyRaw = overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif';
+      const titleFontFamilyMapped = FONT_MAPPING[titleFontFamilyRaw] || titleFontFamilyRaw;
+      const titleFontFamily = getFontStackForMeasurement(titleFontFamilyRaw);
+      
+      const titleColor = overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF';
+      const titleOpacity = overlayEdit.title_opacity !== undefined ? overlayEdit.title_opacity : (displayAsset.overlayConfig.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1);
+      const titleTransform = getEffectiveTransform('title');
+      const titleTextTransformed = applyTextTransform(titleText, titleTransform);
+      
+      const titleMaxWidthPercent = overlayEdit.title_max_width_percent !== undefined
+        ? overlayEdit.title_max_width_percent
+        : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+      const titleMaxWidthPx = (canvas.width * titleMaxWidthPercent) / 100;
+      
+      const titleFontWeight = overlayEdit.title_font_weight === 'bold' ? 'bold' : overlayEdit.title_font_weight === 'light' ? '300' : 'normal';
+      const titleLetterSpacing = overlayEdit.title_letter_spacing === 'wide' ? '0.15em' : 'normal';
+      
+      // Calculate lines using same method as preview
+      const titleLines = await calculateTextLinesWithCanvas(
+        titleTextTransformed,
+        titleMaxWidthPx,
+        titleFontSize,
+        titleFontFamilyMapped,
+        titleFontWeight,
+        titleLetterSpacing
+      );
+
+      // Set font
+      ctx.font = `${titleFontWeight} ${titleFontSize}px ${titleFontFamily}`;
+      ctx.fillStyle = titleColor;
+      ctx.globalAlpha = titleOpacity;
+      ctx.textAlign = (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'start' ? 'left' : 
+                      (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'end' ? 'right' : 'center';
+      ctx.textBaseline = 'top';
+      
+      // Apply letter spacing (approximate)
+      const letterSpacingValue = overlayEdit.title_letter_spacing === 'wide' ? titleFontSize * 0.15 : 0;
+      
+      // Calculate position
+      const centerX = (canvas.width * titleXPercent) / 100;
+      const centerY = (canvas.height * titleYPercent) / 100;
+      const lineHeight = titleFontSize * 1.2;
+      const totalHeight = titleLines.length * lineHeight;
+      const startY = centerY - (totalHeight / 2) + lineHeight;
+      
+      // Draw each line
+      titleLines.forEach((line, index) => {
+        const y = startY + (index * lineHeight);
+        let x = centerX;
+        
+        if (ctx.textAlign === 'left') {
+          x = centerX - (titleMaxWidthPx / 2);
+        } else if (ctx.textAlign === 'right') {
+          x = centerX + (titleMaxWidthPx / 2);
+        }
+        
+        // Draw text with letter spacing approximation
+        if (letterSpacingValue > 0) {
+          let currentX = x;
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            ctx.fillText(char, currentX, y);
+            const charWidth = ctx.measureText(char).width;
+            currentX += charWidth + letterSpacingValue;
+          }
+        } else {
+          ctx.fillText(line, x, y);
+        }
+      });
+      
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw subtitle if exists
+    if (subtitleText) {
+      const subtitleXPercent = overlayEdit.subtitle_x_percent !== undefined 
+        ? overlayEdit.subtitle_x_percent 
+        : (displayAsset.overlayConfig.subtitle_x_percent !== undefined 
+          ? displayAsset.overlayConfig.subtitle_x_percent 
+          : 50);
+      const subtitleYPercent = overlayEdit.subtitle_y_percent !== undefined 
+        ? overlayEdit.subtitle_y_percent 
+        : (displayAsset.overlayConfig.subtitle_y_percent !== undefined 
+          ? displayAsset.overlayConfig.subtitle_y_percent 
+          : 80);
+      
+      const subtitleFontSize = getFontSizeNumeric(
+        overlayEdit.subtitle_font_size !== undefined 
+          ? overlayEdit.subtitle_font_size 
+          : displayAsset?.overlayConfig?.subtitle_font_size,
+        false
+      );
+      
+      const subtitleFontFamilyRaw = overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif';
+      const subtitleFontFamilyMapped = FONT_MAPPING[subtitleFontFamilyRaw] || subtitleFontFamilyRaw;
+      const subtitleFontFamily = getFontStackForMeasurement(subtitleFontFamilyRaw);
+      
+      const subtitleColor = overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF';
+      const subtitleOpacity = overlayEdit.subtitle_opacity !== undefined ? overlayEdit.subtitle_opacity : (displayAsset.overlayConfig.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9);
+      const subtitleTransform = getEffectiveTransform('subtitle');
+      const subtitleTextTransformed = applyTextTransform(subtitleText, subtitleTransform);
+      
+      const subtitleMaxWidthPercent = overlayEdit.subtitle_max_width_percent !== undefined
+        ? overlayEdit.subtitle_max_width_percent
+        : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80);
+      const subtitleMaxWidthPx = (canvas.width * subtitleMaxWidthPercent) / 100;
+      
+      const subtitleFontWeight = overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal';
+      const subtitleLetterSpacing = overlayEdit.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal';
+      
+      // Calculate lines using same method as preview
+      const subtitleLines = await calculateTextLinesWithCanvas(
+        subtitleTextTransformed,
+        subtitleMaxWidthPx,
+        subtitleFontSize,
+        subtitleFontFamilyMapped,
+        subtitleFontWeight,
+        subtitleLetterSpacing
+      );
+
+      // Set font
+      ctx.font = `${subtitleFontWeight} ${subtitleFontSize}px ${subtitleFontFamily}`;
+      ctx.fillStyle = subtitleColor;
+      ctx.globalAlpha = subtitleOpacity;
+      ctx.textAlign = (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'start' ? 'left' : 
+                      (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'end' ? 'right' : 'center';
+      ctx.textBaseline = 'top';
+      
+      // Apply letter spacing (approximate)
+      const letterSpacingValue = overlayEdit.subtitle_letter_spacing === 'wide' ? subtitleFontSize * 0.15 : 0;
+      
+      // Calculate position
+      const centerX = (canvas.width * subtitleXPercent) / 100;
+      const centerY = (canvas.height * subtitleYPercent) / 100;
+      const lineHeight = subtitleFontSize * 1.2;
+      const totalHeight = subtitleLines.length * lineHeight;
+      const startY = centerY - (totalHeight / 2) + lineHeight;
+      
+      // Draw each line
+      subtitleLines.forEach((line, index) => {
+        const y = startY + (index * lineHeight);
+        let x = centerX;
+        
+        if (ctx.textAlign === 'left') {
+          x = centerX - (subtitleMaxWidthPx / 2);
+        } else if (ctx.textAlign === 'right') {
+          x = centerX + (subtitleMaxWidthPx / 2);
+        }
+        
+        // Draw text with letter spacing approximation
+        if (letterSpacingValue > 0) {
+          let currentX = x;
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            ctx.fillText(char, currentX, y);
+            const charWidth = ctx.measureText(char).width;
+            currentX += charWidth + letterSpacingValue;
+          }
+        } else {
+          ctx.fillText(line, x, y);
+        }
+      });
+      
+      ctx.globalAlpha = 1;
+    }
+
+    return canvas.toDataURL('image/png');
+  };
+
+  // Download handler - downloads the frontend-generated image (exact match with preview)
+  const handleDownload = async () => {
+    if (!imageUrl || !imageDimensions || !currentAsset) return;
+    
+    try {
+      const dataUrl = await generateImageFromPreview();
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `asset-${currentAsset.id || Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('Failed to generate download. Please try again.');
+    }
   };
 
   // Save handler - saves overlay changes and then uploads the final image to brand assets
