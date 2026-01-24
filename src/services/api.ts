@@ -35,9 +35,14 @@ async function request<T>(
 
   let response: Response;
   try {
+    console.log(`[API] Making request to: ${url}`);
+    console.log(`[API] Request method: ${options.method || 'GET'}`);
     response = await fetch(url, config);
+    console.log(`[API] Response status: ${response.status} ${response.statusText}`);
+    console.log(`[API] Response headers:`, Object.fromEntries(response.headers.entries()));
   } catch (error: any) {
     // Network error or fetch failed
+    console.error('[API] Fetch error:', error);
     let errorMessage = 'Failed to fetch';
     
     if (error.message) {
@@ -49,9 +54,15 @@ async function request<T>(
     errorMessage += '\n1. The backend server is not running or not accessible';
     errorMessage += '\n2. VITE_API_URL is incorrect or not set';
     errorMessage += '\n3. CORS is blocking the request';
+    errorMessage += '\n4. Network connectivity issue';
     errorMessage += `\n\nCurrent VITE_API_URL (raw): ${import.meta.env.VITE_API_URL || 'not set (using default: http://localhost:3001/api)'}`;
     errorMessage += `\nNormalized API_BASE_URL: ${API_BASE_URL}`;
     errorMessage += `\nRequest URL: ${url}`;
+    errorMessage += '\n\n🔍 Troubleshooting steps:';
+    errorMessage += '\n1. Check Railway Dashboard → Backend Service → Logs';
+    errorMessage += '\n2. Verify backend is running: curl https://social-media-production-cf45.up.railway.app/health';
+    errorMessage += '\n3. Check if backend service is deployed and running';
+    errorMessage += '\n4. Verify VITE_API_URL is set correctly in Railway';
     
     if (!import.meta.env.VITE_API_URL) {
       errorMessage += '\n\n❌ VITE_API_URL is not set!';
