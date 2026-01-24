@@ -97,7 +97,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   
   // Compute display asset and image URL from current asset
   const displayAsset = currentAsset;
-  const imageUrl = currentAsset?.imageUrl || currentAsset?.image_url || '';
+  // Use base image URL (without overlays) so we can render our own overlay on top
+  const imageUrl = currentAsset?.baseImageUrl || currentAsset?.base_image_url || currentAsset?.imageUrl || currentAsset?.image_url || '';
   
   // Load initial asset when provided
   useEffect(() => {
@@ -610,9 +611,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               e.stopPropagation();
               setIsResizing(true);
               setResizeHandle('nw');
-              const currentWidth = overlayEdit.title_max_width_percent !== undefined
-                ? overlayEdit.title_max_width_percent
-                : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+              const isTitle = element === 'title';
+              const currentWidth = isTitle
+                ? (overlayEdit.title_max_width_percent !== undefined
+                    ? overlayEdit.title_max_width_percent
+                    : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined
+                    ? overlayEdit.subtitle_max_width_percent
+                    : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -627,9 +633,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               e.stopPropagation();
               setIsResizing(true);
               setResizeHandle('ne');
-              const currentWidth = overlayEdit.title_max_width_percent !== undefined
-                ? overlayEdit.title_max_width_percent
-                : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+              const isTitle = element === 'title';
+              const currentWidth = isTitle
+                ? (overlayEdit.title_max_width_percent !== undefined
+                    ? overlayEdit.title_max_width_percent
+                    : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined
+                    ? overlayEdit.subtitle_max_width_percent
+                    : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -644,9 +655,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               e.stopPropagation();
               setIsResizing(true);
               setResizeHandle('sw');
-              const currentWidth = overlayEdit.title_max_width_percent !== undefined
-                ? overlayEdit.title_max_width_percent
-                : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+              const isTitle = element === 'title';
+              const currentWidth = isTitle
+                ? (overlayEdit.title_max_width_percent !== undefined
+                    ? overlayEdit.title_max_width_percent
+                    : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined
+                    ? overlayEdit.subtitle_max_width_percent
+                    : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -661,9 +677,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               e.stopPropagation();
               setIsResizing(true);
               setResizeHandle('se');
-              const currentWidth = overlayEdit.title_max_width_percent !== undefined
-                ? overlayEdit.title_max_width_percent
-                : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+              const isTitle = element === 'title';
+              const currentWidth = isTitle
+                ? (overlayEdit.title_max_width_percent !== undefined
+                    ? overlayEdit.title_max_width_percent
+                    : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined
+                    ? overlayEdit.subtitle_max_width_percent
+                    : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -695,9 +716,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               e.stopPropagation();
               setIsResizing(true);
               setResizeHandle('w');
-              const currentWidth = overlayEdit.title_max_width_percent !== undefined
-                ? overlayEdit.title_max_width_percent
-                : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+              const isTitle = element === 'title';
+              const currentWidth = isTitle
+                ? (overlayEdit.title_max_width_percent !== undefined
+                    ? overlayEdit.title_max_width_percent
+                    : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined
+                    ? overlayEdit.subtitle_max_width_percent
+                    : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -712,9 +738,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               e.stopPropagation();
               setIsResizing(true);
               setResizeHandle('e');
-              const currentWidth = overlayEdit.title_max_width_percent !== undefined
-                ? overlayEdit.title_max_width_percent
-                : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+              const isTitle = element === 'title';
+              const currentWidth = isTitle
+                ? (overlayEdit.title_max_width_percent !== undefined
+                    ? overlayEdit.title_max_width_percent
+                    : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+                : (overlayEdit.subtitle_max_width_percent !== undefined
+                    ? overlayEdit.subtitle_max_width_percent
+                    : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
               setResizeStart({
                 x: e.clientX,
                 y: e.clientY,
@@ -854,15 +885,24 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const deltaXPercent = (deltaX / imageBounds.width) * 100;
             const deltaYPercent = (deltaY / imageBounds.height) * 100;
             
-            // Calculate new width and height based on resize handle
-            const currentMaxWidth = overlayEdit.title_max_width_percent !== undefined
-              ? overlayEdit.title_max_width_percent
-              : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+            // Determine which element is being resized based on editingTextElement
+            const isResizingTitle = editingTextElement === 'title';
+            const currentMaxWidth = isResizingTitle
+              ? (overlayEdit.title_max_width_percent !== undefined
+                  ? overlayEdit.title_max_width_percent
+                  : (displayAsset?.overlayConfig?.title_max_width_percent || 80))
+              : (overlayEdit.subtitle_max_width_percent !== undefined
+                  ? overlayEdit.subtitle_max_width_percent
+                  : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
             
             let newWidthPercent = currentMaxWidth;
-            const currentXPercent = overlayEdit.title_x_percent !== undefined
-              ? overlayEdit.title_x_percent
-              : (displayAsset?.overlayConfig?.title_x_percent || 50);
+            const currentXPercent = isResizingTitle
+              ? (overlayEdit.title_x_percent !== undefined
+                  ? overlayEdit.title_x_percent
+                  : (displayAsset?.overlayConfig?.title_x_percent || 50))
+              : (overlayEdit.subtitle_x_percent !== undefined
+                  ? overlayEdit.subtitle_x_percent
+                  : (displayAsset?.overlayConfig?.subtitle_x_percent || 50));
             let newXPercent = currentXPercent;
             
             if (resizeHandle.includes('e')) {
@@ -874,11 +914,17 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               newXPercent = Math.max(5, Math.min(95, currentXPercent - deltaXPercent / 2));
             }
             
-            const updates: any = {
-              title_max_width_percent: newWidthPercent
-            };
-            if (resizeHandle.includes('w')) {
-              updates.title_x_percent = newXPercent;
+            const updates: any = {};
+            if (isResizingTitle) {
+              updates.title_max_width_percent = newWidthPercent;
+              if (resizeHandle.includes('w')) {
+                updates.title_x_percent = newXPercent;
+              }
+            } else {
+              updates.subtitle_max_width_percent = newWidthPercent;
+              if (resizeHandle.includes('w')) {
+                updates.subtitle_x_percent = newXPercent;
+              }
             }
             setOverlayEdit(prev => ({ ...prev, ...updates }));
             autoSaveOverlay(updates);
@@ -907,16 +953,42 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const x = (actualX / imageDimensions.width) * 100;
             const y = (actualY / imageDimensions.height) * 100;
             
-            // Update title position
-            setOverlayEdit(prev => ({
-              ...prev,
-              title_x_percent: x,
-              title_y_percent: y
-            }));
-            autoSaveOverlay({
-              title_x_percent: x,
-              title_y_percent: y
-            });
+            // Determine which element is being dragged based on drag start position
+            const titleText = overlayEdit.title !== undefined ? overlayEdit.title : (displayAsset?.overlayConfig?.title || '');
+            const subtitleText = overlayEdit.subtitle !== undefined ? overlayEdit.subtitle : (displayAsset?.overlayConfig?.subtitle || '');
+            const titleY = overlayEdit.title_y_percent !== undefined 
+              ? overlayEdit.title_y_percent 
+              : (displayAsset?.overlayConfig?.title_y_percent || 30);
+            const subtitleY = overlayEdit.subtitle_y_percent !== undefined 
+              ? overlayEdit.subtitle_y_percent 
+              : (displayAsset?.overlayConfig?.subtitle_y_percent || 80);
+            
+            // Determine which element is closer to the drag start position
+            const distanceToTitle = Math.abs((dragStart.y || 0) - titleY);
+            const distanceToSubtitle = Math.abs((dragStart.y || 0) - subtitleY);
+            const isDraggingTitle = titleText && (!subtitleText || distanceToTitle < distanceToSubtitle);
+            
+            if (isDraggingTitle) {
+              setOverlayEdit(prev => ({
+                ...prev,
+                title_x_percent: x,
+                title_y_percent: y
+              }));
+              autoSaveOverlay({
+                title_x_percent: x,
+                title_y_percent: y
+              });
+            } else {
+              setOverlayEdit(prev => ({
+                ...prev,
+                subtitle_x_percent: x,
+                subtitle_y_percent: y
+              }));
+              autoSaveOverlay({
+                subtitle_x_percent: x,
+                subtitle_y_percent: y
+              });
+            }
           } else {
             // Fallback to container-based calculation if image bounds can't be determined
             // This shouldn't happen, but if it does, use container dimensions
@@ -940,16 +1012,42 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const actualY = relativeY * scaleY;
             const x = (actualX / imageDimensions.width) * 100;
             const y = (actualY / imageDimensions.height) * 100;
-            // Update title position
-            setOverlayEdit(prev => ({
-              ...prev,
-              title_x_percent: x,
-              title_y_percent: y
-            }));
-            autoSaveOverlay({
-              title_x_percent: x,
-              title_y_percent: y
-            });
+            // Determine which element is being dragged based on drag start position
+            const titleText = overlayEdit.title !== undefined ? overlayEdit.title : (displayAsset?.overlayConfig?.title || '');
+            const subtitleText = overlayEdit.subtitle !== undefined ? overlayEdit.subtitle : (displayAsset?.overlayConfig?.subtitle || '');
+            const titleY = overlayEdit.title_y_percent !== undefined 
+              ? overlayEdit.title_y_percent 
+              : (displayAsset?.overlayConfig?.title_y_percent || 30);
+            const subtitleY = overlayEdit.subtitle_y_percent !== undefined 
+              ? overlayEdit.subtitle_y_percent 
+              : (displayAsset?.overlayConfig?.subtitle_y_percent || 80);
+            
+            // Determine which element is closer to the drag start position
+            const distanceToTitle = Math.abs((dragStart.y || 0) - titleY);
+            const distanceToSubtitle = Math.abs((dragStart.y || 0) - subtitleY);
+            const isDraggingTitle = titleText && (!subtitleText || distanceToTitle < distanceToSubtitle);
+            
+            if (isDraggingTitle) {
+              setOverlayEdit(prev => ({
+                ...prev,
+                title_x_percent: x,
+                title_y_percent: y
+              }));
+              autoSaveOverlay({
+                title_x_percent: x,
+                title_y_percent: y
+              });
+            } else {
+              setOverlayEdit(prev => ({
+                ...prev,
+                subtitle_x_percent: x,
+                subtitle_y_percent: y
+              }));
+              autoSaveOverlay({
+                subtitle_x_percent: x,
+                subtitle_y_percent: y
+              });
+            }
           }
         }
       }
@@ -1454,7 +1552,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   </div>
                 )}
                 
-                {/* Single Text Overlay */}
+                {/* Two Separate Text Overlays - Title and Subtitle */}
                 {displayAsset.type === 'product' && displayAsset.overlayConfig && (
                   <>
                     {/* Title Text Block */}
@@ -1578,18 +1676,140 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         </div>
                       );
                     })()}
+                    
+                    {/* Subtitle Text Block */}
+                    {(overlayEdit.subtitle !== undefined ? overlayEdit.subtitle : displayAsset.overlayConfig.subtitle) && (() => {
+                      const subtitleXPercent = overlayEdit.subtitle_x_percent !== undefined 
+                        ? overlayEdit.subtitle_x_percent 
+                        : (displayAsset.overlayConfig.subtitle_x_percent !== undefined 
+                          ? displayAsset.overlayConfig.subtitle_x_percent 
+                          : 50);
+                      const subtitleYPercent = overlayEdit.subtitle_y_percent !== undefined 
+                        ? overlayEdit.subtitle_y_percent 
+                        : (displayAsset.overlayConfig.subtitle_y_percent !== undefined 
+                          ? displayAsset.overlayConfig.subtitle_y_percent 
+                          : 80);
+                      const subtitleFontSize = overlayEdit.subtitle_font_size || displayAsset.overlayConfig?.subtitle_font_size;
+                      const isEditing = editingTextElement === 'subtitle';
+                      const subtitleText = overlayEdit.subtitle !== undefined 
+                        ? overlayEdit.subtitle 
+                        : (displayAsset.overlayConfig.subtitle || '');
+                      
+                      return (
+                        <div
+                          ref={subtitleTextRef}
+                          className={`absolute select-none border-2 ${isEditing ? 'border-dashed border-blue-400' : 'border-transparent'} ${isEditing ? 'bg-blue-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'}`}
+                          style={{
+                            ...getOverlayPosition(subtitleXPercent, subtitleYPercent),
+                            textAlign: (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                            width: getMaxWidthPixels(overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset.overlayConfig.subtitle_max_width_percent || 80)),
+                            maxWidth: getMaxWidthPixels(overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset.overlayConfig.subtitle_max_width_percent || 80)),
+                            padding: '0.5rem',
+                            color: overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF',
+                            opacity: overlayEdit.subtitle_opacity !== undefined ? overlayEdit.subtitle_opacity : (displayAsset.overlayConfig.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9),
+                            fontFamily: getFontStackForMeasurement((overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif') as 'sans-serif' | 'serif' | 'cursive' | 'handwritten'),
+                            fontWeight: overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal',
+                            fontSize: getFontSize(subtitleFontSize, false),
+                            letterSpacing: overlayEdit.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal',
+                            textTransform: overlayEdit.subtitle_font_transform || 'none',
+                            filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
+                            pointerEvents: 'all',
+                            zIndex: isDragging || isEditing ? 20 : 10,
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word',
+                            wordBreak: 'normal'
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTextElement(isEditing ? null : 'subtitle');
+                          }}
+                          onBlur={(e) => {
+                            const newText = e.currentTarget.textContent || '';
+                            if (newText !== subtitleText) {
+                              setOverlayEdit(prev => ({ ...prev, subtitle: newText }));
+                              autoSaveOverlay({ subtitle: newText });
+                            }
+                            setEditingTextElement(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              e.currentTarget.blur();
+                              setEditingTextElement(null);
+                            }
+                          }}
+                          onPaste={(e) => {
+                            e.preventDefault();
+                            const text = e.clipboardData.getData('text/plain');
+                            document.execCommand('insertText', false, text);
+                          }}
+                          onMouseDown={(e) => {
+                            if (eyedropperActive || isEditing) {
+                              if (!isEditing) {
+                                e.stopPropagation();
+                              }
+                              return;
+                            }
+                            e.preventDefault();
+                            setIsDragging(true);
+                            const imageContainer = e.currentTarget.parentElement;
+                            if (imageContainer && imageDimensions) {
+                              const imageBounds = getImageDisplayBounds(imageContainer);
+                              if (imageBounds) {
+                                const relativeX = e.clientX - imageBounds.x;
+                                const relativeY = e.clientY - imageBounds.y;
+                                const scaleX = imageDimensions.width / imageBounds.width;
+                                const scaleY = imageDimensions.height / imageBounds.height;
+                                const actualX = relativeX * scaleX;
+                                const actualY = relativeY * scaleY;
+                                const x = (actualX / imageDimensions.width) * 100;
+                                const y = (actualY / imageDimensions.height) * 100;
+                                setDragStart({ x, y });
+                              } else {
+                                const rect = imageContainer.getBoundingClientRect();
+                                const containerAspect = rect.width / rect.height;
+                                const imageAspect = imageDimensions.width / imageDimensions.height;
+                                let displayWidth: number, displayHeight: number;
+                                if (imageAspect > containerAspect) {
+                                  displayWidth = rect.width;
+                                  displayHeight = rect.width / imageAspect;
+                                } else {
+                                  displayHeight = rect.height;
+                                  displayWidth = rect.height * imageAspect;
+                                }
+                                const relativeX = e.clientX - rect.left - (rect.width - displayWidth) / 2;
+                                const relativeY = e.clientY - rect.top - (rect.height - displayHeight) / 2;
+                                const scaleX = imageDimensions.width / displayWidth;
+                                const scaleY = imageDimensions.height / displayHeight;
+                                const actualX = relativeX * scaleX;
+                                const actualY = relativeY * scaleY;
+                                const x = (actualX / imageDimensions.width) * 100;
+                                const y = (actualY / imageDimensions.height) * 100;
+                                setDragStart({ x, y });
+                              }
+                            }
+                          }}
+                          contentEditable={isEditing}
+                          suppressContentEditableWarning={true}
+                        >
+                          {isEditing && renderResizeHandles('subtitle')}
+                          {calculatedSubtitleLines.length > 0 
+                            ? calculatedSubtitleLines.join('\n')
+                            : subtitleText}
+                        </div>
+                      );
+                    })()}
 
                     {/* Floating Text Toolbar */}
-                    {editingTextElement === 'title' && activeBrand && (
+                    {editingTextElement && activeBrand && (
                       <TextToolbar
-                        elementType="title"
+                        elementType={editingTextElement}
                         overlayConfig={displayAsset.overlayConfig}
                         overlayEdit={overlayEdit}
                         onUpdate={(updates) => {
                           setOverlayEdit(prev => ({ ...prev, ...updates }));
                           autoSaveOverlay(updates);
                         }}
-                        textElementRef={titleTextRef}
+                        textElementRef={editingTextElement === 'title' ? titleTextRef : subtitleTextRef}
                         activeBrand={activeBrand}
                         onEyedropperClick={setEyedropperActive}
                       />
