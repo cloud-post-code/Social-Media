@@ -298,7 +298,7 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
 
 export const generateNonProductAsset = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { brandId, userPurpose } = req.body;
+    const { brandId, userPurpose, useExactLogo, logoUrl, brandImageUrls } = req.body;
 
     if (!brandId || !userPurpose) {
       return res.status(400).json({ 
@@ -311,7 +311,12 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
       return res.status(404).json({ error: { message: 'Brand not found' } });
     }
 
-    const strategy = await geminiService.generateNonProductStrategy(brand, userPurpose);
+    const strategy = await geminiService.generateNonProductStrategy(
+      brand, 
+      userPurpose,
+      useExactLogo ? logoUrl : undefined,
+      brandImageUrls
+    );
 
     if (!strategy?.step_1_visual_concept?.imagen_prompt_final) {
       throw new Error('Strategy generation failed to provide a prompt');
@@ -347,13 +352,14 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
 
     const subtitleYPercent = suggestedPosition.toLowerCase().includes('top') ? 70 : 80;
 
-    // Create overlay config from strategy
+    // Create overlay config from strategy with improved readability
     const overlayConfig: OverlayConfig = {
       title: stripMarkdown(messageStrategy?.headline_text || ''),
       subtitle: stripMarkdown(messageStrategy?.body_caption_draft || ''),
-      // Title properties
+      // Title properties - enhanced for readability
       title_font_family: 'sans-serif',
       title_font_weight: 'bold',
+      title_font_size: 72, // Larger font size for readability
       title_font_transform: 'none',
       title_letter_spacing: 'normal',
       title_color_hex: designInstructions.suggested_text_color || '#FFFFFF',
@@ -362,9 +368,16 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
       title_text_anchor: textAnchor,
       title_max_width_percent: 80,
       title_opacity: 1.0,
-      // Subtitle properties
+      // Add background for better readability
+      title_overlay_background_type: 'solid',
+      title_overlay_background_color: '#000000',
+      title_overlay_background_opacity: 0.6,
+      title_overlay_background_shape: 'rounded',
+      title_overlay_background_padding: 16,
+      // Subtitle properties - enhanced for readability
       subtitle_font_family: 'sans-serif',
       subtitle_font_weight: 'regular',
+      subtitle_font_size: 48, // Larger font size for readability
       subtitle_font_transform: 'none',
       subtitle_letter_spacing: 'normal',
       subtitle_color_hex: designInstructions.suggested_text_color || '#FFFFFF',
@@ -372,10 +385,17 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
       subtitle_y_percent: subtitleYPercent,
       subtitle_text_anchor: textAnchor,
       subtitle_max_width_percent: 80,
-      subtitle_opacity: 0.9
+      subtitle_opacity: 0.95,
+      // Add background for better readability
+      subtitle_overlay_background_type: 'solid',
+      subtitle_overlay_background_color: '#000000',
+      subtitle_overlay_background_opacity: 0.5,
+      subtitle_overlay_background_shape: 'rounded',
+      subtitle_overlay_background_padding: 12
     };
 
-    // Apply overlay to image (same as product posts)
+    // Apply overlay to image
+    // Note: Logo overlay will be added in a future update
     const finalImageUrl = await imageOverlayService.applyTextOverlay(
       baseImageUrl,
       overlayConfig

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrandDNA, GeneratedAsset, GenerationOption } from '../models/types.js';
 import { assetApi } from '../services/assetApi.js';
+import { useBrandAssets } from '../hooks/useBrandAssets.js';
 
 interface AssetCreationPageProps {
   activeBrand: BrandDNA | null;
@@ -16,6 +17,13 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
   const [productFocus, setProductFocus] = useState('');
   const [userPurpose, setUserPurpose] = useState('');
   const [productImage, setProductImage] = useState<string | null>(null);
+  
+  // Non-product specific state
+  const [useExactLogo, setUseExactLogo] = useState(false);
+  const [postCount, setPostCount] = useState(1);
+  
+  // Load brand assets for non-product posts
+  const { assets: brandImages, logo, loading: assetsLoading } = useBrandAssets(activeBrand?.id);
   
   // Image size selector state
   const [imageSizePreset, setImageSizePreset] = useState<'story' | 'square' | 'custom'>('square');
@@ -64,11 +72,44 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         });
         setStatusText('Capturing high-fidelity visual...');
       } else {
-        asset = await assetApi.generateNonProduct({
-          brandId: activeBrand.id,
-          userPurpose
-        });
-        setStatusText('Visualizing abstract metaphor...');
+        // Handle batch generation for non-product posts
+        const assetsToCreate: GeneratedAsset[] = [];
+        
+        for (let i = 0; i < postCount; i++) {
+          setStatusText(`Generating post ${i + 1} of ${postCount}...`);
+          
+          const asset = await assetApi.generateNonProduct({
+            brandId: activeBrand.id,
+            userPurpose,
+            useExactLogo,
+            logoUrl: useExactLogo && logo ? logo.image_url : undefined,
+            brandImageUrls: brandImages.length > 0 ? brandImages.map(img => img.image_url) : undefined
+          });
+          
+          // Convert backend format to frontend format
+          const frontendAsset: GeneratedAsset = {
+            ...asset,
+            imageUrl: asset.image_url,
+            brandId: asset.brand_id,
+            campaignImages: asset.campaign_images,
+            overlayConfig: asset.overlay_config,
+            baseImageUrl: asset.base_image_url,
+            userPrompt: asset.user_prompt,
+            feedbackHistory: asset.feedback_history,
+            timestamp: asset.created_at ? new Date(asset.created_at).getTime() : Date.now()
+          };
+          
+          assetsToCreate.push(frontendAsset);
+        }
+        
+        // Call onAssetCreated for each generated asset
+        for (const asset of assetsToCreate) {
+          onAssetCreated(asset);
+        }
+        
+        setLoading(false);
+        setStatusText('');
+        return;
       }
 
       // Convert backend format to frontend format for display
@@ -265,12 +306,76 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                   className="w-full p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] h-52 font-medium text-2xl"
                 />
               </div>
+              
+              {/* Brand Assets Section */}
+              {(logo || brandImages.length > 0) && (
+                <div className="space-y-4 p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Brand Assets</h3>
+                  
+                  {/* Logo */}
+                  {logo && (
+                    <div className="flex items-center gap-4">
+                      <div className="w-20 h-20 bg-white rounded-xl border-2 border-slate-200 p-2 flex items-center justify-center overflow-hidden">
+                        <img src={logo.image_url} alt="Brand logo" className="max-w-full max-h-full object-contain" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={useExactLogo}
+                            onChange={e => setUseExactLogo(e.target.checked)}
+                            className="w-5 h-5 rounded border-2 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm font-bold text-slate-700">Use exact logo in generated post</span>
+                        </label>
+                        <p className="text-xs text-slate-500 mt-1">The logo will be included in the generated image</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Brand Images */}
+                  {brandImages.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 mb-2">Brand Images ({brandImages.length} available)</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {brandImages.slice(0, 8).map((img) => (
+                          <div key={img.id} className="aspect-square bg-white rounded-xl border border-slate-200 overflow-hidden">
+                            <img src={img.image_url} alt="Brand image" className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-2">Brand images will be used as reference for style and composition</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Batch Generation */}
+              <div className="space-y-3">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Number of Posts</label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={postCount}
+                    onChange={e => setPostCount(parseInt(e.target.value))}
+                    className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  />
+                  <div className="w-20 text-center">
+                    <span className="text-2xl font-black text-slate-900">{postCount}</span>
+                    <span className="text-xs text-slate-500 block">post{postCount !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 ml-4">Generate multiple variations (up to 10 at a time)</p>
+              </div>
+              
               <button 
                 onClick={handleGenerate}
                 disabled={loading || !userPurpose}
-                className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300"
+                className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
               >
-                {loading ? statusText : 'Generate Brand DNA Asset'}
+                {loading ? statusText : `Generate ${postCount} Brand DNA Asset${postCount !== 1 ? 's' : ''}`}
               </button>
             </div>
           )}

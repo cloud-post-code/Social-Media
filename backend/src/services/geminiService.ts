@@ -1322,7 +1322,12 @@ Return ONLY:
   };
 };
 
-export const generateNonProductStrategy = async (brandDNA: BrandDNA, userPurpose: string) => {
+export const generateNonProductStrategy = async (
+  brandDNA: BrandDNA, 
+  userPurpose: string,
+  logoUrl?: string,
+  brandImageUrls?: string[]
+) => {
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
 
@@ -1333,10 +1338,29 @@ export const generateNonProductStrategy = async (brandDNA: BrandDNA, userPurpose
   
   const colorsList = allColors.join(', ');
 
+  // Build brand assets context
+  let brandAssetsContext = '';
+  if (logoUrl || (brandImageUrls && brandImageUrls.length > 0)) {
+    brandAssetsContext = '\n\n### BRAND ASSETS AVAILABLE\n';
+    if (logoUrl) {
+      brandAssetsContext += '- Logo is available and can be referenced for style, colors, and composition.\n';
+    }
+    if (brandImageUrls && brandImageUrls.length > 0) {
+      brandAssetsContext += `- ${brandImageUrls.length} brand image(s) available as reference for style, composition, and visual consistency.\n`;
+      brandAssetsContext += '- Use these brand images to inform the visual style, color usage, and overall aesthetic.\n';
+    }
+    brandAssetsContext += '- The generated image should align with the visual style seen in these brand assets.\n';
+  }
+
+  const logoInstruction = logoUrl 
+    ? ' The logo will be added as an overlay separately, so DO NOT include it in the image generation prompt.'
+    : ' NO logos should be included in the generated image.';
+
   const prompt = `
     You are an expert Creative Director. Create a "Non-Product" Brand Moment post.
     Brand DNA: ${JSON.stringify(brandDNA)}
     User Purpose: ${userPurpose}
+    ${brandAssetsContext}
 
     ### BRAND COLOR PALETTE
     All brand colors: ${allColors.join(', ')}
@@ -1349,7 +1373,7 @@ export const generateNonProductStrategy = async (brandDNA: BrandDNA, userPurpose
       "step_1_visual_concept": {
         "visual_metaphor_reasoning": "Explanation",
         "includes_person": boolean,
-        "imagen_prompt_final": "Detailed prompt for Imagen 3. Incorporate brand colors [${allColors.join(', ')}] naturally into the composition. NO watermark. NO branding sections. NO logos. NO text overlays. Clean image only."
+        "imagen_prompt_final": "Detailed prompt for Imagen 3. Incorporate brand colors [${allColors.join(', ')}] naturally into the composition.${logoInstruction} NO watermark. NO branding sections. NO text overlays. Clean image only.${brandImageUrls && brandImageUrls.length > 0 ? ' The visual style should be consistent with the brand images provided as reference.' : ''}"
       },
       "step_2_message_strategy": {
         "headline_text": "Main text hook",

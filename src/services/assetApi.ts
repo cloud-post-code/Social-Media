@@ -20,6 +20,9 @@ export const assetApi = {
   generateNonProduct: (data: {
     brandId: string;
     userPurpose: string;
+    useExactLogo?: boolean;
+    logoUrl?: string;
+    brandImageUrls?: string[];
   }) => api.post<GeneratedAsset>('/assets/generate/non-product', data),
   
   generateCampaign: (data: {
