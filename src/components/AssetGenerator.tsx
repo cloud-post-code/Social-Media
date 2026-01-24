@@ -33,7 +33,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   
   const [currentAsset, setCurrentAsset] = useState<GeneratedAsset | null>(null);
   const [feedback, setFeedback] = useState('');
-  const [isEditingText, setIsEditingText] = useState(false);
+  const [editingTextElement, setEditingTextElement] = useState<'title' | 'subtitle' | null>(null);
   const [overlayEdit, setOverlayEdit] = useState<{
     title?: string;
     subtitle?: string;
@@ -78,7 +78,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [customWidth, setCustomWidth] = useState<number>(1080);
   const [customHeight, setCustomHeight] = useState<number>(1080);
   
-  const [eyedropperActive, setEyedropperActive] = useState(false);
+  const [eyedropperActive, setEyedropperActive] = useState<'title' | 'subtitle' | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   
   const [isDragging, setIsDragging] = useState(false);
@@ -87,11 +87,13 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [resizeHandle, setResizeHandle] = useState<'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null>(null);
   const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
-  const textOverlayRef = useRef<HTMLDivElement>(null);
+  const titleTextRef = useRef<HTMLDivElement>(null);
+  const subtitleTextRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   
   // Store calculated line breaks for preview display
-  const [calculatedTextLines, setCalculatedTextLines] = useState<string[]>([]);
+  const [calculatedTitleLines, setCalculatedTitleLines] = useState<string[]>([]);
+  const [calculatedSubtitleLines, setCalculatedSubtitleLines] = useState<string[]>([]);
   
   // Compute display asset and image URL from current asset
   const displayAsset = currentAsset;
@@ -136,86 +138,115 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   // Handle click outside to deselect text
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (isEditingText) {
+      if (editingTextElement) {
         const target = e.target as HTMLElement;
         if (!target.closest('[contenteditable="true"]') && 
             !target.closest('.fixed') && // Don't close when clicking toolbar
             !target.closest('[class*="resize"]')) { // Don't close when clicking resize handles
-          setIsEditingText(false);
+          setEditingTextElement(null);
         }
       }
     };
 
-    if (isEditingText) {
+    if (editingTextElement) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => {
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [isEditingText]);
+  }, [editingTextElement]);
 
   // Recalculate line breaks in real-time when text or font properties change
   useEffect(() => {
     if (!imageDimensions || !displayAsset?.overlayConfig) return;
 
     const recalculateLines = async () => {
-      // Combine title and subtitle into single text
+      // Calculate title lines
       const titleText = overlayEdit.title !== undefined 
         ? overlayEdit.title 
         : (displayAsset?.overlayConfig?.title || '');
+      
+      if (titleText) {
+        const titleMaxWidthPercent = overlayEdit.title_max_width_percent !== undefined
+          ? overlayEdit.title_max_width_percent
+          : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
+        const titleMaxWidthPx = getMaxWidthPixelsNumeric(titleMaxWidthPercent);
+        
+        const titleFontSize = getFontSizeNumeric(
+          overlayEdit.title_font_size !== undefined 
+            ? overlayEdit.title_font_size 
+            : displayAsset?.overlayConfig?.title_font_size,
+          true
+        );
+        
+        const titleFontFamily = overlayEdit.title_font_family || 
+          displayAsset?.overlayConfig?.title_font_family || 
+          'sans-serif';
+        const titleFontWeight = overlayEdit.title_font_weight === 'bold' 
+          ? 'bold' 
+          : overlayEdit.title_font_weight === 'light' 
+            ? '300' 
+            : 'normal';
+        const titleLetterSpacing = overlayEdit.title_letter_spacing === 'wide' 
+          ? '0.15em' 
+          : 'normal';
+        
+        const titleLines = await calculateTextLinesWithCanvas(
+          titleText,
+          titleMaxWidthPx,
+          titleFontSize,
+          titleFontFamily,
+          titleFontWeight,
+          titleLetterSpacing
+        );
+        
+        setCalculatedTitleLines(titleLines);
+      } else {
+        setCalculatedTitleLines([]);
+      }
+
+      // Calculate subtitle lines
       const subtitleText = overlayEdit.subtitle !== undefined 
         ? overlayEdit.subtitle 
         : (displayAsset?.overlayConfig?.subtitle || '');
       
-      const combinedText = [titleText, subtitleText].filter(t => t).join('\n');
-      
-      if (combinedText) {
-        // Use title properties as primary (or subtitle if title doesn't exist)
-        const hasTitle = titleText.length > 0;
-        const maxWidthPercent = overlayEdit.title_max_width_percent !== undefined
-          ? overlayEdit.title_max_width_percent
-          : (hasTitle 
-            ? (displayAsset?.overlayConfig?.title_max_width_percent || 80)
-            : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80));
-        const maxWidthPx = getMaxWidthPixelsNumeric(maxWidthPercent);
+      if (subtitleText) {
+        const subtitleMaxWidthPercent = overlayEdit.subtitle_max_width_percent !== undefined
+          ? overlayEdit.subtitle_max_width_percent
+          : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80);
+        const subtitleMaxWidthPx = getMaxWidthPixelsNumeric(subtitleMaxWidthPercent);
         
-        const fontSize = getFontSizeNumeric(
-          overlayEdit.title_font_size !== undefined 
-            ? overlayEdit.title_font_size 
-            : (hasTitle 
-              ? displayAsset?.overlayConfig?.title_font_size
-              : displayAsset?.overlayConfig?.subtitle_font_size),
-          hasTitle
+        const subtitleFontSize = getFontSizeNumeric(
+          overlayEdit.subtitle_font_size !== undefined 
+            ? overlayEdit.subtitle_font_size 
+            : displayAsset?.overlayConfig?.subtitle_font_size,
+          false
         );
         
-        const fontFamily = overlayEdit.title_font_family || 
-          (hasTitle 
-            ? displayAsset?.overlayConfig?.title_font_family 
-            : displayAsset?.overlayConfig?.subtitle_font_family) || 
+        const subtitleFontFamily = overlayEdit.subtitle_font_family || 
+          displayAsset?.overlayConfig?.subtitle_font_family || 
           'sans-serif';
-        const fontWeight = overlayEdit.title_font_weight === 'bold' 
+        const subtitleFontWeight = overlayEdit.subtitle_font_weight === 'bold' 
           ? 'bold' 
-          : overlayEdit.title_font_weight === 'light' 
+          : overlayEdit.subtitle_font_weight === 'light' 
             ? '300' 
-            : (hasTitle 
-              ? (overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal')
-              : 'normal');
-        const letterSpacing = overlayEdit.title_letter_spacing === 'wide' 
+            : 'normal';
+        const subtitleLetterSpacing = overlayEdit.subtitle_letter_spacing === 'wide' 
           ? '0.15em' 
           : 'normal';
         
-        const lines = await calculateTextLinesWithCanvas(
-          combinedText,
-          maxWidthPx,
-          fontSize,
-          fontFamily,
-          fontWeight,
-          letterSpacing
+        const subtitleLines = await calculateTextLinesWithCanvas(
+          subtitleText,
+          subtitleMaxWidthPx,
+          subtitleFontSize,
+          subtitleFontFamily,
+          subtitleFontWeight,
+          subtitleLetterSpacing
         );
         
-        setCalculatedTextLines(lines);
+        setCalculatedSubtitleLines(subtitleLines);
       } else {
-        setCalculatedTextLines([]);
+        setCalculatedSubtitleLines([]);
       }
     };
 
@@ -568,8 +599,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   };
   
   // Render resize handles for text blocks
-  const renderResizeHandles = () => {
-    if (isEditingText) {
+  const renderResizeHandles = (element: 'title' | 'subtitle') => {
+    if (editingTextElement === element) {
       return (
         <>
           {/* Corner handles */}
@@ -723,8 +754,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   };
   
   // Function to pick color from image using canvas
-  const pickColorFromImage = async (e: React.MouseEvent<HTMLImageElement>) => {
-    if (!eyedropperActive) return;
+  const pickColorFromImage = async (e: React.MouseEvent<HTMLImageElement>, target: 'title' | 'subtitle') => {
+    if (!eyedropperActive || eyedropperActive !== target) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -782,14 +813,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       
       console.log(`[Eyedropper] Picked color ${hex} at (${clampedX}, ${clampedY}) from image`);
       
-      // Update overlay edit state for both title and subtitle
-      setOverlayEdit(prev => ({
-        ...prev, 
-        title_color_hex: hex,
-        subtitle_color_hex: hex
-      }));
+      // Update overlay edit state for the target element
+      if (target === 'title') {
+        setOverlayEdit(prev => ({...prev, title_color_hex: hex}));
+      } else {
+        setOverlayEdit(prev => ({...prev, subtitle_color_hex: hex}));
+      }
       
-      setEyedropperActive(false);
+      setEyedropperActive(null);
     } catch (error: any) {
       console.error('[Eyedropper] Error picking color:', error);
       alert(`Failed to pick color: ${error.message || 'Unknown error'}`);
@@ -907,15 +938,36 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const x = (actualX / imageDimensions.width) * 100;
             const y = (actualY / imageDimensions.height) * 100;
             
-            setOverlayEdit(prev => ({
-              ...prev,
-              title_x_percent: x,
-              title_y_percent: y,
-              subtitle_x_percent: x,
-              subtitle_y_percent: y,
-              x_percent: x, // Keep legacy for backward compatibility
-              y_percent: y
-            }));
+            // Determine which element is being dragged based on drag start position
+            const titleText = overlayEdit.title !== undefined ? overlayEdit.title : (displayAsset?.overlayConfig?.title || '');
+            const subtitleText = overlayEdit.subtitle !== undefined ? overlayEdit.subtitle : (displayAsset?.overlayConfig?.subtitle || '');
+            const titleY = overlayEdit.title_y_percent !== undefined 
+              ? overlayEdit.title_y_percent 
+              : (displayAsset?.overlayConfig?.title_y_percent || 30);
+            const subtitleY = overlayEdit.subtitle_y_percent !== undefined 
+              ? overlayEdit.subtitle_y_percent 
+              : (displayAsset?.overlayConfig?.subtitle_y_percent || 80);
+            
+            // Determine which element is closer to the drag start position
+            const distanceToTitle = Math.abs((dragStart.y || 0) - titleY);
+            const distanceToSubtitle = Math.abs((dragStart.y || 0) - subtitleY);
+            const isDraggingTitle = titleText && (!subtitleText || distanceToTitle < distanceToSubtitle);
+            
+            if (isDraggingTitle) {
+              setOverlayEdit(prev => ({
+                ...prev,
+                title_x_percent: x,
+                title_y_percent: y,
+                x_percent: x,
+                y_percent: y
+              }));
+            } else {
+              setOverlayEdit(prev => ({
+                ...prev,
+                subtitle_x_percent: x,
+                subtitle_y_percent: y
+              }));
+            }
           } else {
             // Fallback to container-based calculation if image bounds can't be determined
             // This shouldn't happen, but if it does, use container dimensions
@@ -939,15 +991,35 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const actualY = relativeY * scaleY;
             const x = (actualX / imageDimensions.width) * 100;
             const y = (actualY / imageDimensions.height) * 100;
-            setOverlayEdit(prev => ({
-              ...prev,
-              title_x_percent: x,
-              title_y_percent: y,
-              subtitle_x_percent: x,
-              subtitle_y_percent: y,
-              x_percent: x,
-              y_percent: y
-            }));
+            // Determine which element is being dragged based on drag start position
+            const titleText = overlayEdit.title !== undefined ? overlayEdit.title : (displayAsset?.overlayConfig?.title || '');
+            const subtitleText = overlayEdit.subtitle !== undefined ? overlayEdit.subtitle : (displayAsset?.overlayConfig?.subtitle || '');
+            const titleY = overlayEdit.title_y_percent !== undefined 
+              ? overlayEdit.title_y_percent 
+              : (displayAsset?.overlayConfig?.title_y_percent || 30);
+            const subtitleY = overlayEdit.subtitle_y_percent !== undefined 
+              ? overlayEdit.subtitle_y_percent 
+              : (displayAsset?.overlayConfig?.subtitle_y_percent || 80);
+            
+            const distanceToTitle = Math.abs((dragStart.y || 0) - titleY);
+            const distanceToSubtitle = Math.abs((dragStart.y || 0) - subtitleY);
+            const isDraggingTitle = titleText && (!subtitleText || distanceToTitle < distanceToSubtitle);
+            
+            if (isDraggingTitle) {
+              setOverlayEdit(prev => ({
+                ...prev,
+                title_x_percent: x,
+                title_y_percent: y,
+                x_percent: x,
+                y_percent: y
+              }));
+            } else {
+              setOverlayEdit(prev => ({
+                ...prev,
+                subtitle_x_percent: x,
+                subtitle_y_percent: y
+              }));
+            }
           }
         }
       }
@@ -1413,8 +1485,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 style={getAspectRatioStyle()}
                 onClick={(e) => {
                   // Close active text element when clicking outside
-                  if (isEditingText && !(e.target as HTMLElement).closest('[contenteditable="true"]')) {
-                    setIsEditingText(false);
+                  if (editingTextElement && !(e.target as HTMLElement).closest('[contenteditable="true"]')) {
+                    setEditingTextElement(null);
                   }
                 }}
               >
@@ -1423,7 +1495,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   className={`w-full h-full object-contain transition duration-700 group-hover:scale-105 ${eyedropperActive ? 'cursor-crosshair' : ''}`}
                   onClick={(e) => {
                     if (eyedropperActive) {
-                      pickColorFromImage(e);
+                      pickColorFromImage(e, eyedropperActive);
                     }
                   }}
                   onLoad={(e) => {
@@ -1447,190 +1519,273 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 {eyedropperActive && (
                   <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none z-20">
                     <div className="bg-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold text-slate-800">
-                      Click on the image to pick text color
+                      Click on the image to pick {eyedropperActive === 'title' ? 'title' : 'subtitle'} color
                     </div>
                   </div>
                 )}
                 
-                {/* Unified Text Overlay - Always visible for product assets */}
-                {displayAsset.type === 'product' && displayAsset.overlayConfig && (() => {
-                  const titleText = overlayEdit.title !== undefined 
-                    ? overlayEdit.title 
-                    : (displayAsset.overlayConfig.title || '');
-                  const subtitleText = overlayEdit.subtitle !== undefined 
-                    ? overlayEdit.subtitle 
-                    : (displayAsset.overlayConfig.subtitle || '');
-                  
-                  const combinedText = [titleText, subtitleText].filter(t => t).join('\n');
-                  
-                  if (!combinedText) return null;
-                  
-                  // Use title position as primary, or subtitle if title doesn't exist
-                  const hasTitle = titleText.length > 0;
-                  const xPercent = overlayEdit.title_x_percent !== undefined 
-                    ? overlayEdit.title_x_percent 
-                    : (hasTitle 
-                      ? (displayAsset.overlayConfig.title_x_percent !== undefined 
-                        ? displayAsset.overlayConfig.title_x_percent 
-                        : 50)
-                      : (displayAsset.overlayConfig.subtitle_x_percent !== undefined 
-                        ? displayAsset.overlayConfig.subtitle_x_percent 
-                        : 50));
-                  const yPercent = overlayEdit.title_y_percent !== undefined 
-                    ? overlayEdit.title_y_percent 
-                    : (hasTitle 
-                      ? (displayAsset.overlayConfig.title_y_percent !== undefined 
-                        ? displayAsset.overlayConfig.title_y_percent 
-                        : 30)
-                      : (displayAsset.overlayConfig.subtitle_y_percent !== undefined 
-                        ? displayAsset.overlayConfig.subtitle_y_percent 
-                        : 50));
-                  
-                  const fontSize = overlayEdit.title_font_size || 
-                    (hasTitle 
-                      ? displayAsset.overlayConfig?.title_font_size
-                      : displayAsset.overlayConfig?.subtitle_font_size);
-                  const maxWidthPercent = overlayEdit.title_max_width_percent !== undefined
-                    ? overlayEdit.title_max_width_percent
-                    : (hasTitle 
-                      ? (displayAsset.overlayConfig.title_max_width_percent || 80)
-                      : (displayAsset.overlayConfig.subtitle_max_width_percent || 80));
-                  
-                  return (
-                    <>
-                      <div
-                        ref={textOverlayRef}
-                        className={`absolute select-none border-2 ${isEditingText ? 'border-indigo-600' : 'border-dashed border-indigo-400'} bg-indigo-50/20 rounded-lg p-3 backdrop-blur-sm ${isEditingText ? 'cursor-text' : 'cursor-move'}`}
-                        style={{
-                          ...getOverlayPosition(xPercent, yPercent),
-                          textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'end' ? 'right' : 'center',
-                          width: getMaxWidthPixels(maxWidthPercent),
-                          maxWidth: getMaxWidthPixels(maxWidthPercent),
-                          padding: '0.5rem',
-                          color: overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF',
-                          opacity: overlayEdit.title_opacity !== undefined ? overlayEdit.title_opacity : (displayAsset.overlayConfig.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1),
-                          fontFamily: getFontStackForMeasurement((overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif') as 'sans-serif' | 'serif' | 'cursive' | 'handwritten'),
-                          fontWeight: overlayEdit.title_font_weight === 'bold' ? 'bold' : overlayEdit.title_font_weight === 'light' ? '300' : 'normal',
-                          fontSize: getFontSize(fontSize, hasTitle),
-                          letterSpacing: overlayEdit.title_letter_spacing === 'wide' ? '0.15em' : 'normal',
-                          textTransform: overlayEdit.title_font_transform || 'none',
-                          filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
-                          pointerEvents: 'all',
-                          zIndex: isDragging || isEditingText ? 20 : 10,
-                          wordWrap: 'break-word',
-                          overflowWrap: 'break-word',
-                          wordBreak: 'normal'
-                        }}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          setIsEditingText(!isEditingText);
-                        }}
-                        onBlur={(e) => {
-                          // Save text content when blurring - split by first newline
-                          const newText = e.currentTarget.textContent || '';
-                          if (newText !== combinedText) {
-                            const lines = newText.split('\n');
-                            const newTitle = lines[0] || '';
-                            const newSubtitle = lines.slice(1).join('\n') || '';
-                            setOverlayEdit(prev => ({ 
-                              ...prev, 
-                              title: newTitle,
-                              subtitle: newSubtitle,
-                              title_x_percent: xPercent,
-                              title_y_percent: yPercent
-                            }));
-                            autoSaveOverlay({ 
-                              title: newTitle,
-                              subtitle: newSubtitle,
-                              title_x_percent: xPercent,
-                              title_y_percent: yPercent
-                            });
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') {
-                            e.currentTarget.blur();
-                            setIsEditingText(false);
-                          }
-                        }}
-                        onPaste={(e) => {
-                          e.preventDefault();
-                          const text = e.clipboardData.getData('text/plain');
-                          document.execCommand('insertText', false, text);
-                        }}
-                        onMouseDown={(e) => {
-                          if (eyedropperActive || isEditingText) {
-                            if (!isEditingText) {
-                              e.stopPropagation();
-                            }
-                            return;
-                          }
-                          e.preventDefault();
-                          setIsDragging(true);
-                          const imageContainer = e.currentTarget.parentElement;
-                          if (imageContainer && imageDimensions) {
-                            const imageBounds = getImageDisplayBounds(imageContainer);
-                            if (imageBounds) {
-                              const relativeX = e.clientX - imageBounds.x;
-                              const relativeY = e.clientY - imageBounds.y;
-                              const scaleX = imageDimensions.width / imageBounds.width;
-                              const scaleY = imageDimensions.height / imageBounds.height;
-                              const actualX = relativeX * scaleX;
-                              const actualY = relativeY * scaleY;
-                              const x = (actualX / imageDimensions.width) * 100;
-                              const y = (actualY / imageDimensions.height) * 100;
-                              setDragStart({ x, y });
-                            } else {
-                              const rect = imageContainer.getBoundingClientRect();
-                              const containerAspect = rect.width / rect.height;
-                              const imageAspect = imageDimensions.width / imageDimensions.height;
-                              let displayWidth: number, displayHeight: number;
-                              if (imageAspect > containerAspect) {
-                                displayWidth = rect.width;
-                                displayHeight = rect.width / imageAspect;
-                              } else {
-                                displayHeight = rect.height;
-                                displayWidth = rect.height * imageAspect;
-                              }
-                              const relativeX = e.clientX - rect.left - (rect.width - displayWidth) / 2;
-                              const relativeY = e.clientY - rect.top - (rect.height - displayHeight) / 2;
-                              const scaleX = imageDimensions.width / displayWidth;
-                              const scaleY = imageDimensions.height / displayHeight;
-                              const actualX = relativeX * scaleX;
-                              const actualY = relativeY * scaleY;
-                              const x = (actualX / imageDimensions.width) * 100;
-                              const y = (actualY / imageDimensions.height) * 100;
-                              setDragStart({ x, y });
-                            }
-                          }
-                        }}
-                        contentEditable={isEditingText}
-                        suppressContentEditableWarning={true}
-                      >
-                        {isEditingText && renderResizeHandles()}
-                        {calculatedTextLines.length > 0 
-                          ? calculatedTextLines.join('\n')
-                          : combinedText}
-                      </div>
-
-                      {/* Floating Text Toolbar */}
-                      {isEditingText && activeBrand && (
-                        <TextToolbar
-                          elementType="title"
-                          overlayConfig={displayAsset.overlayConfig}
-                          overlayEdit={overlayEdit}
-                          onUpdate={(updates) => {
-                            setOverlayEdit(prev => ({ ...prev, ...updates }));
-                            autoSaveOverlay(updates);
+                {/* Two Separate Text Overlays - Title and Subtitle */}
+                {displayAsset.type === 'product' && displayAsset.overlayConfig && (
+                  <>
+                    {/* Title Text Block */}
+                    {(overlayEdit.title !== undefined ? overlayEdit.title : displayAsset.overlayConfig.title) && (() => {
+                      const titleXPercent = overlayEdit.title_x_percent !== undefined 
+                        ? overlayEdit.title_x_percent 
+                        : (displayAsset.overlayConfig.title_x_percent !== undefined 
+                          ? displayAsset.overlayConfig.title_x_percent 
+                          : 50);
+                      const titleYPercent = overlayEdit.title_y_percent !== undefined 
+                        ? overlayEdit.title_y_percent 
+                        : (displayAsset.overlayConfig.title_y_percent !== undefined 
+                          ? displayAsset.overlayConfig.title_y_percent 
+                          : 30);
+                      const titleFontSize = overlayEdit.title_font_size || displayAsset.overlayConfig?.title_font_size;
+                      const isEditing = editingTextElement === 'title';
+                      const titleText = overlayEdit.title !== undefined 
+                        ? overlayEdit.title 
+                        : (displayAsset.overlayConfig.title || '');
+                      
+                      return (
+                        <div
+                          ref={titleTextRef}
+                          className={`absolute select-none border-2 ${isEditing ? 'border-indigo-600' : 'border-dashed border-indigo-400'} bg-indigo-50/20 rounded-lg p-3 backdrop-blur-sm ${isEditing ? 'cursor-text' : 'cursor-move'}`}
+                          style={{
+                            ...getOverlayPosition(titleXPercent, titleYPercent),
+                            textAlign: (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                            width: getMaxWidthPixels(overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset.overlayConfig.title_max_width_percent || 80)),
+                            maxWidth: getMaxWidthPixels(overlayEdit.title_max_width_percent !== undefined ? overlayEdit.title_max_width_percent : (displayAsset.overlayConfig.title_max_width_percent || 80)),
+                            padding: '0.5rem',
+                            color: overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF',
+                            opacity: overlayEdit.title_opacity !== undefined ? overlayEdit.title_opacity : (displayAsset.overlayConfig.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1),
+                            fontFamily: getFontStackForMeasurement((overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif') as 'sans-serif' | 'serif' | 'cursive' | 'handwritten'),
+                            fontWeight: overlayEdit.title_font_weight === 'bold' ? 'bold' : overlayEdit.title_font_weight === 'light' ? '300' : 'normal',
+                            fontSize: getFontSize(titleFontSize, true),
+                            letterSpacing: overlayEdit.title_letter_spacing === 'wide' ? '0.15em' : 'normal',
+                            textTransform: overlayEdit.title_font_transform || 'none',
+                            filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
+                            pointerEvents: 'all',
+                            zIndex: isDragging || isEditing ? 20 : 10,
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word',
+                            wordBreak: 'normal'
                           }}
-                          textElementRef={textOverlayRef}
-                          activeBrand={activeBrand}
-                          onEyedropperClick={() => setEyedropperActive(true)}
-                        />
-                      )}
-                    </>
-                  );
-                })()}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTextElement(isEditing ? null : 'title');
+                          }}
+                          onBlur={(e) => {
+                            const newText = e.currentTarget.textContent || '';
+                            if (newText !== titleText) {
+                              setOverlayEdit(prev => ({ ...prev, title: newText }));
+                              autoSaveOverlay({ title: newText });
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              e.currentTarget.blur();
+                              setEditingTextElement(null);
+                            }
+                          }}
+                          onPaste={(e) => {
+                            e.preventDefault();
+                            const text = e.clipboardData.getData('text/plain');
+                            document.execCommand('insertText', false, text);
+                          }}
+                          onMouseDown={(e) => {
+                            if (eyedropperActive || isEditing) {
+                              if (!isEditing) {
+                                e.stopPropagation();
+                              }
+                              return;
+                            }
+                            e.preventDefault();
+                            setIsDragging(true);
+                            const imageContainer = e.currentTarget.parentElement;
+                            if (imageContainer && imageDimensions) {
+                              const imageBounds = getImageDisplayBounds(imageContainer);
+                              if (imageBounds) {
+                                const relativeX = e.clientX - imageBounds.x;
+                                const relativeY = e.clientY - imageBounds.y;
+                                const scaleX = imageDimensions.width / imageBounds.width;
+                                const scaleY = imageDimensions.height / imageBounds.height;
+                                const actualX = relativeX * scaleX;
+                                const actualY = relativeY * scaleY;
+                                const x = (actualX / imageDimensions.width) * 100;
+                                const y = (actualY / imageDimensions.height) * 100;
+                                setDragStart({ x, y });
+                              } else {
+                                const rect = imageContainer.getBoundingClientRect();
+                                const containerAspect = rect.width / rect.height;
+                                const imageAspect = imageDimensions.width / imageDimensions.height;
+                                let displayWidth: number, displayHeight: number;
+                                if (imageAspect > containerAspect) {
+                                  displayWidth = rect.width;
+                                  displayHeight = rect.width / imageAspect;
+                                } else {
+                                  displayHeight = rect.height;
+                                  displayWidth = rect.height * imageAspect;
+                                }
+                                const relativeX = e.clientX - rect.left - (rect.width - displayWidth) / 2;
+                                const relativeY = e.clientY - rect.top - (rect.height - displayHeight) / 2;
+                                const scaleX = imageDimensions.width / displayWidth;
+                                const scaleY = imageDimensions.height / displayHeight;
+                                const actualX = relativeX * scaleX;
+                                const actualY = relativeY * scaleY;
+                                const x = (actualX / imageDimensions.width) * 100;
+                                const y = (actualY / imageDimensions.height) * 100;
+                                setDragStart({ x, y });
+                              }
+                            }
+                          }}
+                          contentEditable={isEditing}
+                          suppressContentEditableWarning={true}
+                        >
+                          {isEditing && renderResizeHandles('title')}
+                          {calculatedTitleLines.length > 0 
+                            ? calculatedTitleLines.join('\n')
+                            : titleText}
+                        </div>
+                      );
+                    })()}
+                    
+                    {/* Subtitle Text Block */}
+                    {(overlayEdit.subtitle !== undefined ? overlayEdit.subtitle : displayAsset.overlayConfig.subtitle) && (() => {
+                      const subtitleXPercent = overlayEdit.subtitle_x_percent !== undefined 
+                        ? overlayEdit.subtitle_x_percent 
+                        : (displayAsset.overlayConfig.subtitle_x_percent !== undefined 
+                          ? displayAsset.overlayConfig.subtitle_x_percent 
+                          : 50);
+                      const subtitleYPercent = overlayEdit.subtitle_y_percent !== undefined 
+                        ? overlayEdit.subtitle_y_percent 
+                        : (displayAsset.overlayConfig.subtitle_y_percent !== undefined 
+                          ? displayAsset.overlayConfig.subtitle_y_percent 
+                          : 80);
+                      const subtitleFontSize = overlayEdit.subtitle_font_size || displayAsset.overlayConfig?.subtitle_font_size;
+                      const isEditing = editingTextElement === 'subtitle';
+                      const subtitleText = overlayEdit.subtitle !== undefined 
+                        ? overlayEdit.subtitle 
+                        : (displayAsset.overlayConfig.subtitle || '');
+                      
+                      return (
+                        <div
+                          ref={subtitleTextRef}
+                          className={`absolute select-none border-2 ${isEditing ? 'border-blue-600' : 'border-dashed border-blue-400'} bg-blue-50/20 rounded-lg p-3 backdrop-blur-sm ${isEditing ? 'cursor-text' : 'cursor-move'}`}
+                          style={{
+                            ...getOverlayPosition(subtitleXPercent, subtitleYPercent),
+                            textAlign: (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'start' ? 'left' : (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'end' ? 'right' : 'center',
+                            width: getMaxWidthPixels(overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset.overlayConfig.subtitle_max_width_percent || 80)),
+                            maxWidth: getMaxWidthPixels(overlayEdit.subtitle_max_width_percent !== undefined ? overlayEdit.subtitle_max_width_percent : (displayAsset.overlayConfig.subtitle_max_width_percent || 80)),
+                            padding: '0.5rem',
+                            color: overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF',
+                            opacity: overlayEdit.subtitle_opacity !== undefined ? overlayEdit.subtitle_opacity : (displayAsset.overlayConfig.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9),
+                            fontFamily: getFontStackForMeasurement((overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif') as 'sans-serif' | 'serif' | 'cursive' | 'handwritten'),
+                            fontWeight: overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal',
+                            fontSize: getFontSize(subtitleFontSize, false),
+                            letterSpacing: overlayEdit.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal',
+                            textTransform: overlayEdit.subtitle_font_transform || 'none',
+                            filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
+                            pointerEvents: 'all',
+                            zIndex: isDragging || isEditing ? 20 : 10,
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word',
+                            wordBreak: 'normal'
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTextElement(isEditing ? null : 'subtitle');
+                          }}
+                          onBlur={(e) => {
+                            const newText = e.currentTarget.textContent || '';
+                            if (newText !== subtitleText) {
+                              setOverlayEdit(prev => ({ ...prev, subtitle: newText }));
+                              autoSaveOverlay({ subtitle: newText });
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              e.currentTarget.blur();
+                              setEditingTextElement(null);
+                            }
+                          }}
+                          onPaste={(e) => {
+                            e.preventDefault();
+                            const text = e.clipboardData.getData('text/plain');
+                            document.execCommand('insertText', false, text);
+                          }}
+                          onMouseDown={(e) => {
+                            if (eyedropperActive || isEditing) {
+                              if (!isEditing) {
+                                e.stopPropagation();
+                              }
+                              return;
+                            }
+                            e.preventDefault();
+                            setIsDragging(true);
+                            const imageContainer = e.currentTarget.parentElement;
+                            if (imageContainer && imageDimensions) {
+                              const imageBounds = getImageDisplayBounds(imageContainer);
+                              if (imageBounds) {
+                                const relativeX = e.clientX - imageBounds.x;
+                                const relativeY = e.clientY - imageBounds.y;
+                                const scaleX = imageDimensions.width / imageBounds.width;
+                                const scaleY = imageDimensions.height / imageBounds.height;
+                                const actualX = relativeX * scaleX;
+                                const actualY = relativeY * scaleY;
+                                const x = (actualX / imageDimensions.width) * 100;
+                                const y = (actualY / imageDimensions.height) * 100;
+                                setDragStart({ x, y });
+                              } else {
+                                const rect = imageContainer.getBoundingClientRect();
+                                const containerAspect = rect.width / rect.height;
+                                const imageAspect = imageDimensions.width / imageDimensions.height;
+                                let displayWidth: number, displayHeight: number;
+                                if (imageAspect > containerAspect) {
+                                  displayWidth = rect.width;
+                                  displayHeight = rect.width / imageAspect;
+                                } else {
+                                  displayHeight = rect.height;
+                                  displayWidth = rect.height * imageAspect;
+                                }
+                                const relativeX = e.clientX - rect.left - (rect.width - displayWidth) / 2;
+                                const relativeY = e.clientY - rect.top - (rect.height - displayHeight) / 2;
+                                const scaleX = imageDimensions.width / displayWidth;
+                                const scaleY = imageDimensions.height / displayHeight;
+                                const actualX = relativeX * scaleX;
+                                const actualY = relativeY * scaleY;
+                                const x = (actualX / imageDimensions.width) * 100;
+                                const y = (actualY / imageDimensions.height) * 100;
+                                setDragStart({ x, y });
+                              }
+                            }
+                          }}
+                          contentEditable={isEditing}
+                          suppressContentEditableWarning={true}
+                        >
+                          {isEditing && renderResizeHandles('subtitle')}
+                          {calculatedSubtitleLines.length > 0 
+                            ? calculatedSubtitleLines.join('\n')
+                            : subtitleText}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Floating Text Toolbar */}
+                    {editingTextElement && activeBrand && (
+                      <TextToolbar
+                        elementType={editingTextElement}
+                        overlayConfig={displayAsset.overlayConfig}
+                        overlayEdit={overlayEdit}
+                        onUpdate={(updates) => {
+                          setOverlayEdit(prev => ({ ...prev, ...updates }));
+                          autoSaveOverlay(updates);
+                        }}
+                        textElementRef={editingTextElement === 'title' ? titleTextRef : subtitleTextRef}
+                        activeBrand={activeBrand}
+                        onEyedropperClick={setEyedropperActive}
+                      />
+                    )}
+                  </>
+                )}
               </div>
               
               {/* For non-product assets, show CSS overlay if needed */}
@@ -1708,396 +1863,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               </div>
             )}
           </div>
-
-          {/* Feedback Chat */}
-                    <div className="space-y-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider">Title</h3>
-                        {(overlayEdit.title !== undefined && overlayEdit.title !== '') || displayAsset.overlayConfig?.title ? (
-                          <button
-                            onClick={async () => {
-                              setOverlayEdit({...overlayEdit, title: ''});
-                              // Immediately save the deletion
-                              if (currentAsset && currentAsset.type === 'product') {
-                                try {
-                                  const updated = await assetApi.updateOverlay(currentAsset.id, {...overlayEdit, title: ''});
-                                  const frontendAsset: GeneratedAsset = {
-                                    ...updated,
-                                    imageUrl: updated.image_url,
-                                    brandId: updated.brand_id,
-                                    campaignImages: updated.campaign_images,
-                                    overlayConfig: updated.overlay_config,
-                                    baseImageUrl: updated.base_image_url,
-                                    userPrompt: updated.user_prompt,
-                                    feedbackHistory: updated.feedback_history,
-                                    timestamp: updated.created_at ? new Date(updated.created_at).getTime() : Date.now()
-                                  };
-                                  setCurrentAsset(frontendAsset);
-                                } catch (err) {
-                                  console.error('Failed to delete title:', err);
-                                }
-                              }
-                            }}
-                            className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-all"
-                            title="Delete title"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        ) : null}
-                      </div>
-                      
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                          Text (Press Enter for new line)
-                        </label>
-                        <textarea
-                          value={overlayEdit.title || ''}
-                          onChange={e => {
-                            setOverlayEdit({...overlayEdit, title: e.target.value});
-                            // Auto-resize textarea
-                            e.target.style.height = 'auto';
-                            e.target.style.height = `${e.target.scrollHeight}px`;
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              // Allow Enter to create new line
-                              // Textarea will auto-resize via onChange
-                            }
-                          }}
-                          rows={3}
-                          className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold resize-y overflow-hidden"
-                          placeholder="Enter title... (Press Enter for new line)"
-                          style={{ minHeight: '3rem' }}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Color</label>
-                        <div className="space-y-2">
-                          {activeBrand && (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => setOverlayEdit({...overlayEdit, title_color_hex: activeBrand.visual_identity.primary_color_hex})}
-                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
-                                style={{ backgroundColor: activeBrand.visual_identity.primary_color_hex }}
-                                title="Primary Brand Color"
-                              />
-                              <button
-                                onClick={() => setOverlayEdit({...overlayEdit, title_color_hex: activeBrand.visual_identity.accent_color_hex})}
-                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
-                                style={{ backgroundColor: activeBrand.visual_identity.accent_color_hex }}
-                                title="Accent Brand Color"
-                              />
-                              <button
-                                onClick={() => setEyedropperActive('title')}
-                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm bg-white flex items-center justify-center"
-                                title="Pick color from image"
-                              >
-                                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                                </svg>
-                              </button>
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <input
-                              type="color"
-                              value={overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF'}
-                              onChange={e => setOverlayEdit({...overlayEdit, title_color_hex: e.target.value})}
-                              className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
-                            />
-                            <input
-                              type="text"
-                              value={overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF'}
-                              onChange={e => setOverlayEdit({...overlayEdit, title_color_hex: e.target.value})}
-                              className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                              placeholder="#FFFFFF"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Size</label>
-                        <div className="flex gap-2 items-center">
-                          <input
-                            type="number"
-                            min="12"
-                            max="200"
-                            value={overlayEdit.title_font_size || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setOverlayEdit({...overlayEdit, title_font_size: val ? parseInt(val) : undefined});
-                            }}
-                            className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                            placeholder="Auto"
-                          />
-                          <span className="text-sm font-bold text-slate-500">px</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Family</label>
-                          <select
-                            value={overlayEdit.title_font_family || displayAsset.overlayConfig?.title_font_family || 'sans-serif'}
-                            onChange={e => setOverlayEdit({...overlayEdit, title_font_family: e.target.value as any})}
-                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                          >
-                            <option value="sans-serif">Sans-serif</option>
-                            <option value="serif">Serif</option>
-                            <option value="cursive">Cursive</option>
-                            <option value="handwritten">Handwritten</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Weight</label>
-                          <select
-                            value={overlayEdit.title_font_weight || displayAsset.overlayConfig?.title_font_weight || 'bold'}
-                            onChange={e => setOverlayEdit({...overlayEdit, title_font_weight: e.target.value as any})}
-                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                          >
-                            <option value="light">Light</option>
-                            <option value="regular">Regular</option>
-                            <option value="bold">Bold</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Text Alignment</label>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setOverlayEdit({...overlayEdit, title_text_anchor: 'start'})}
-                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
-                              (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'start'
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                            }`}
-                          >
-                            Left
-                          </button>
-                          <button
-                            onClick={() => setOverlayEdit({...overlayEdit, title_text_anchor: 'middle'})}
-                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
-                              (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'middle'
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                            }`}
-                          >
-                            Center
-                          </button>
-                          <button
-                            onClick={() => setOverlayEdit({...overlayEdit, title_text_anchor: 'end'})}
-                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
-                              (overlayEdit.title_text_anchor || displayAsset.overlayConfig?.title_text_anchor || 'middle') === 'end'
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                            }`}
-                          >
-                            Right
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Subtitle Section */}
-                    <div className="space-y-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider">Subtitle</h3>
-                        {(overlayEdit.subtitle !== undefined && overlayEdit.subtitle !== '') || displayAsset.overlayConfig?.subtitle ? (
-                          <button
-                            onClick={async () => {
-                              setOverlayEdit({...overlayEdit, subtitle: ''});
-                              // Immediately save the deletion
-                              if (currentAsset && currentAsset.type === 'product') {
-                                try {
-                                  const updated = await assetApi.updateOverlay(currentAsset.id, {...overlayEdit, subtitle: ''});
-                                  const frontendAsset: GeneratedAsset = {
-                                    ...updated,
-                                    imageUrl: updated.image_url,
-                                    brandId: updated.brand_id,
-                                    campaignImages: updated.campaign_images,
-                                    overlayConfig: updated.overlay_config,
-                                    baseImageUrl: updated.base_image_url,
-                                    userPrompt: updated.user_prompt,
-                                    feedbackHistory: updated.feedback_history,
-                                    timestamp: updated.created_at ? new Date(updated.created_at).getTime() : Date.now()
-                                  };
-                                  setCurrentAsset(frontendAsset);
-                                } catch (err) {
-                                  console.error('Failed to delete subtitle:', err);
-                                }
-                              }
-                            }}
-                            className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-all"
-                            title="Delete subtitle"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        ) : null}
-                      </div>
-                      
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                          Text (Press Enter for new line)
-                        </label>
-                        <textarea
-                          value={overlayEdit.subtitle || ''}
-                          onChange={e => {
-                            setOverlayEdit({...overlayEdit, subtitle: e.target.value});
-                            // Auto-resize textarea
-                            e.target.style.height = 'auto';
-                            e.target.style.height = `${e.target.scrollHeight}px`;
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              // Allow Enter to create new line
-                              // Textarea will auto-resize via onChange
-                            }
-                          }}
-                          rows={3}
-                          className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium resize-y overflow-hidden"
-                          placeholder="Enter subtitle... (Press Enter for new line)"
-                          style={{ minHeight: '3rem' }}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Color</label>
-                        <div className="space-y-2">
-                          {activeBrand && (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => setOverlayEdit({...overlayEdit, subtitle_color_hex: activeBrand.visual_identity.primary_color_hex})}
-                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
-                                style={{ backgroundColor: activeBrand.visual_identity.primary_color_hex }}
-                                title="Primary Brand Color"
-                              />
-                              <button
-                                onClick={() => setOverlayEdit({...overlayEdit, subtitle_color_hex: activeBrand.visual_identity.accent_color_hex})}
-                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm"
-                                style={{ backgroundColor: activeBrand.visual_identity.accent_color_hex }}
-                                title="Accent Brand Color"
-                              />
-                              <button
-                                onClick={() => setEyedropperActive('subtitle')}
-                                className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all shadow-sm bg-white flex items-center justify-center"
-                                title="Pick color from image"
-                              >
-                                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                                </svg>
-                              </button>
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <input
-                              type="color"
-                              value={overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF'}
-                              onChange={e => setOverlayEdit({...overlayEdit, subtitle_color_hex: e.target.value})}
-                              className="w-16 h-12 rounded-xl border-2 border-slate-200 cursor-pointer"
-                            />
-                            <input
-                              type="text"
-                              value={overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF'}
-                              onChange={e => setOverlayEdit({...overlayEdit, subtitle_color_hex: e.target.value})}
-                              className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                              placeholder="#FFFFFF"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Size</label>
-                        <div className="flex gap-2 items-center">
-                          <input
-                            type="number"
-                            min="12"
-                            max="200"
-                            value={overlayEdit.subtitle_font_size || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setOverlayEdit({...overlayEdit, subtitle_font_size: val ? parseInt(val) : undefined});
-                            }}
-                            className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                            placeholder="Auto"
-                          />
-                          <span className="text-sm font-bold text-slate-500">px</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Family</label>
-                          <select
-                            value={overlayEdit.subtitle_font_family || displayAsset.overlayConfig?.subtitle_font_family || 'sans-serif'}
-                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_font_family: e.target.value as any})}
-                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                          >
-                            <option value="sans-serif">Sans-serif</option>
-                            <option value="serif">Serif</option>
-                            <option value="cursive">Cursive</option>
-                            <option value="handwritten">Handwritten</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Font Weight</label>
-                          <select
-                            value={overlayEdit.subtitle_font_weight || displayAsset.overlayConfig?.subtitle_font_weight || 'regular'}
-                            onChange={e => setOverlayEdit({...overlayEdit, subtitle_font_weight: e.target.value as any})}
-                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold"
-                          >
-                            <option value="light">Light</option>
-                            <option value="regular">Regular</option>
-                            <option value="bold">Bold</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Text Alignment</label>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setOverlayEdit({...overlayEdit, subtitle_text_anchor: 'start'})}
-                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
-                              (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'start'
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                            }`}
-                          >
-                            Left
-                          </button>
-                          <button
-                            onClick={() => setOverlayEdit({...overlayEdit, subtitle_text_anchor: 'middle'})}
-                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
-                              (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'middle'
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                            }`}
-                          >
-                            Center
-                          </button>
-                          <button
-                            onClick={() => setOverlayEdit({...overlayEdit, subtitle_text_anchor: 'end'})}
-                            className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold text-sm ${
-                              (overlayEdit.subtitle_text_anchor || displayAsset.overlayConfig?.subtitle_text_anchor || 'middle') === 'end'
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                            }`}
-                          >
-                            Right
-                          </button>
-                        </div>
-                      </div>
-                    </div>
 
           {/* Feedback Chat */}
           <div className="lg:col-span-6">
