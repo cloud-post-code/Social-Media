@@ -258,14 +258,31 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
       updatedOverlayConfig
     );
 
-    // Update strategy with new overlay config
-    const updatedStrategy = {
-      ...asset.strategy,
-      step_3_overlay_design: {
-        ...asset.strategy?.step_3_overlay_design,
-        overlay_config: updatedOverlayConfig
-      }
-    };
+    // Update strategy with new overlay config - handle different strategy structures
+    let updatedStrategy;
+    if (asset.type === 'product') {
+      // Product posts have step_3_overlay_design
+      updatedStrategy = {
+        ...asset.strategy,
+        step_3_overlay_design: {
+          ...asset.strategy?.step_3_overlay_design,
+          overlay_config: updatedOverlayConfig
+        }
+      };
+    } else if (asset.type === 'non-product') {
+      // Non-product posts have step_1_visual_concept and step_2_message_strategy
+      // Preserve the entire strategy structure and add overlay_config to step_2_message_strategy
+      updatedStrategy = {
+        ...asset.strategy,
+        step_2_message_strategy: {
+          ...(asset.strategy?.step_2_message_strategy || {}),
+          overlay_config: updatedOverlayConfig
+        }
+      };
+    } else {
+      // Fallback: preserve existing strategy
+      updatedStrategy = asset.strategy;
+    }
 
     const updatedAsset = await assetService.updateAsset(id, {
       image_url: finalImageUrl,
