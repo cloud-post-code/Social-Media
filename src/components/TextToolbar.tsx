@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { OverlayConfig } from '../models/types';
-import { GOOGLE_FONTS, loadGoogleFont, getFontFamilyString, FONT_MAPPING } from '../utils/googleFonts';
+import { GOOGLE_FONTS, loadGoogleFont, getFontFamilyString, FONT_MAPPING, GoogleFont } from '../utils/googleFonts';
 
 interface TextToolbarProps {
   elementType: 'title' | 'subtitle';
@@ -89,7 +89,10 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
   const textAnchor = overlayEdit[`${prefix}_text_anchor` as keyof OverlayConfig] as 'start' | 'middle' | 'end' || 
     overlayConfig?.[`${prefix}_text_anchor` as keyof OverlayConfig] as 'start' | 'middle' | 'end' || 'middle';
 
-  const handleFontFamilyChange = async (value: string) => {
+  const handleFontFamilyChange = async (e: React.MouseEvent, value: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     // Load the font if it's a Google Font
     const isGoogleFont = GOOGLE_FONTS.some(f => f.family === value);
     if (isGoogleFont) {
@@ -120,13 +123,26 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
       }
     };
     if (showFontDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
+      // Use a slight delay to allow button clicks to process first
+      setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+      }, 100);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showFontDropdown]);
 
+  // Include system fonts in the list
+  const SYSTEM_FONTS: GoogleFont[] = [
+    { family: 'sans-serif', category: 'sans-serif' },
+    { family: 'serif', category: 'serif' },
+    { family: 'cursive', category: 'handwriting' },
+    { family: 'handwritten', category: 'handwriting' },
+  ];
+  
+  const ALL_FONTS = [...SYSTEM_FONTS, ...GOOGLE_FONTS];
+  
   // Filter fonts based on search
-  const filteredFonts = GOOGLE_FONTS.filter(font =>
+  const filteredFonts = ALL_FONTS.filter(font =>
     font.family.toLowerCase().includes(fontSearch.toLowerCase())
   );
 
@@ -186,11 +202,12 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
                   <button
                     key={font.family}
                     type="button"
-                    onClick={() => handleFontFamilyChange(font.family)}
+                    onClick={(e) => handleFontFamilyChange(e, font.family)}
+                    onMouseDown={(e) => e.preventDefault()} // Prevent dropdown from closing before click
                     className={`w-full px-3 py-2 text-left hover:bg-indigo-50 transition-colors flex items-center justify-between ${
                       fontFamily === font.family ? 'bg-indigo-100 font-bold' : ''
                     }`}
-                    style={{ fontFamily: `"${font.family}", sans-serif` }}
+                    style={{ fontFamily: getFontFamilyString(font.family) }}
                   >
                     <span>{font.family}</span>
                     <span className="text-xs text-slate-500 capitalize">{font.category}</span>
