@@ -238,15 +238,16 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       
       // First, save any pending overlay changes using saveOverlay
       // This will update the asset with the latest overlay config and regenerate the image
-      await saveOverlay(overlayEdit);
+      const updatedAsset = await saveOverlay(overlayEdit);
       
-      // Wait for state to update and get the latest final image URL
-      // The saveOverlay function updates currentAsset state, so we need to wait a moment
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!updatedAsset) {
+        alert('Failed to save overlay changes. Please try again.');
+        setSaving(false);
+        return;
+      }
       
-      // Get the updated final image URL from the current asset state
-      // Since saveOverlay updates currentAsset, finalImageUrl will be updated
-      const imageToSave = currentAsset?.imageUrl || currentAsset?.image_url;
+      // Get the updated final image URL from the returned asset
+      const imageToSave = updatedAsset.imageUrl || updatedAsset.image_url;
       
       if (!imageToSave) {
         alert('No image available to save');
@@ -1395,8 +1396,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     }
   };
 
-  const saveOverlay = async (updates?: Partial<typeof overlayEdit>) => {
-    if (!currentAsset || currentAsset.type !== 'product') return;
+  const saveOverlay = async (updates?: Partial<typeof overlayEdit>): Promise<GeneratedAsset | undefined> => {
+    if (!currentAsset || (currentAsset.type !== 'product' && currentAsset.type !== 'non-product')) return undefined;
     
     const configToSave = updates ? { ...overlayEdit, ...updates } : overlayEdit;
     
@@ -1518,9 +1519,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       setCurrentAsset(frontendAsset);
       // Merge saved changes into overlayEdit to keep UI in sync
       setOverlayEdit({});
+      return frontendAsset;
     } catch (err) {
       console.error('Overlay update failed:', err);
       // Don't show alert for auto-save failures, just log
+      return undefined;
     } finally {
       setSaving(false);
     }
