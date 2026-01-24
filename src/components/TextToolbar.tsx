@@ -109,21 +109,24 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
     // Use the actual font family name for loading
     const actualFontFamily = font.family;
     
-    // Load the font if it's a Google Font
-    const isGoogleFont = GOOGLE_FONTS.some(f => f.family === actualFontFamily);
-    if (isGoogleFont) {
-      try {
-        await loadGoogleFont(actualFontFamily);
-      } catch (err) {
-        console.error('Failed to load font:', err);
-      }
-    }
-    
     // Store the value (generic name if available for backward compatibility, otherwise actual font name)
     const valueToStore = font.storedValue || actualFontFamily;
+    
+    // Update state immediately before font loads - this ensures immediate visual update
     onUpdate({ [`${prefix}_font_family`]: valueToStore } as any);
+    
+    // Close dropdown immediately
     setShowFontDropdown(false);
     setFontSearch('');
+    
+    // Load the font asynchronously in the background (font will apply once loaded)
+    const isGoogleFont = GOOGLE_FONTS.some(f => f.family === actualFontFamily);
+    if (isGoogleFont) {
+      // Don't await - let it load in background
+      loadGoogleFont(actualFontFamily).catch(err => {
+        console.error('Failed to load font:', err);
+      });
+    }
   };
 
   // Load current font on mount
@@ -139,14 +142,15 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (fontDropdownRef.current && !fontDropdownRef.current.contains(event.target as Node)) {
         setShowFontDropdown(false);
+        setFontSearch('');
       }
     };
     if (showFontDropdown) {
-      // Use a slight delay to allow button clicks to process first
-      setTimeout(() => {
-        document.addEventListener('mousedown', handleClickOutside);
-      }, 100);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      // Use capture phase to catch events before they bubble
+      document.addEventListener('mousedown', handleClickOutside, true);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside, true);
+      };
     }
   }, [showFontDropdown]);
 
@@ -237,8 +241,11 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
                     <button
                       key={font.family}
                       type="button"
-                      onClick={(e) => handleFontFamilyChange(e, font)}
-                      onMouseDown={(e) => e.preventDefault()} // Prevent dropdown from closing before click
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent click from bubbling to document
+                        handleFontFamilyChange(e, font);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()} // Prevent mousedown from bubbling
                       className={`w-full px-3 py-2 text-left hover:bg-indigo-50 transition-colors flex items-center justify-between ${
                         isSelected ? 'bg-indigo-100 font-bold' : ''
                       }`}

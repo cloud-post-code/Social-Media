@@ -11,9 +11,14 @@ export const GOOGLE_FONTS: GoogleFont[] = [
   // Sans-serif (most popular)
   { family: 'Inter', category: 'sans-serif' },
   { family: 'Roboto', category: 'sans-serif' },
+  { family: 'Open Sans', category: 'sans-serif' },
+  { family: 'Montserrat', category: 'sans-serif' },
+  { family: 'Poppins', category: 'sans-serif' },
   
   // Serif
   { family: 'Merriweather', category: 'serif' },
+  { family: 'Playfair Display', category: 'serif' },
+  { family: 'Lora', category: 'serif' },
   
   // Handwriting/Cursive
   { family: 'Dancing Script', category: 'handwriting' },
@@ -63,10 +68,13 @@ export const getFontFamilyString = (fontName: string): string => {
     return `"${FONT_MAPPING[fontName]}", ${fontName === 'cursive' || fontName === 'handwritten' ? 'cursive' : fontName}`;
   }
   
-  // If it's already a Google Font name, use it directly
-  const isGoogleFont = GOOGLE_FONTS.some(f => f.family === fontName);
-  if (isGoogleFont) {
-    return `"${fontName}", sans-serif`;
+  // If it's already a Google Font name, use it directly with appropriate fallback
+  const googleFont = GOOGLE_FONTS.find(f => f.family === fontName);
+  if (googleFont) {
+    const fallback = googleFont.category === 'serif' ? 'serif' : 
+                     googleFont.category === 'handwriting' ? 'cursive' :
+                     googleFont.category === 'monospace' ? 'monospace' : 'sans-serif';
+    return `"${fontName}", ${fallback}`;
   }
   
   // Fallback to system fonts
