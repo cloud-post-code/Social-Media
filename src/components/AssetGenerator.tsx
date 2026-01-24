@@ -1287,27 +1287,20 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     }
   };
 
-  // Debounced auto-save function
-  const debouncedSaveRef = useRef<NodeJS.Timeout | null>(null);
+  // Immediate auto-save function (no debounce)
   const autoSaveOverlay = useCallback((updates?: Partial<typeof overlayEdit>) => {
-    if (debouncedSaveRef.current) {
-      clearTimeout(debouncedSaveRef.current);
-    }
-    debouncedSaveRef.current = setTimeout(() => {
-      // Merge updates with current overlayEdit state
-      const mergedUpdates = updates ? { ...overlayEdit, ...updates } : overlayEdit;
-      saveOverlay(mergedUpdates);
-    }, 500);
-  }, [overlayEdit]);
-
-  // Cleanup debounce on unmount
-  useEffect(() => {
-    return () => {
-      if (debouncedSaveRef.current) {
-        clearTimeout(debouncedSaveRef.current);
-      }
-    };
+    // Use a ref to get the latest overlayEdit state
+    const latestOverlayEdit = overlayEditRef.current;
+    // Merge updates with current overlayEdit state
+    const mergedUpdates = updates ? { ...latestOverlayEdit, ...updates } : latestOverlayEdit;
+    saveOverlay(mergedUpdates);
   }, []);
+
+  // Ref to track latest overlayEdit for auto-save
+  const overlayEditRef = useRef(overlayEdit);
+  useEffect(() => {
+    overlayEditRef.current = overlayEdit;
+  }, [overlayEdit]);
   
   // Auto-save after drag/resize ends
   useEffect(() => {
@@ -1575,6 +1568,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       
                       return (
                         <div
+                          key={`title-${overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif'}-${overlayEdit.title_font_size || displayAsset.overlayConfig.title_font_size || ''}`}
                           ref={titleTextRef}
                           className={`absolute select-none border-2 ${isEditing ? 'border-dashed border-indigo-400' : 'border-transparent'} ${isEditing ? 'bg-indigo-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'}`}
                           style={{
@@ -1697,6 +1691,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       
                       return (
                         <div
+                          key={`subtitle-${overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif'}-${overlayEdit.subtitle_font_size || displayAsset.overlayConfig.subtitle_font_size || ''}`}
                           ref={subtitleTextRef}
                           className={`absolute select-none border-2 ${isEditing ? 'border-dashed border-blue-400' : 'border-transparent'} ${isEditing ? 'bg-blue-50/20' : 'bg-transparent'} rounded-lg p-3 ${isEditing ? 'backdrop-blur-sm' : ''} ${isEditing ? 'cursor-text' : 'cursor-move'}`}
                           style={{
