@@ -12,19 +12,76 @@ import ErrorMessage from './components/ErrorMessage.js';
 const App: React.FC = () => {
   const { brands, loading: brandsLoading, error: brandsError, createBrand, updateBrand, deleteBrand } = useBrands();
   const { assets, loading: assetsLoading, createAsset, deleteAsset } = useAssets();
-  const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
-  const [view, setView] = useState<'home' | 'dna' | 'studio' | 'create'>('home');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
+  
+  // Restore state from localStorage on mount
+  const [activeBrandId, setActiveBrandId] = useState<string | null>(() => {
+    const saved = localStorage.getItem('brandgenius_activeBrandId');
+    return saved || null;
+  });
+  const [view, setView] = useState<'home' | 'dna' | 'studio' | 'create'>(() => {
+    const saved = localStorage.getItem('brandgenius_view') as 'home' | 'dna' | 'studio' | 'create' | null;
+    return saved || 'home';
+  });
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('brandgenius_sidebarOpen');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [editingAssetId, setEditingAssetId] = useState<string | null>(() => {
+    const saved = localStorage.getItem('brandgenius_editingAssetId');
+    return saved || null;
+  });
 
   const activeBrand = brands.find(b => b.id === activeBrandId) || null;
   const editingAsset = editingAssetId ? assets.find(a => a.id === editingAssetId) : null;
+
+  // Persist activeBrandId to localStorage
+  useEffect(() => {
+    if (activeBrandId) {
+      localStorage.setItem('brandgenius_activeBrandId', activeBrandId);
+    } else {
+      localStorage.removeItem('brandgenius_activeBrandId');
+    }
+  }, [activeBrandId]);
+
+  // Persist view to localStorage
+  useEffect(() => {
+    localStorage.setItem('brandgenius_view', view);
+  }, [view]);
+
+  // Persist sidebarOpen to localStorage
+  useEffect(() => {
+    localStorage.setItem('brandgenius_sidebarOpen', String(sidebarOpen));
+  }, [sidebarOpen]);
+
+  // Persist editingAssetId to localStorage
+  useEffect(() => {
+    if (editingAssetId) {
+      localStorage.setItem('brandgenius_editingAssetId', editingAssetId);
+    } else {
+      localStorage.removeItem('brandgenius_editingAssetId');
+    }
+  }, [editingAssetId]);
 
   useEffect(() => {
     if (brands.length > 0 && !activeBrandId) {
       setActiveBrandId(brands[0].id);
     }
   }, [brands, activeBrandId]);
+
+  // Restore studio view if editingAssetId is set and assets are loaded
+  useEffect(() => {
+    if (editingAssetId && assets.length > 0 && editingAsset) {
+      // Ensure we're on the studio view when editing an asset
+      if (view !== 'studio') {
+        setView('studio');
+      }
+      // Ensure the brand is active
+      const assetBrandId = editingAsset.brand_id || editingAsset.brandId;
+      if (assetBrandId && assetBrandId !== activeBrandId) {
+        setActiveBrandId(assetBrandId);
+      }
+    }
+  }, [editingAssetId, assets, editingAsset, view, activeBrandId]);
 
   const handleSaveBrand = async (dna: BrandDNA): Promise<BrandDNA> => {
     try {

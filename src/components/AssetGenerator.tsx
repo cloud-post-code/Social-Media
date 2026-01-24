@@ -30,6 +30,13 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [currentAsset, setCurrentAsset] = useState<GeneratedAsset | null>(null);
   const [feedback, setFeedback] = useState('');
   const [editingTextElement, setEditingTextElement] = useState<'title' | 'subtitle' | null>(null);
+  
+  // Helper function to get localStorage key for overlay edit state
+  const getOverlayEditKey = (assetId: string | undefined) => {
+    return assetId ? `brandgenius_overlayEdit_${assetId}` : null;
+  };
+  
+  // Initialize overlayEdit from localStorage if available
   const [overlayEdit, setOverlayEdit] = useState<{
     title?: string;
     subtitle?: string;
@@ -306,8 +313,27 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         timestamp: initialAsset.created_at ? new Date(initialAsset.created_at).getTime() : initialAsset.timestamp || Date.now()
       };
       setCurrentAsset(frontendAsset);
-      // Reset all editing state when switching to a new asset to prevent state bleeding between assets
-      setOverlayEdit({});
+      
+      // Restore overlayEdit from localStorage if available
+      const savedOverlayEditKey = getOverlayEditKey(frontendAsset.id);
+      if (savedOverlayEditKey) {
+        try {
+          const saved = localStorage.getItem(savedOverlayEditKey);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            setOverlayEdit(parsed);
+          } else {
+            setOverlayEdit({});
+          }
+        } catch (e) {
+          console.error('Failed to restore overlayEdit from localStorage:', e);
+          setOverlayEdit({});
+        }
+      } else {
+        setOverlayEdit({});
+      }
+      
+      // Reset editing UI state when switching to a new asset
       setEditingTextElement(null);
       setEyedropperActive(null);
       setIsDragging(false);
@@ -1517,8 +1543,12 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         timestamp: updated.created_at ? new Date(updated.created_at).getTime() : Date.now()
       };
       setCurrentAsset(frontendAsset);
-      // Merge saved changes into overlayEdit to keep UI in sync
+      // Clear overlayEdit state and localStorage since changes are now saved
       setOverlayEdit({});
+      const savedOverlayEditKey = getOverlayEditKey(frontendAsset.id);
+      if (savedOverlayEditKey) {
+        localStorage.removeItem(savedOverlayEditKey);
+      }
       return frontendAsset;
     } catch (err) {
       console.error('Overlay update failed:', err);
@@ -1543,6 +1573,20 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   useEffect(() => {
     overlayEditRef.current = overlayEdit;
   }, [overlayEdit]);
+
+  // Persist overlayEdit to localStorage whenever it changes
+  useEffect(() => {
+    if (currentAsset?.id && Object.keys(overlayEdit).length > 0) {
+      const key = getOverlayEditKey(currentAsset.id);
+      if (key) {
+        try {
+          localStorage.setItem(key, JSON.stringify(overlayEdit));
+        } catch (e) {
+          console.error('Failed to save overlayEdit to localStorage:', e);
+        }
+      }
+    }
+  }, [overlayEdit, currentAsset?.id]);
   
   // Auto-save after drag/resize ends
   useEffect(() => {
