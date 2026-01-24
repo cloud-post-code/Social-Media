@@ -71,26 +71,10 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
             }
           }
           if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
-            // Check how many images we can still upload
-            const currentImageCount = assets.length;
-            const maxImages = 50;
-            const remainingSlots = Math.max(0, maxImages - currentImageCount);
-            
-            if (remainingSlots === 0) {
-              console.warn('Cannot upload extracted images: brand already has 50 images');
-              setExtractedAssets(null);
-              return;
-            }
-            
-            // Only upload as many as we can fit
-            const imagesToUpload = extractedAssets.imageUrls.slice(0, remainingSlots);
-            for (const imageUrl of imagesToUpload) {
+            for (const imageUrl of extractedAssets.imageUrls) {
               try {
                 await uploadAsset(imageUrl, 'brand_image');
               } catch (err: any) {
-                if (err.message?.includes('Maximum')) {
-                  break; // Reached max limit
-                }
                 console.error('Failed to save image:', err);
               }
             }
@@ -254,18 +238,14 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
           
           if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
             console.log(`[Extraction] Attempting to save ${extractedAssets.imageUrls.length} brand images...`);
-            for (let i = 0; i < Math.min(extractedAssets.imageUrls.length, 50); i++) {
+            for (let i = 0; i < extractedAssets.imageUrls.length; i++) {
               const imageUrl = extractedAssets.imageUrls[i];
               try {
-                console.log(`[Extraction] Saving image ${i + 1}/${Math.min(extractedAssets.imageUrls.length, 50)}: ${imageUrl.substring(0, 100)}...`);
+                console.log(`[Extraction] Saving image ${i + 1}/${extractedAssets.imageUrls.length}: ${imageUrl.substring(0, 100)}...`);
                 await brandAssetApi.uploadAsset(createdBrand.id, imageUrl, 'brand_image');
                 savedImages++;
                 console.log(`[Extraction] ✓ Image ${i + 1} saved successfully`);
               } catch (err: any) {
-                if (err.message?.includes('Maximum')) {
-                  console.log(`[Extraction] Reached maximum image limit at image ${i + 1}`);
-                  break;
-                }
                 console.error(`[Extraction] ✗ Failed to save image ${i + 1}:`, {
                   error: err.message,
                   response: err.response?.data,
@@ -352,13 +332,6 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
   const handleAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>, assetType: 'logo' | 'brand_image') => {
     const file = e.target.files?.[0];
     if (!file || !brandId) return;
-    
-    // Check limits before uploading
-    if (assetType === 'brand_image' && assets.length >= 50) {
-      alert('Maximum of 50 brand images allowed. Please delete an image first.');
-      e.target.value = ''; // Reset file input
-      return;
-    }
     
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -474,35 +447,10 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
         
         // Save brand images if extracted
         if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
-          // Check current asset count first
-          let currentImageCount = 0;
-          try {
-            const currentAssets = await brandAssetApi.getAssets(savedBrand.id, 'brand_image').catch(() => []);
-            currentImageCount = currentAssets?.length || 0;
-          } catch (err: any) {
-            // If we can't get the count, assume 0 (brand might be new)
-            console.warn('Could not get current asset count, assuming 0:', err);
-            currentImageCount = 0;
-          }
-          
-          const maxImages = 50;
-          const remainingSlots = Math.max(0, maxImages - currentImageCount);
-          
-          if (remainingSlots === 0) {
-            console.warn('Cannot upload extracted images: brand already has 50 images');
-            setExtractedAssets(null);
-            return;
-          }
-          
-          // Only upload as many as we can fit
-          const imagesToUpload = extractedAssets.imageUrls.slice(0, remainingSlots);
-          for (const imageUrl of imagesToUpload) {
+          for (const imageUrl of extractedAssets.imageUrls) {
             try {
               await brandAssetApi.uploadAsset(savedBrand.id, imageUrl, 'brand_image');
             } catch (err: any) {
-              if (err.message?.includes('Maximum')) {
-                break; // Reached max limit
-              }
               console.error('Failed to save image:', err);
             }
           }
@@ -524,7 +472,6 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     setFormData({ ...savedBrand });
   };
 
-  const canUploadMoreImages = assets.length < 50;
   const hasLogo = !!logo;
 
   return (
@@ -829,19 +776,17 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">
-                  Brand Images ({assets.length} / 50)
+                  Brand Images ({assets.length})
                 </h4>
-                {canUploadMoreImages && (
-                  <label className="text-xs text-indigo-600 font-bold cursor-pointer hover:text-indigo-700 transition">
-                    + Upload Image
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={(e) => handleAssetUpload(e, 'brand_image')}
-                    />
-                  </label>
-                )}
+                <label className="text-xs text-indigo-600 font-bold cursor-pointer hover:text-indigo-700 transition">
+                  + Upload Image
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => handleAssetUpload(e, 'brand_image')}
+                  />
+                </label>
               </div>
               {assets.length > 0 ? (
                 <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
@@ -882,22 +827,15 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
               ) : (
                 <div className="bg-white p-12 rounded-2xl border-2 border-dashed border-slate-200 text-center">
                   <p className="text-slate-400 text-sm font-medium mb-2">No brand images yet</p>
-                  {canUploadMoreImages && (
-                    <label className="text-xs text-indigo-600 font-bold cursor-pointer hover:text-indigo-700 transition inline-block">
-                      + Upload First Image
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={(e) => handleAssetUpload(e, 'brand_image')}
-                      />
-                    </label>
-                  )}
-                </div>
-              )}
-              {!canUploadMoreImages && (
-                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                  <p className="text-xs text-amber-800">Maximum of 50 images reached. Delete an image to upload a new one.</p>
+                  <label className="text-xs text-indigo-600 font-bold cursor-pointer hover:text-indigo-700 transition inline-block">
+                    + Upload First Image
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={(e) => handleAssetUpload(e, 'brand_image')}
+                    />
+                  </label>
                 </div>
               )}
             </div>

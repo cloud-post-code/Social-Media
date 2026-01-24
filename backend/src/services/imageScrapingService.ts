@@ -59,19 +59,17 @@ export async function getWebsiteStructure(url: string): Promise<string> {
       // Extract all images with their attributes
       const images = doc.querySelectorAll('img');
       images.forEach((img: any, index: number) => {
-        if (index < 50) { // Limit to first 50 images
-          const rect = img.getBoundingClientRect();
-          result.images.push({
-            src: img.src || img.getAttribute('src') || '',
-            alt: img.alt || '',
-            width: rect.width,
-            height: rect.height,
-            className: img.className || '',
-            id: img.id || '',
-            parentTag: img.parentElement?.tagName || '',
-            parentClass: img.parentElement?.className || ''
-          });
-        }
+        const rect = img.getBoundingClientRect();
+        result.images.push({
+          src: img.src || img.getAttribute('src') || '',
+          alt: img.alt || '',
+          width: rect.width,
+          height: rect.height,
+          className: img.className || '',
+          id: img.id || '',
+          parentTag: img.parentElement?.tagName || '',
+          parentClass: img.parentElement?.className || ''
+        });
       });
       
       // Extract navigation structure

@@ -148,19 +148,6 @@ export const createBrandAsset = async (
   imageUrl: string,
   assetType: 'logo' | 'brand_image'
 ): Promise<BrandAsset> => {
-  // Check limits
-  if (assetType === 'logo') {
-    const existingLogo = await getBrandLogo(brandId);
-    if (existingLogo) {
-      throw new Error('Brand already has a logo. Delete the existing logo first.');
-    }
-  } else if (assetType === 'brand_image') {
-    const existingImages = await getBrandAssets(brandId, 'brand_image');
-    if (existingImages.length >= 50) {
-      throw new Error('Maximum of 50 brand images allowed');
-    }
-  }
-  
   // If imageUrl is an external URL (starts with http), fetch and convert to base64
   let finalImageUrl = imageUrl;
   if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
@@ -186,6 +173,35 @@ export const createBrandAsset = async (
     throw new Error(`Image conversion failed: URL is still external: ${finalImageUrl.substring(0, 100)}`);
   }
   
+  // For logos, check if one already exists and overwrite it
+  if (assetType === 'logo') {
+    const existingLogo = await getBrandLogo(brandId);
+    if (existingLogo) {
+      console.log(`[Brand Asset] Logo already exists, updating existing logo: ${existingLogo.id}`);
+      const result = await pool.query<BrandAssetRow>(
+        'UPDATE brand_assets SET image_url = $1, created_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+        [finalImageUrl, existingLogo.id]
+      );
+      console.log(`[Brand Asset] Successfully updated logo: ${existingLogo.id}`);
+      return rowToBrandAsset(result.rows[0]);
+    }
+  }
+  
+  // For brand images, check if an identical image already exists and overwrite it
+  if (assetType === 'brand_image') {
+    const existingImages = await getBrandAssets(brandId, 'brand_image');
+    const existingImage = existingImages.find(img => img.image_url === finalImageUrl);
+    if (existingImage) {
+      console.log(`[Brand Asset] Identical brand image already exists, updating: ${existingImage.id}`);
+      const result = await pool.query<BrandAssetRow>(
+        'UPDATE brand_assets SET image_url = $1, created_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+        [finalImageUrl, existingImage.id]
+      );
+      console.log(`[Brand Asset] Successfully updated brand image: ${existingImage.id}`);
+      return rowToBrandAsset(result.rows[0]);
+    }
+  }
+  
   // Generate unique ID: assetType_brandId_timestamp_random
   // Use performance.now() for better precision and ensure single timestamp
   const timestamp = Date.now();
@@ -197,7 +213,7 @@ export const createBrandAsset = async (
     throw new Error(`Generated asset ID is too long: ${id.length} characters`);
   }
   
-  console.log(`[Brand Asset] Creating asset with ID: ${id.substring(0, 80)}...`);
+  console.log(`[Brand Asset] Creating new asset with ID: ${id.substring(0, 80)}...`);
   
   const result = await pool.query<BrandAssetRow>(
     'INSERT INTO brand_assets (id, brand_id, image_url, asset_type) VALUES ($1, $2, $3, $4) RETURNING *',
