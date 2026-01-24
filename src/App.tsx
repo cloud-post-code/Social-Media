@@ -31,6 +31,10 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('brandgenius_editingAssetId');
     return saved || null;
   });
+  const [sidebarAssetsPage, setSidebarAssetsPage] = useState(() => {
+    const saved = localStorage.getItem('brandgenius_sidebarAssetsPage');
+    return saved ? parseInt(saved, 10) : 1;
+  });
   
   // Track which editingAssetId we've already navigated for
   const navigatedForAssetIdRef = useRef<string | null>(null);
@@ -65,6 +69,20 @@ const App: React.FC = () => {
       localStorage.removeItem('brandgenius_editingAssetId');
     }
   }, [editingAssetId]);
+
+  // Persist sidebarAssetsPage to localStorage
+  useEffect(() => {
+    localStorage.setItem('brandgenius_sidebarAssetsPage', String(sidebarAssetsPage));
+  }, [sidebarAssetsPage]);
+
+  // Reset sidebar assets page when assets change (e.g., brand switch, asset deletion)
+  useEffect(() => {
+    const itemsPerPage = 6;
+    const totalPages = Math.ceil(assets.length / itemsPerPage);
+    if (totalPages > 0 && sidebarAssetsPage > totalPages) {
+      setSidebarAssetsPage(1);
+    }
+  }, [assets.length, sidebarAssetsPage]);
 
   useEffect(() => {
     // Don't auto-select a brand if we're on the DNA page (creating a new brand)
@@ -323,8 +341,17 @@ const App: React.FC = () => {
                 ))}
               </div>
             ) : assets.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 px-1">
-                {assets.slice(0, 8).map(asset => {
+              <>
+                <div className="grid grid-cols-2 gap-3 px-1">
+                  {(() => {
+                    const itemsPerPage = 6;
+                    const totalPages = Math.ceil(assets.length / itemsPerPage);
+                    const currentPage = Math.min(sidebarAssetsPage, totalPages || 1);
+                    const startIndex = (currentPage - 1) * itemsPerPage;
+                    const endIndex = startIndex + itemsPerPage;
+                    const paginatedAssets = assets.slice(startIndex, endIndex);
+                    
+                    return paginatedAssets.map(asset => {
                   const imageUrl = asset.imageUrl || asset.image_url;
                   return (
                     <div 
@@ -388,9 +415,40 @@ const App: React.FC = () => {
                         </button>
                       </div>
                     </div>
+                    );
+                  });
+                  })()}
+                </div>
+                {(() => {
+                  const itemsPerPage = 6;
+                  const totalPages = Math.ceil(assets.length / itemsPerPage);
+                  const currentPage = Math.min(sidebarAssetsPage, totalPages || 1);
+                  
+                  if (totalPages <= 1) return null;
+                  
+                  return (
+                    <div className="flex items-center justify-between mt-4 px-1">
+                      <button
+                        onClick={() => setSidebarAssetsPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-xs font-bold text-slate-400">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setSidebarAssetsPage(Math.min(totalPages, currentPage + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      >
+                        Next
+                      </button>
+                    </div>
                   );
-                })}
-              </div>
+                })()}
+              </>
             ) : (
               <div className="p-6 bg-slate-50 rounded-2xl text-center border-2 border-dashed border-slate-200">
                 <p className="text-xs font-bold text-slate-400">No assets yet.</p>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrandDNA, GeneratedAsset } from '../models/types.js';
 
 interface HomePageProps {
@@ -22,7 +22,21 @@ const HomePage: React.FC<HomePageProps> = ({
   onDownloadAsset,
   onDeleteAsset
 }) => {
-  const recentAssets = assets.slice(0, 8);
+  const [assetsPage, setAssetsPage] = useState(1);
+  
+  const itemsPerPage = 6;
+  const totalPages = Math.ceil(assets.length / itemsPerPage);
+  const currentPage = Math.min(assetsPage, totalPages || 1);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const recentAssets = assets.slice(startIndex, endIndex);
+  
+  // Reset to page 1 when assets change (e.g., brand switch, asset deletion)
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setAssetsPage(1);
+    }
+  }, [assets.length, totalPages, currentPage]);
 
   return (
     <div className="space-y-10 max-w-6xl mx-auto pb-20">
@@ -82,7 +96,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   key={asset.id}
                   className="aspect-square rounded-2xl overflow-hidden bg-slate-100 border-2 border-white shadow-sm relative group"
                 >
-                  {imageUrl && <img src={imageUrl} className="w-full h-full object-cover" />}
+                  {imageUrl && <img src={imageUrl} loading="lazy" className="w-full h-full object-cover" />}
                   
                   {/* Action buttons overlay */}
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -133,6 +147,27 @@ const HomePage: React.FC<HomePageProps> = ({
               );
             })}
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4 mt-6">
+              <button
+                onClick={() => setAssetsPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 text-sm font-bold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                Previous
+              </button>
+              <span className="text-sm font-bold text-slate-600">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setAssetsPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 text-sm font-bold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </section>
       )}
     </div>
