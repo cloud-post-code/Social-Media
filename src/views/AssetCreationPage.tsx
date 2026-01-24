@@ -49,9 +49,16 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
       });
       
       Promise.all(readers).then((base64Images) => {
-        setProductImages(prev => [...prev, ...base64Images]);
+        // Limit to 2 photos total
+        setProductImages(prev => {
+          const combined = [...prev, ...base64Images];
+          return combined.slice(0, 2);
+        });
         // Initialize empty product focus for each new image
-        setProductFocus(prev => [...prev, ...new Array(base64Images.length).fill('')]);
+        setProductFocus(prev => {
+          const combined = [...prev, ...new Array(base64Images.length).fill('')];
+          return combined.slice(0, 2);
+        });
       });
     }
     // Reset input so same files can be selected again
@@ -243,7 +250,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
     } finally {
       setLoading(false);
       setStatusText('');
-      setCurrentPost(0);
+      setCurrentStep(0);
       setStartTime(null);
     }
   };
@@ -299,8 +306,9 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         
         <div className="space-y-8">
           {option === 'product' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-              <div className="lg:col-span-4 space-y-4">
+            <div className="space-y-8">
+              {/* Reference Hero Images Section */}
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Reference Hero Images</label>
                   {productImages.length > 0 && (
@@ -336,18 +344,20 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                         </div>
                       </div>
                     ))}
-                    <label className="aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
-                      <div className="bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-xl text-indigo-600 group-hover:scale-110 transition">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-                        </svg>
-                      </div>
-                      <span className="text-xs font-black text-slate-500 mt-3">Add More</span>
-                      <input type="file" className="hidden" accept="image/*" multiple onChange={handleProductImageUpload} />
-                    </label>
+                    {productImages.length < 2 && (
+                      <label className="aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
+                        <div className="bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-xl text-indigo-600 group-hover:scale-110 transition">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                          </svg>
+                        </div>
+                        <span className="text-xs font-black text-slate-500 mt-3">Add More</span>
+                        <input type="file" className="hidden" accept="image/*" multiple onChange={handleProductImageUpload} />
+                      </label>
+                    )}
                   </div>
                 ) : (
-                  <label className="block aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
+                  <label className="block aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner max-w-md">
                     <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl text-indigo-600 group-hover:scale-110 transition">
                       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
@@ -355,15 +365,15 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                     </div>
                     <span className="text-sm font-black text-slate-500">Add Product References</span>
                     <p className="text-xs text-slate-400 mt-2 font-medium">PNG, JPG up to 10MB</p>
-                    <p className="text-xs text-slate-400 mt-1 font-medium">Select multiple photos</p>
+                    <p className="text-xs text-slate-400 mt-1 font-medium">Select up to 2 photos</p>
                     <input type="file" className="hidden" accept="image/*" multiple onChange={handleProductImageUpload} />
                   </label>
                 )}
               </div>
-              <div className="lg:col-span-8 flex flex-col justify-center space-y-8">
-                {/* Image Size Selector */}
-                <div className="space-y-3">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Image Size</label>
+              
+              {/* Image Size Selector */}
+              <div className="space-y-3">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Image Size</label>
                   <div className="grid grid-cols-3 gap-3">
                     <button
                       onClick={() => setImageSizePreset('story')}
@@ -423,28 +433,27 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                       </div>
                     </div>
                   )}
-                </div>
-                
-                {/* Progress Bar */}
-                {loading && startTime !== null && (
-                  <div key="product-progress" className="p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
-                    <GenerationProgressBar
-                      current={currentStep}
-                      total={totalSteps}
-                      statusText={statusText || 'Generating...'}
-                      startTime={startTime}
-                    />
-                  </div>
-                )}
-                
-                <button 
-                  onClick={handleGenerate}
-                  disabled={loading || productImages.length === 0 || productFocus.some(focus => !focus || focus.trim() === '')}
-                  className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
-                >
-                  {loading ? 'Generating...' : 'Draft Product Masterpiece'}
-                </button>
               </div>
+              
+              {/* Progress Bar */}
+              {loading && startTime !== null && (
+                <div key="product-progress" className="p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
+                  <GenerationProgressBar
+                    current={currentStep}
+                    total={totalSteps}
+                    statusText={statusText || 'Generating...'}
+                    startTime={startTime}
+                  />
+                </div>
+              )}
+              
+              <button 
+                onClick={handleGenerate}
+                disabled={loading || productImages.length === 0 || productFocus.some(focus => !focus || focus.trim() === '')}
+                className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
+              >
+                {loading ? 'Generating...' : 'Draft Product Masterpiece'}
+              </button>
             </div>
           )}
 
