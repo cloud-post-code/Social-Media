@@ -11,7 +11,7 @@ import ErrorMessage from './components/ErrorMessage.js';
 
 const App: React.FC = () => {
   const { brands, loading: brandsLoading, error: brandsError, createBrand, updateBrand, deleteBrand } = useBrands();
-  const { assets, loading: assetsLoading, createAsset, deleteAsset } = useAssets();
+  const { assets, loading: assetsLoading, createAsset, deleteAsset, loadAssets } = useAssets();
   
   // Restore state from localStorage on mount
   const [activeBrandId, setActiveBrandId] = useState<string | null>(() => {
@@ -134,9 +134,13 @@ const App: React.FC = () => {
   };
 
   const handleAssetCreated = async (asset: GeneratedAsset) => {
+    // Add asset to local state immediately
     await createAsset(asset);
-    setEditingAssetId(asset.id); // Set the newly created asset for editing
-    setView('studio'); // Navigate to studio to show the editor
+    // Also reload assets from server after a short delay to ensure consistency
+    // This ensures all assets are properly loaded and displayed
+    setTimeout(() => {
+      loadAssets();
+    }, 1000); // Delay to allow backend to finish saving
   };
 
   // Handle editing an asset

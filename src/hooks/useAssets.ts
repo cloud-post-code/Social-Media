@@ -25,7 +25,24 @@ export const useAssets = (brandId?: string) => {
   };
 
   const createAsset = async (asset: GeneratedAsset) => {
-    setAssets([asset, ...assets]);
+    // Ensure asset has required fields
+    if (!asset.id) {
+      console.error('Asset missing ID:', asset);
+      return asset;
+    }
+    
+    // Add new asset to the beginning of the list
+    // Use functional update to ensure we have the latest state
+    setAssets(prevAssets => {
+      // Check if asset with this ID already exists to prevent duplicates
+      const existingIndex = prevAssets.findIndex(a => a.id === asset.id);
+      if (existingIndex >= 0) {
+        // Update existing asset instead of adding duplicate
+        return prevAssets.map((a, i) => i === existingIndex ? asset : a);
+      }
+      // Add new asset to the beginning of the list
+      return [asset, ...prevAssets];
+    });
     return asset;
   };
 

@@ -139,14 +139,22 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
           // Immediately convert backend format to frontend format
           const frontendAsset: GeneratedAsset = {
             ...generatedAsset,
-            imageUrl: generatedAsset.image_url,
-            brandId: generatedAsset.brand_id,
-            campaignImages: generatedAsset.campaign_images,
-            overlayConfig: generatedAsset.overlay_config,
-            baseImageUrl: generatedAsset.base_image_url,
-            userPrompt: generatedAsset.user_prompt,
-            feedbackHistory: generatedAsset.feedback_history,
-            timestamp: generatedAsset.created_at ? new Date(generatedAsset.created_at).getTime() : Date.now()
+            id: generatedAsset.id, // Ensure ID is set
+            imageUrl: generatedAsset.image_url || generatedAsset.imageUrl,
+            image_url: generatedAsset.image_url || generatedAsset.imageUrl, // Keep both formats
+            brandId: generatedAsset.brand_id || generatedAsset.brandId,
+            brand_id: generatedAsset.brand_id || generatedAsset.brandId, // Keep both formats
+            campaignImages: generatedAsset.campaign_images || generatedAsset.campaignImages,
+            campaign_images: generatedAsset.campaign_images || generatedAsset.campaignImages, // Keep both formats
+            overlayConfig: generatedAsset.overlay_config || generatedAsset.overlayConfig,
+            overlay_config: generatedAsset.overlay_config || generatedAsset.overlayConfig, // Keep both formats
+            baseImageUrl: generatedAsset.base_image_url || generatedAsset.baseImageUrl,
+            base_image_url: generatedAsset.base_image_url || generatedAsset.baseImageUrl, // Keep both formats
+            userPrompt: generatedAsset.user_prompt || generatedAsset.userPrompt,
+            user_prompt: generatedAsset.user_prompt || generatedAsset.userPrompt, // Keep both formats
+            feedbackHistory: generatedAsset.feedback_history || generatedAsset.feedbackHistory,
+            feedback_history: generatedAsset.feedback_history || generatedAsset.feedbackHistory, // Keep both formats
+            timestamp: generatedAsset.created_at ? new Date(generatedAsset.created_at).getTime() : (generatedAsset.timestamp || Date.now())
           };
           
           // Immediately call onAssetCreated - don't wait for batch to complete
@@ -300,7 +308,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                   )}
                 </div>
                 {productImages.length > 0 ? (
-                  <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {productImages.map((image, index) => (
                       <div key={index} className="space-y-3">
                         <div className="aspect-square bg-slate-50 border-2 border-slate-200 rounded-2xl relative overflow-hidden group">
@@ -328,7 +336,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                         </div>
                       </div>
                     ))}
-                    <label className="block aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
+                    <label className="aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
                       <div className="bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-xl text-indigo-600 group-hover:scale-110 transition">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />

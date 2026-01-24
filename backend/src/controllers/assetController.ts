@@ -226,8 +226,11 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
       }
     };
 
+    // Generate unique ID: timestamp + random component to prevent collisions
+    const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const asset = await assetService.createAsset({
-      id: Date.now().toString(),
+      id: uniqueId,
       brand_id: brandId,
       type: 'product',
       image_url: finalImageUrl,
@@ -462,8 +465,11 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
       overlayConfig
     );
 
+    // Generate unique ID: timestamp + random component to prevent collisions
+    const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const asset = await assetService.createAsset({
-      id: Date.now().toString(),
+      id: uniqueId,
       brand_id: brandId,
       type: 'non-product',
       image_url: finalImageUrl,
@@ -506,8 +512,11 @@ export const generateCampaignAsset = async (req: Request, res: Response, next: N
       )
     );
 
+    // Generate unique ID: timestamp + random component to prevent collisions
+    const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const asset = await assetService.createAsset({
-      id: Date.now().toString(),
+      id: uniqueId,
       brand_id: brandId,
       type: 'campaign',
       image_url: campaignImages[0],
