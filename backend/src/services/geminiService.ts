@@ -1027,6 +1027,7 @@ Goal: Create a highly technical image generation prompt that captures the *exact
 ### INPUT DATA
 Brand DNA: ${JSON.stringify(brandDNA)}
 Product Focus: ${productFocus}
+${referenceImageBase64 ? '**REFERENCE IMAGE PROVIDED:** A reference image of the actual product has been provided. You MUST analyze it FIRST before creating your prompt.' : ''}
 
 ### BRAND COLOR PALETTE
 All brand colors: ${allColors.join(', ')}
@@ -1034,11 +1035,45 @@ Primary color (most important): ${brandDNA.visual_identity.primary_color_hex}
 Accent color (secondary): ${brandDNA.visual_identity.accent_color_hex}
 Use ALL these colors strategically in the image composition - incorporate brand colors naturally into backgrounds, props, lighting, or environmental elements where appropriate. Don't limit yourself to just primary and accent - use the full color palette.
 
+${referenceImageBase64 ? `
+### CRITICAL: REFERENCE IMAGE ANALYSIS (MUST COMPLETE FIRST)
+A reference image has been provided. You MUST analyze it FIRST before creating the prompt. This is the MOST IMPORTANT step to prevent hallucination.
+
+**STEP 1: VISUAL INVENTORY - Extract EXACT attributes from the reference image:**
+1. **Product Shape & Form:** Describe the exact silhouette, dimensions, proportions, and structural elements visible
+2. **Material Texture:** Identify the SPECIFIC texture visible (e.g., "distressed painted metal", "smooth matte ceramic", "woven fabric"). Be precise.
+3. **Color Accuracy:** List EXACT colors visible on each part of the product. Use descriptive color names (e.g., "antique yellow", "distressed teal", "dark bronze"). Note any color variations, gradients, or distressed areas.
+4. **Structural Details:** Note ALL visible details:
+   - Seams, joints, or connection points
+   - Patterns, cutouts, or decorative elements (describe their exact shape and placement)
+   - Hardware, closures, or functional elements
+   - Surface finish characteristics (glossy, matte, brushed, polished, distressed, chipped)
+5. **Scale Indicators:** Any visible size references (buttons, patterns, textures that indicate scale)
+6. **Paint/Finish Condition:** Describe the exact finish state (pristine, distressed, chipped, weathered, etc.)
+
+**STEP 2: ANCHORING VERIFICATION**
+In your step_1_analysis, you MUST verify:
+- texture_lock matches EXACTLY what you see in the reference image
+- Any material properties you describe are VISIBLE in the reference
+- If the reference shows specific details (like star-shaped cutouts, curled trunk, specific color patterns), you MUST include those EXACT details
+- Colors must match what is actually visible, not what you assume
+
+**STEP 3: CONSTRAINT ENFORCEMENT**
+The final imagen_prompt_final MUST preserve:
+- The EXACT material texture from the reference
+- The SAME color palette visible in the reference (part by part)
+- The SAME structural elements (if visible)
+- The SAME surface finish characteristics
+- The SAME level of detail and complexity
+
+**CRITICAL RULE:** If you cannot clearly see a detail in the reference image, DO NOT invent it. Only describe what is actually visible. If the reference shows a distressed finish, you MUST preserve that. If it shows specific colors, you MUST use those exact colors.
+` : ''}
+
 ### CRITICAL INSTRUCTION: VISUAL ANCHORING
 You must prevent "product hallucination." Before writing the final prompt, you must mentally isolate the product's **Material Physics**:
-1. **Texture:** Is it ribbed? Woven? Smooth? Matte? Glossy?
-2. **Weight/Drape:** Does it hang heavily (like wool) or float light (like silk)?
-3. **Imperfections:** Real products have grain and weave. Mentioning these creates realism.
+1. **Texture:** Is it ribbed? Woven? Smooth? Matte? Glossy? ${referenceImageBase64 ? 'MATCH THE REFERENCE IMAGE EXACTLY.' : ''}
+2. **Weight/Drape:** Does it hang heavily (like wool) or float light (like silk)? ${referenceImageBase64 ? 'Base this on what you see in the reference.' : ''}
+3. **Imperfections:** Real products have grain and weave. Mentioning these creates realism. ${referenceImageBase64 ? 'Preserve the exact level of wear/distress visible in the reference.' : ''}
 
 ### CRITICAL INSTRUCTION: TEXT OVERLAY SPACE PLANNING
 This image will have marketing text overlays (title and subtitle) added later. You MUST plan the composition to accommodate text:
@@ -1063,27 +1098,66 @@ This image will have marketing text overlays (title and subtitle) added later. Y
    - Describe the background characteristics in text overlay zones (e.g., "soft gradient background at top", "clean minimal background at bottom")
 
 ### OUTPUT FORMAT (JSON)
-Return ONLY:
+Return ONLY a JSON object with this structure:
+${referenceImageBase64 ? `
 {
   "step_1_analysis": {
-    "texture_lock": "A few words describing the specific material surface (e.g., 'coarse woven linen', 'ribbed wool knit').",
-    "lighting_strategy": "How light hits the texture (e.g., 'Raking side light to accentuate the weave').",
-    "composition_logic": "Where the subject is placed to leave 'Negative Space' for text overlay later. Specifically describe which areas (top/bottom/sides) have simpler backgrounds suitable for text placement, and how the composition creates visual separation between product and text overlay zones."
+    "texture_lock": "EXACT material surface from reference image (e.g., distressed painted metal with chipped yellow paint, smooth matte ceramic). Must match what you see.",
+    "lighting_strategy": "How light hits the texture (e.g., Raking side light to accentuate the weave). Consider how lighting affects the visible textures in the reference.",
+    "composition_logic": "Where the subject is placed to leave Negative Space for text overlay later. Specifically describe which areas (top/bottom/sides) have simpler backgrounds suitable for text placement, and how the composition creates visual separation between product and text overlay zones.",
+    "reference_verification": {
+      "extracted_texture": "What texture is visible in the reference image (be specific)",
+      "extracted_colors": ["List exact colors visible on each part of the product"],
+      "extracted_details": ["List all structural details, patterns, cutouts, decorative elements visible"],
+      "extracted_finish": "Describe the exact finish condition (pristine, distressed, chipped, etc.)",
+      "confidence_level": "high|medium|low - how clearly can you see product details"
+    }
+  },
+  "reasoning": "Brief explanation of the visual strategy and how you preserved reference image details",
+  "includes_person": boolean,
+  "composition_notes": "Notes about composition and placement",
+  "hallucination_check": "Explicit statement: I am preserving [list specific attributes from reference_verification] from the reference image and NOT inventing [list things you cannot see]. The generated product will match the reference in: [colors, textures, details, finish].",
+  "imagen_prompt_final": "A prompt following this strict structure: [REFERENCE ANCHOR: Match the EXACT material texture, colors, and structural details from the reference image. Preserve: [list specific details from step_1_analysis.reference_verification]. DO NOT invent features not visible in reference.] + [SUBJECT DEFINITION: detailed description of ${productFocus} EXACTLY matching the reference image. Include: exact colors per part, exact texture, exact structural details, exact finish condition.] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + [COMPOSITION: Create negative space areas (top/bottom/sides) with simpler backgrounds suitable for text overlays - use depth of field or lighting to separate product from background zones] + [LIGHTING: Specific lighting to highlight material quality and create contrast in background areas] + [TECH SPECS: 8k, macro details, commercial photography, depth of field] + [NEGATIVE PROMPT: DO NOT add features not in reference image, DO NOT change material texture from reference, DO NOT invent colors/patterns not visible, DO NOT add decorative elements that do not exist, DO NOT modify structure, DO NOT change finish condition, NO text, NO watermark, NO branding, NO logos]. Clean image only. Ensure background areas where text will be placed have simpler, less busy compositions."
+}
+` : `
+{
+  "step_1_analysis": {
+    "texture_lock": "A few words describing the specific material surface (e.g., coarse woven linen, ribbed wool knit).",
+    "lighting_strategy": "How light hits the texture (e.g., Raking side light to accentuate the weave).",
+    "composition_logic": "Where the subject is placed to leave Negative Space for text overlay later. Specifically describe which areas (top/bottom/sides) have simpler backgrounds suitable for text placement, and how the composition creates visual separation between product and text overlay zones."
   },
   "reasoning": "Brief explanation of the visual strategy",
   "includes_person": boolean,
   "composition_notes": "Notes about composition and placement",
-  "imagen_prompt_final": "A prompt following this strict structure: [SUBJECT DEFINITION: detailed description of ${productFocus} focusing on texture, weave, and material weight] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + [COMPOSITION: Create negative space areas (top/bottom/sides) with simpler backgrounds suitable for text overlays - use depth of field or lighting to separate product from background zones] + [LIGHTING: Specific lighting to highlight material quality and create contrast in background areas] + [TECH SPECS: 8k, macro details, commercial photography, depth of field]. NO text in image. NO watermark. NO branding sections. NO logos. Clean image only. Ensure background areas where text will be placed have simpler, less busy compositions."
+  "imagen_prompt_final": "A prompt following this strict structure: [SUBJECT DEFINITION: detailed description of ${productFocus} focusing on texture, weave, and material weight] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + [COMPOSITION: Create negative space areas (top/bottom/sides) with simpler backgrounds suitable for text overlays - use depth of field or lighting to separate product from background zones] + [LIGHTING: Specific lighting to highlight material quality and create contrast in background areas] + [TECH SPECS: 8k, macro details, commercial photography, depth of field] + [NEGATIVE PROMPT: NO text, NO watermark, NO branding, NO logos]. Clean image only. Ensure background areas where text will be placed have simpler, less busy compositions."
 }
+`}
   `;
 
-  let parts: any[] = [{ text: prompt }];
+  let parts: any[] = [];
+  
+  // Add explicit reference image instruction FIRST if reference is provided
   if (referenceImageBase64) {
     const base64Data = referenceImageBase64.includes(',') 
       ? referenceImageBase64.split(',')[1] 
       : referenceImageBase64;
+    
+    parts.push({ 
+      text: `CRITICAL: You have been provided a REFERENCE IMAGE of the actual product. 
+      This is the MOST IMPORTANT input. You MUST:
+      1. Analyze this image FIRST before creating your prompt
+      2. Extract ALL visible details: colors, textures, structural elements, finish condition
+      3. Preserve these EXACT details in your final prompt
+      4. DO NOT invent details that are not visible in the reference image
+      5. Match colors, textures, and finish EXACTLY as shown
+      
+      The reference image shows the REAL product. Your generated image must match it closely.`
+    });
     parts.push({ inlineData: { mimeType: "image/png", data: base64Data } });
   }
+  
+  // Add the main prompt
+  parts.push({ text: prompt });
 
   const response = await ai.models.generateContent({
     model,
