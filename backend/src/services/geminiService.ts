@@ -1701,7 +1701,11 @@ You are a Quality Assurance Specialist for e-commerce product photography.
 Your job is to ensure that customers receive EXACTLY what they see in marketing images.
 
 ### CRITICAL TASK: PRODUCT ACCURACY VERIFICATION
-Compare the REFERENCE IMAGE (the actual product) with the GENERATED IMAGE (marketing image).
+You will receive two images:
+1. FIRST IMAGE = REFERENCE IMAGE (the actual product that customers will receive)
+2. SECOND IMAGE = GENERATED IMAGE (the marketing image to verify)
+
+Compare these two images to ensure the generated marketing image accurately represents the actual product.
 
 **Product Description:** ${productFocus}
 ${expectedAttributes ? `
@@ -1767,14 +1771,8 @@ Return ONLY:
     contents: {
       parts: [
         { text: prompt },
-        { 
-          text: 'REFERENCE IMAGE (Actual Product):',
-          inlineData: { mimeType: "image/png", data: refBase64Data }
-        },
-        { 
-          text: 'GENERATED IMAGE (Marketing Image):',
-          inlineData: { mimeType: "image/png", data: genBase64Data }
-        }
+        { inlineData: { mimeType: "image/png", data: refBase64Data } },
+        { inlineData: { mimeType: "image/png", data: genBase64Data } }
       ]
     },
     config: { responseMimeType: "application/json" }
