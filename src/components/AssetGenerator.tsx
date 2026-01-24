@@ -106,17 +106,40 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     document.body.removeChild(link);
   };
 
-  // Upload handler - saves the final image to brand assets
-  const handleUpload = async () => {
-    if (!finalImageUrl || !activeBrand?.id) {
+  // Save handler - saves overlay changes and then uploads the final image to brand assets
+  const handleSave = async () => {
+    if (!currentAsset || !activeBrand?.id) {
       alert('Please select a brand first');
       return;
     }
 
     try {
       setSaving(true);
+      
+      // First, save any pending overlay changes using saveOverlay
+      // This will update the asset with the latest overlay config and regenerate the image
+      await saveOverlay(overlayEdit);
+      
+      // Wait for state to update and get the latest final image URL
+      // The saveOverlay function updates currentAsset state, so we need to wait a moment
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get the updated final image URL from the current asset state
+      // Since saveOverlay updates currentAsset, finalImageUrl will be updated
+      const imageToSave = currentAsset?.imageUrl || currentAsset?.image_url;
+      
+      if (!imageToSave) {
+        alert('No image available to save');
+        setSaving(false);
+        return;
+      }
+
       // Convert image URL to base64
-      const response = await fetch(finalImageUrl);
+      const response = await fetch(imageToSave);
+      if (!response.ok) {
+        throw new Error('Failed to fetch image');
+      }
+      
       const blob = await response.blob();
       const reader = new FileReader();
       
@@ -140,9 +163,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
       
       reader.readAsDataURL(blob);
     } catch (err) {
-      console.error('Upload failed:', err);
+      console.error('Save failed:', err);
       setSaving(false);
-      alert('Failed to upload image. Please try again.');
+      alert('Failed to save image. Please try again.');
     }
   };
   
@@ -1726,14 +1749,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       Download
                     </button>
                     <button
-                      onClick={handleUpload}
-                      disabled={!activeBrand?.id || saving}
+                      onClick={handleSave}
+                      disabled={!activeBrand?.id || saving || !currentAsset}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
-                      Upload
+                      Save
                     </button>
                   </div>
                 </div>
