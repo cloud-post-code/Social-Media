@@ -262,7 +262,11 @@ const App: React.FC = () => {
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all group ${brand.id === activeBrandId ? 'bg-slate-900 text-white shadow-xl shadow-slate-200' : 'hover:bg-slate-50 text-slate-500 hover:text-slate-800'}`}
                 >
                   <button
-                    onClick={() => { setActiveBrandId(brand.id); setView('studio'); }}
+                    onClick={() => { 
+                      setActiveBrandId(brand.id); 
+                      setEditingAssetId(null); // Clear editing state when switching brands
+                      setView('studio'); 
+                    }}
                     className="flex-1 flex items-center gap-4 text-left"
                   >
                     <div 
@@ -377,19 +381,30 @@ const App: React.FC = () => {
             </button>
             <div className="flex bg-slate-100 p-1.5 rounded-2xl">
                <button 
-                onClick={() => setView('home')}
+                onClick={() => { 
+                  setEditingAssetId(null); // Clear editing state when navigating away
+                  setView('home'); 
+                }}
                 className={`px-8 py-2.5 rounded-xl text-xs font-black transition-all ${view === 'home' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                >
                  HOME
                </button>
                <button 
-                onClick={() => setView('dna')}
+                onClick={() => { 
+                  setEditingAssetId(null); // Clear editing state when navigating away
+                  setView('dna'); 
+                }}
                 className={`px-8 py-2.5 rounded-xl text-xs font-black transition-all ${view === 'dna' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                >
                  DNA LIBRARY
                </button>
                <button 
-                onClick={() => { if(activeBrand) setView('studio'); }}
+                onClick={() => { 
+                  if(activeBrand) {
+                    setEditingAssetId(null); // Clear editing state when navigating to studio
+                    setView('studio'); 
+                  }
+                }}
                 disabled={!activeBrand}
                 className={`px-8 py-2.5 rounded-xl text-xs font-black transition-all ${view === 'studio' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600 disabled:opacity-30'}`}
                >
@@ -448,6 +463,7 @@ const App: React.FC = () => {
               activeBrand={activeBrand}
               onAssetCreated={handleAssetCreated}
               initialAsset={editingAsset}
+              onExitEditing={() => setEditingAssetId(null)}
             />
           )}
           {view === 'create' && (
