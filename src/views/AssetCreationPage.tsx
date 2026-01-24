@@ -100,7 +100,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
           setCurrentPost(i + 0.1); // Start of this post
           
           const asset = await assetApi.generateNonProduct({
-            brandId: activeBrand.id,
+          brandId: activeBrand.id,
             userPurpose,
             useExactLogo,
             logoUrl: useExactLogo && logo ? logo.image_url : undefined,

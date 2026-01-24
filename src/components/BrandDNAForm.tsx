@@ -476,38 +476,38 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     <div className="space-y-8 max-w-5xl mx-auto pb-20 animate-in fade-in slide-in-from-top-4 duration-500">
       {/* Extraction Header - Only show when creating a new brand */}
       {!formData.id && (
-        <section className="bg-gradient-to-br from-slate-900 to-indigo-950 p-10 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
-          <div className="relative z-10">
-            <h2 className="text-3xl font-black mb-2">Build from existing brand</h2>
-            <p className="text-slate-300 mb-8 max-w-xl">Enter a website URL or upload a screenshot to let BrandGenius AI reverse-engineer your brand's DNA instantly.</p>
-            
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1 flex bg-white/10 backdrop-blur-xl rounded-2xl p-1.5 border border-white/20 focus-within:border-indigo-400 transition">
-                <input 
-                  type="text" 
-                  placeholder="https://brand-website.com"
-                  value={urlInput}
-                  onChange={e => setUrlInput(e.target.value)}
-                  className="bg-transparent flex-1 px-5 py-4 outline-none text-white placeholder:text-white/40 font-medium"
-                />
-                <button 
-                  onClick={handleExtract}
-                  disabled={isExtracting}
-                  className="bg-white text-slate-900 px-8 py-4 rounded-xl font-black hover:bg-indigo-50 transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {isExtracting ? 'Analyzing...' : 'Auto-Generate'}
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <label className="flex flex-1 lg:flex-none items-center justify-center bg-indigo-600/20 border border-white/20 px-8 py-4 rounded-2xl cursor-pointer hover:bg-indigo-600/30 transition active:scale-95">
-                  <span className="font-bold text-sm">Upload Screenshot</span>
-                  <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
-                </label>
-              </div>
+      <section className="bg-gradient-to-br from-slate-900 to-indigo-950 p-10 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
+        <div className="relative z-10">
+          <h2 className="text-3xl font-black mb-2">Build from existing brand</h2>
+          <p className="text-slate-300 mb-8 max-w-xl">Enter a website URL or upload a screenshot to let BrandGenius AI reverse-engineer your brand's DNA instantly.</p>
+          
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex-1 flex bg-white/10 backdrop-blur-xl rounded-2xl p-1.5 border border-white/20 focus-within:border-indigo-400 transition">
+              <input 
+                type="text" 
+                placeholder="https://brand-website.com"
+                value={urlInput}
+                onChange={e => setUrlInput(e.target.value)}
+                className="bg-transparent flex-1 px-5 py-4 outline-none text-white placeholder:text-white/40 font-medium"
+              />
+              <button 
+                onClick={handleExtract}
+                disabled={isExtracting}
+                className="bg-white text-slate-900 px-8 py-4 rounded-xl font-black hover:bg-indigo-50 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isExtracting ? 'Analyzing...' : 'Auto-Generate'}
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <label className="flex flex-1 lg:flex-none items-center justify-center bg-indigo-600/20 border border-white/20 px-8 py-4 rounded-2xl cursor-pointer hover:bg-indigo-600/30 transition active:scale-95">
+                <span className="font-bold text-sm">Upload Screenshot</span>
+                <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+              </label>
             </div>
           </div>
-          <div className="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500/20 blur-[100px] rounded-full"></div>
-        </section>
+        </div>
+        <div className="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500/20 blur-[100px] rounded-full"></div>
+      </section>
       )}
 
       {/* Manual Form */}
