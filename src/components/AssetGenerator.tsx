@@ -1886,6 +1886,16 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       </svg>
                       Download
                     </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={!activeBrand?.id || saving || !currentAsset}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Save
+                    </button>
                   </div>
                 </div>
 
