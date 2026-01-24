@@ -197,10 +197,18 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
       subtitle_overlay_background_padding: overlayDesign.overlay_background_padding
     };
 
-    const finalImageUrl = await imageOverlayService.applyTextOverlay(
+    let finalImageUrl = await imageOverlayService.applyTextOverlay(
       baseImageUrl,
       overlayConfig
     );
+
+    // Optimize images before storing
+    try {
+      finalImageUrl = await imageOverlayService.optimizeImage(finalImageUrl);
+      baseImageUrl = await imageOverlayService.optimizeImage(baseImageUrl);
+    } catch (error) {
+      console.warn('[AssetController] Failed to optimize images, using originals:', error);
+    }
 
     // Store strategy information
     const strategy = {
@@ -319,10 +327,17 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
       subtitle_overlay_background_padding: overlay_config.subtitle_overlay_background_padding !== undefined ? overlay_config.subtitle_overlay_background_padding : existing?.subtitle_overlay_background_padding
     };
 
-    const finalImageUrl = await imageOverlayService.updateOverlay(
+    let finalImageUrl = await imageOverlayService.updateOverlay(
       baseImage,
       updatedOverlayConfig
     );
+
+    // Optimize image before storing
+    try {
+      finalImageUrl = await imageOverlayService.optimizeImage(finalImageUrl);
+    } catch (error) {
+      console.warn('[AssetController] Failed to optimize updated image, using original:', error);
+    }
 
     // Update strategy with new overlay config - handle different strategy structures
     let updatedStrategy;
@@ -388,7 +403,7 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
       throw new Error('Strategy generation failed to provide a prompt');
     }
 
-    const baseImageUrl = await geminiService.generateImage(
+    let baseImageUrl = await geminiService.generateImage(
       strategy.step_1_visual_concept.imagen_prompt_final
     );
 
@@ -462,10 +477,18 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
 
     // Apply overlay to image
     // Note: Logo overlay will be added in a future update
-    const finalImageUrl = await imageOverlayService.applyTextOverlay(
+    let finalImageUrl = await imageOverlayService.applyTextOverlay(
       baseImageUrl,
       overlayConfig
     );
+
+    // Optimize images before storing
+    try {
+      finalImageUrl = await imageOverlayService.optimizeImage(finalImageUrl);
+      baseImageUrl = await imageOverlayService.optimizeImage(baseImageUrl);
+    } catch (error) {
+      console.warn('[AssetController] Failed to optimize images, using originals:', error);
+    }
 
     // Generate unique ID: timestamp + random component to prevent collisions
     const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -508,11 +531,20 @@ export const generateCampaignAsset = async (req: Request, res: Response, next: N
       postCount
     );
 
-    const campaignImages = await Promise.all(
+    let campaignImages = await Promise.all(
       (campaignStrategy.posts || []).map((p: any) => 
         geminiService.generateImage(p.visual_prompt)
       )
     );
+
+    // Optimize campaign images before storing
+    try {
+      campaignImages = await Promise.all(
+        campaignImages.map(img => imageOverlayService.optimizeImage(img))
+      );
+    } catch (error) {
+      console.warn('[AssetController] Failed to optimize campaign images, using originals:', error);
+    }
 
     // Generate unique ID: timestamp + random component to prevent collisions
     const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -942,13 +974,25 @@ export const editAssetImage = async (req: Request, res: Response, next: NextFunc
         
         // Reapply overlay if we have one
         if (asset.overlay_config) {
-          const finalImageUrl = await imageOverlayService.applyTextOverlay(
+          let finalImageUrl = await imageOverlayService.applyTextOverlay(
             newBaseImageUrl,
             asset.overlay_config
           );
+          // Optimize the final image
+          try {
+            finalImageUrl = await imageOverlayService.optimizeImage(finalImageUrl);
+          } catch (error) {
+            console.warn('[AssetController] Failed to optimize final image:', error);
+          }
           newBaseImageUrl = finalImageUrl; // In this case, base becomes final since we edited it
         } else {
-          newBaseImageUrl = newImageUrl;
+          // Optimize the edited image
+          try {
+            newBaseImageUrl = await imageOverlayService.optimizeImage(newImageUrl);
+          } catch (error) {
+            console.warn('[AssetController] Failed to optimize edited image:', error);
+            newBaseImageUrl = newImageUrl;
+          }
         }
         break;
       }
@@ -956,14 +1000,28 @@ export const editAssetImage = async (req: Request, res: Response, next: NextFunc
 
     // Apply overlay to create final image
     let finalImageUrl = newBaseImageUrl || asset.base_image_url || asset.image_url;
-    if (newOverlayConfig && stepAnalysis.stepToRedo !== 'final_image' && newOverlayConfig.title && newOverlayConfig.subtitle) {
+    if (newOverlayConfig && stepAnalysis.stepToRedo !== 'final_image') {
+      // Only require overlay config to exist, not both title AND subtitle
+      // Some assets might only have title or only subtitle
       const baseImageForOverlay = newBaseImageUrl || asset.base_image_url || asset.image_url;
-      if (baseImageForOverlay) {
+      if (baseImageForOverlay && (newOverlayConfig.title || newOverlayConfig.subtitle)) {
         finalImageUrl = await imageOverlayService.applyTextOverlay(
           baseImageForOverlay, // Always use base image for overlay application
           newOverlayConfig
         );
       }
+    }
+
+    // Optimize images before storing
+    try {
+      if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
+        finalImageUrl = await imageOverlayService.optimizeImage(finalImageUrl);
+      }
+      if (newBaseImageUrl && newBaseImageUrl.startsWith('data:image')) {
+        newBaseImageUrl = await imageOverlayService.optimizeImage(newBaseImageUrl);
+      }
+    } catch (error) {
+      console.warn('[AssetController] Failed to optimize edited images, using originals:', error);
     }
 
     // Track feedback iteration in strategy

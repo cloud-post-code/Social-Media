@@ -1453,6 +1453,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         timestamp: updated.created_at ? new Date(updated.created_at).getTime() : Date.now()
       };
       setCurrentAsset(frontendAsset);
+      // Clear overlayEdit to show regenerated values instead of stale edits
+      setOverlayEdit({});
       setFeedback('');
     } catch (err) {
       alert('Revision failed.');
@@ -1696,6 +1698,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
               >
                 <img 
                   src={imageUrl} 
+                  loading="lazy"
                   className={`w-full h-full object-contain transition duration-700 group-hover:scale-105 ${eyedropperActive ? 'cursor-crosshair' : ''}`}
                   onClick={(e) => {
                     if (eyedropperActive) {
@@ -2085,7 +2088,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                     onClick={() => setCurrentAsset({...displayAsset, imageUrl: img, image_url: img})}
                     className={`w-32 h-32 shrink-0 rounded-3xl overflow-hidden border-4 transition-all ${imageUrl === img ? 'border-indigo-600 scale-95 shadow-inner' : 'border-white hover:border-indigo-200'}`}
                   >
-                    <img src={img} className="w-full h-full object-cover" />
+                    <img src={img} loading="lazy" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
