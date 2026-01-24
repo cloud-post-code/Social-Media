@@ -84,6 +84,17 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const { uploadAsset } = useBrandAssets(activeBrand?.id);
   
+  // Helper to get effective transform value (checks overlayEdit first, then displayAsset config)
+  const getEffectiveTransform = (
+    type: 'title' | 'subtitle'
+  ): 'uppercase' | 'lowercase' | 'capitalize' | 'none' => {
+    const key = type === 'title' ? 'title_font_transform' : 'subtitle_font_transform';
+    if (overlayEdit[key] !== undefined) {
+      return overlayEdit[key] as 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+    }
+    return (displayAsset?.overlayConfig?.[key] as 'uppercase' | 'lowercase' | 'capitalize' | 'none') || 'none';
+  };
+  
   // Store calculated line breaks for preview display
   const [calculatedTitleLines, setCalculatedTitleLines] = useState<string[]>([]);
   const [calculatedSubtitleLines, setCalculatedSubtitleLines] = useState<string[]>([]);
@@ -1198,7 +1209,11 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     try {
       setSaving(true);
       // Calculate line breaks using Canvas API for exact match
-      const overlayConfigToSend = { ...configToSave };
+      const overlayConfigToSend: any = { ...configToSave };
+      
+      // Always include transform values using the helper to ensure backend gets correct value
+      overlayConfigToSend.title_font_transform = getEffectiveTransform('title');
+      overlayConfigToSend.subtitle_font_transform = getEffectiveTransform('subtitle');
       
       // Get current text values
       const titleText = configToSave.title !== undefined 
@@ -1449,7 +1464,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             fontWeight: overlayEdit.title_font_weight === 'bold' ? 'bold' : overlayEdit.title_font_weight === 'light' ? '300' : 'normal',
                             fontSize: getFontSize(titleFontSize, true),
                             letterSpacing: overlayEdit.title_letter_spacing === 'wide' ? '0.15em' : 'normal',
-                            textTransform: overlayEdit.title_font_transform || 'none',
+                            textTransform: getEffectiveTransform('title'),
                             filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
                             pointerEvents: 'all',
                             zIndex: isDragging || isEditing ? 20 : 10,
@@ -1578,7 +1593,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             fontWeight: overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal',
                             fontSize: getFontSize(subtitleFontSize, false),
                             letterSpacing: overlayEdit.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal',
-                            textTransform: overlayEdit.subtitle_font_transform || 'none',
+                            textTransform: getEffectiveTransform('subtitle'),
                             filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.7))',
                             pointerEvents: 'all',
                             zIndex: isDragging || isEditing ? 20 : 10,
