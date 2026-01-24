@@ -66,10 +66,11 @@ const App: React.FC = () => {
   }, [editingAssetId]);
 
   useEffect(() => {
-    if (brands.length > 0 && !activeBrandId) {
+    // Don't auto-select a brand if we're on the DNA page (creating a new brand)
+    if (brands.length > 0 && !activeBrandId && view !== 'dna') {
       setActiveBrandId(brands[0].id);
     }
-  }, [brands, activeBrandId]);
+  }, [brands, activeBrandId, view]);
 
   // Navigate to studio view when editingAssetId is set or changes
   // Only navigate once per editingAssetId to allow users to navigate away
