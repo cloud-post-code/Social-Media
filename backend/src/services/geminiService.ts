@@ -1308,35 +1308,47 @@ Before determining placement, you MUST analyze the image:
    - Identify areas with sufficient brightness contrast (light backgrounds need dark text, dark backgrounds need light text)
    - Look for zones with minimal visual clutter (avoid busy/complex areas)
    - Find areas with consistent color/brightness that won't interfere with text legibility
+   - **MANDATORY**: If no area has sufficient natural contrast, you MUST add overlay background elements
 
 2. **Readability Zones:**
    - Top areas: Often work well if image has simpler backgrounds at top
    - Bottom areas: Common choice, but ensure sufficient contrast
    - Center areas: Use only if background is uniform and provides good contrast
    - Avoid: Areas with high detail, busy patterns, or extreme brightness variations
+   - **PRIORITY**: Choose position that maximizes readability, even if it means adding overlay backgrounds
 
 3. **Text Length Consideration:**
    - Title length: "${title.length}" characters
    - Subtitle length: "${subtitle.length}" characters
    - Position must accommodate both text blocks without overlapping important image elements
+   - Ensure there's enough space for clear, readable text placement
 
-4. **Accessibility Standards:**
-   - Ensure text meets WCAG contrast ratio of at least 4.5:1 for normal text, 3:1 for large text
+4. **Accessibility Standards (MANDATORY):**
+   - **REQUIRED**: Text MUST meet WCAG contrast ratio of at least 4.5:1 for normal text, 3:1 for large text
+   - **REQUIRED**: If natural contrast is insufficient, you MUST add overlay background elements (gradient, solid, blur, or shape)
    - Test color combinations: If background is light, use dark text; if background is dark, use light text
-   - Consider adding subtle text shadows or backgrounds if contrast is borderline
+   - **ALWAYS ADD**: Text shadows are automatically applied, but you should still ensure overlay backgrounds when needed
+   - **DEFAULT TO SAFE**: When in doubt, add a subtle overlay background (opacity 0.4-0.6) to ensure readability
 
-5. **Overlay Background Elements Analysis:**
-   - Analyze the image at the chosen text position
-   - Determine if overlay elements (gradients, shapes, blur) would improve readability
-   - Consider: Is the background too busy? Too bright/dark? Does it need visual separation?
-   - If overlay elements are needed, choose:
-     - **Type**: 'gradient' (smooth color transition), 'solid' (solid color background), 'blur' (blurred background), 'shape' (geometric shape), or 'none' (no overlay needed)
-     - **Color**: Choose from brand colors [${allColors.join(', ')}] or derive from image analysis
-     - **Opacity**: 0.3-0.7 for subtle, 0.7-0.9 for stronger (ensure text remains readable)
-     - **Shape**: 'rectangle' (sharp corners), 'rounded' (slightly rounded), 'pill' (very rounded), 'circle' (circular)
-     - **Padding**: 20-40 pixels around text for comfortable spacing
-   - Overlay elements should be NON-INTRUSIVE and match the brand's visual style
-   - Only suggest overlay elements if they genuinely improve readability without detracting from the image
+5. **Overlay Background Elements Analysis (ENHANCED):**
+   - **MANDATORY CHECK**: Analyze the image at the chosen text position FIRST
+   - **DEFAULT ASSUMPTION**: Most product images benefit from overlay backgrounds for text readability
+   - **REQUIRED**: If the background is busy, has varying brightness, or lacks sufficient contrast, you MUST add overlay elements
+   - Choose overlay type based on image analysis:
+     - **'gradient'**: Best for images with varying brightness - creates smooth transition
+     - **'solid'**: Best for consistent backgrounds that need contrast boost - most reliable for readability
+     - **'blur'**: Best for very busy/complex backgrounds - creates visual separation
+     - **'shape'**: Best for minimal backgrounds that need subtle enhancement
+     - **'none'**: ONLY use if background is uniform, has excellent contrast, and text is clearly readable without overlay
+   - **Color Selection**: Choose from brand colors [${allColors.join(', ')}] OR white/black based on what provides best contrast
+   - **Opacity Guidelines**: 
+     - 0.4-0.5: Subtle, for backgrounds with decent contrast
+     - 0.6-0.7: Medium, for backgrounds with moderate contrast issues (RECOMMENDED DEFAULT)
+     - 0.8-0.9: Strong, for very busy or low-contrast backgrounds
+   - **Shape**: 'rounded' (recommended default) or 'pill' for softer look, 'rectangle' for bold look
+   - **Padding**: 25-35 pixels around text for comfortable spacing (30px recommended)
+   - **CRITICAL**: Overlay elements MUST improve readability without detracting from the product image
+   - **WHEN IN DOUBT**: Add a subtle overlay background - it's better to have slightly more contrast than risk unreadable text
 
 ### INSTRUCTIONS
 - **PRIORITY: READABILITY FIRST** - Choose position and color that maximizes text legibility
@@ -1398,9 +1410,9 @@ Return ONLY:
     position: designStrategy.suggested_position || result.position || 'bottom-right',
     max_width_percent: designStrategy.max_width_percent || result.max_width_percent || 80,
     opacity: designStrategy.opacity !== undefined ? designStrategy.opacity : (result.opacity !== undefined ? result.opacity : 1.0),
-    overlay_background_type: designStrategy.overlay_background_type || result.overlay_background_type || 'none',
-    overlay_background_color: designStrategy.overlay_background_color || result.overlay_background_color,
-    overlay_background_opacity: designStrategy.overlay_background_opacity !== undefined ? designStrategy.overlay_background_opacity : (result.overlay_background_opacity !== undefined ? result.overlay_background_opacity : 0.5),
+    overlay_background_type: designStrategy.overlay_background_type || result.overlay_background_type || 'solid',
+    overlay_background_color: designStrategy.overlay_background_color || result.overlay_background_color || '#000000',
+    overlay_background_opacity: designStrategy.overlay_background_opacity !== undefined ? designStrategy.overlay_background_opacity : (result.overlay_background_opacity !== undefined ? result.overlay_background_opacity : 0.6),
     overlay_background_shape: designStrategy.overlay_background_shape || result.overlay_background_shape || 'rounded',
     overlay_background_padding: designStrategy.overlay_background_padding !== undefined ? designStrategy.overlay_background_padding : (result.overlay_background_padding !== undefined ? result.overlay_background_padding : 30),
     reasoning: result.reasoning || ''

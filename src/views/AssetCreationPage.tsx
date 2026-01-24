@@ -89,14 +89,14 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         
         const dimensions = getImageDimensions();
         
-        // Process each photo sequentially
+        // Process each photo sequentially - each goes through full independent process
         for (let i = 0; i < imagesToProcess.length; i++) {
           const photoIndex = i + 1;
-          setStatusText(`Processing photo ${photoIndex} of ${total}...`);
+          setStatusText(`Processing photo ${photoIndex} of ${total} independently...`);
           setCurrentPost(i + 0.1); // Start of this photo
           
-          setStatusText(`Generating product image ${photoIndex} of ${total}...`);
-          setCurrentPost(i + 0.3); // 30% - generating image
+          setStatusText(`Generating product image ${photoIndex} of ${total} (with its own text)...`);
+          setCurrentPost(i + 0.2); // 20% - generating image
           
           const generatedAsset = await assetApi.generateProduct({
             brandId: activeBrand.id,
@@ -106,7 +106,9 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             height: dimensions.height
           });
           
-          setStatusText(`Applying text overlay for photo ${photoIndex}...`);
+          // Each image gets its own text generated based on that specific image
+          // The backend processes: image generation -> text generation -> overlay design -> final output
+          setStatusText(`Finalizing asset ${photoIndex} with readable text overlay...`);
           setCurrentPost(i + 0.9); // 90% - applying overlay
           
           // Immediately convert backend format to frontend format
