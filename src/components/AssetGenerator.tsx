@@ -3,6 +3,7 @@ import { BrandDNA, GeneratedAsset } from '../models/types.js';
 import { assetApi } from '../services/assetApi.js';
 import TextToolbar from './TextToolbar.js';
 import { getFontFamilyString, loadGoogleFont, GOOGLE_FONTS, FONT_MAPPING } from '../utils/googleFonts.js';
+import { useBrandAssets } from '../hooks/useBrandAssets.js';
 
 // Utility function to strip markdown syntax from text
 const stripMarkdown = (text: string): string => {
@@ -81,6 +82,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const subtitleTextRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const { uploadAsset } = useBrandAssets(activeBrand?.id);
   
   // Store calculated line breaks for preview display
   const [calculatedTitleLines, setCalculatedTitleLines] = useState<string[]>([]);
@@ -93,7 +95,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   // For download, use the final image_url with overlays applied (from backend)
   const finalImageUrl = currentAsset?.imageUrl || currentAsset?.image_url || imageUrl;
   
-  // Download handler
+  // Download handler - downloads the final image with overlays in exact size
   const handleDownload = () => {
     if (!finalImageUrl) return;
     const link = document.createElement('a');
@@ -102,6 +104,46 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Upload handler - saves the final image to brand assets
+  const handleUpload = async () => {
+    if (!finalImageUrl || !activeBrand?.id) {
+      alert('Please select a brand first');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      // Convert image URL to base64
+      const response = await fetch(finalImageUrl);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      
+      reader.onloadend = async () => {
+        const base64data = reader.result as string;
+        try {
+          await uploadAsset(base64data, 'brand_image');
+          alert('Image saved to brand assets successfully!');
+        } catch (err) {
+          console.error('Upload failed:', err);
+          alert('Failed to upload image. Please try again.');
+        } finally {
+          setSaving(false);
+        }
+      };
+      
+      reader.onerror = () => {
+        setSaving(false);
+        alert('Failed to process image. Please try again.');
+      };
+      
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      setSaving(false);
+      alert('Failed to upload image. Please try again.');
+    }
   };
   
   // Load initial asset when provided
@@ -1295,7 +1337,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
           <div className="lg:col-span-6 space-y-8">
             {/* Visual Preview with Draggable Text Overlay */}
-            <div className="relative group rounded-[4rem] overflow-hidden shadow-[0_48px_80px_-24px_rgba(0,0,0,0.3)] border-[20px] border-white ring-1 ring-slate-200">
+            <div className="relative group rounded-[4rem] overflow-hidden shadow-[0_48px_80px_-24px_rgba(0,0,0,0.3)] ring-1 ring-slate-200">
               <div 
                 ref={imageContainerRef} 
                 className="image-preview-container relative w-full" 
@@ -1682,6 +1724,16 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
                       Download
+                    </button>
+                    <button
+                      onClick={handleUpload}
+                      disabled={!activeBrand?.id || saving}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      Upload
                     </button>
                   </div>
                 </div>
