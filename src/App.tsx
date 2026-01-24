@@ -4,6 +4,7 @@ import { useBrands } from './hooks/useBrands.js';
 import { useAssets } from './hooks/useAssets.js';
 import BrandDNAPage from './views/BrandDNAPage.js';
 import ContentStudioPage from './views/ContentStudioPage.js';
+import AssetCreationPage from './views/AssetCreationPage.js';
 import HomePage from './views/HomePage.js';
 import LoadingSpinner from './components/LoadingSpinner.js';
 import ErrorMessage from './components/ErrorMessage.js';
@@ -12,7 +13,7 @@ const App: React.FC = () => {
   const { brands, loading: brandsLoading, error: brandsError, createBrand, updateBrand, deleteBrand } = useBrands();
   const { assets, loading: assetsLoading, createAsset, deleteAsset } = useAssets();
   const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
-  const [view, setView] = useState<'home' | 'dna' | 'studio'>('home');
+  const [view, setView] = useState<'home' | 'dna' | 'studio' | 'create'>('home');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
 
@@ -65,7 +66,8 @@ const App: React.FC = () => {
 
   const handleAssetCreated = async (asset: GeneratedAsset) => {
     await createAsset(asset);
-    setEditingAssetId(null); // Clear editing state after creation
+    setEditingAssetId(asset.id); // Set the newly created asset for editing
+    setView('studio'); // Navigate to studio to show the editor
   };
 
   // Handle editing an asset
@@ -225,7 +227,18 @@ const App: React.FC = () => {
 
           {assets.length > 0 && (
             <section>
-              <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 px-2">Recent Assets</h2>
+              <div className="flex items-center justify-between mb-6 px-2">
+                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Recent Assets</h2>
+                {activeBrand && (
+                  <button 
+                    onClick={() => { setView('create'); }}
+                    className="bg-indigo-50 text-indigo-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all active:scale-90"
+                    title="New Asset"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3 px-1">
                 {assets.slice(0, 8).map(asset => {
                   const imageUrl = asset.imageUrl || asset.image_url;
@@ -367,6 +380,20 @@ const App: React.FC = () => {
               activeBrand={activeBrand}
               onAssetCreated={handleAssetCreated}
               initialAsset={editingAsset}
+            />
+          )}
+          {view === 'create' && (
+            <AssetCreationPage 
+              activeBrand={activeBrand}
+              onAssetCreated={handleAssetCreated}
+              onCancel={() => {
+                if (brands.length > 0) {
+                  setActiveBrandId(brands[0].id);
+                  setView('studio');
+                } else {
+                  setView('home');
+                }
+              }}
             />
           )}
         </div>

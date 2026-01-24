@@ -6,71 +6,25 @@ export interface GoogleFont {
   category: 'sans-serif' | 'serif' | 'display' | 'handwriting' | 'monospace';
 }
 
-// Popular Google Fonts organized by category
+// Popular Google Fonts - reduced to 10 for faster builds
 export const GOOGLE_FONTS: GoogleFont[] = [
-  // Sans-serif
+  // Sans-serif (most popular)
+  { family: 'Inter', category: 'sans-serif' },
   { family: 'Roboto', category: 'sans-serif' },
   { family: 'Open Sans', category: 'sans-serif' },
-  { family: 'Lato', category: 'sans-serif' },
   { family: 'Montserrat', category: 'sans-serif' },
-  { family: 'Raleway', category: 'sans-serif' },
-  { family: 'Poppins', category: 'sans-serif' },
-  { family: 'Source Sans Pro', category: 'sans-serif' },
-  { family: 'Ubuntu', category: 'sans-serif' },
-  { family: 'Nunito', category: 'sans-serif' },
-  { family: 'Inter', category: 'sans-serif' },
-  { family: 'Work Sans', category: 'sans-serif' },
-  { family: 'DM Sans', category: 'sans-serif' },
-  { family: 'Manrope', category: 'sans-serif' },
-  { family: 'Plus Jakarta Sans', category: 'sans-serif' },
-  { family: 'Figtree', category: 'sans-serif' },
   
   // Serif
   { family: 'Merriweather', category: 'serif' },
-  { family: 'Lora', category: 'serif' },
   { family: 'Playfair Display', category: 'serif' },
-  { family: 'Crimson Text', category: 'serif' },
-  { family: 'PT Serif', category: 'serif' },
-  { family: 'Libre Baskerville', category: 'serif' },
-  { family: 'Cormorant Garamond', category: 'serif' },
-  { family: 'EB Garamond', category: 'serif' },
-  { family: 'Bitter', category: 'serif' },
-  { family: 'Vollkorn', category: 'serif' },
-  
-  // Display
-  { family: 'Oswald', category: 'display' },
-  { family: 'Bebas Neue', category: 'display' },
-  { family: 'Righteous', category: 'display' },
-  { family: 'Bangers', category: 'display' },
-  { family: 'Fredoka One', category: 'display' },
-  { family: 'Abril Fatface', category: 'display' },
-  { family: 'Anton', category: 'display' },
-  { family: 'Bungee', category: 'display' },
-  { family: 'Creepster', category: 'display' },
-  { family: 'Fugaz One', category: 'display' },
   
   // Handwriting/Cursive
   { family: 'Dancing Script', category: 'handwriting' },
-  { family: 'Pacifico', category: 'handwriting' },
-  { family: 'Great Vibes', category: 'handwriting' },
   { family: 'Kalam', category: 'handwriting' },
-  { family: 'Caveat', category: 'handwriting' },
-  { family: 'Permanent Marker', category: 'handwriting' },
-  { family: 'Satisfy', category: 'handwriting' },
-  { family: 'Amatic SC', category: 'handwriting' },
-  { family: 'Shadows Into Light', category: 'handwriting' },
-  { family: 'Indie Flower', category: 'handwriting' },
-  { family: 'Comfortaa', category: 'handwriting' },
-  { family: 'Kaushan Script', category: 'handwriting' },
-  { family: 'Lobster', category: 'handwriting' },
-  { family: 'Allura', category: 'handwriting' },
-  { family: 'Parisienne', category: 'handwriting' },
   
-  // Monospace (for completeness)
-  { family: 'Roboto Mono', category: 'monospace' },
-  { family: 'Source Code Pro', category: 'monospace' },
-  { family: 'Fira Code', category: 'monospace' },
-  { family: 'JetBrains Mono', category: 'monospace' },
+  // Display
+  { family: 'Oswald', category: 'display' },
+  { family: 'Bangers', category: 'display' },
 ];
 
 // Map old font names to Google Fonts
