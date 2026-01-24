@@ -399,21 +399,31 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     return (dims.displayWidth * percent) / 100;
   };
 
-  // Get numeric font size for calculations
+  // Get numeric font size for calculations (scaled to match displayed/preview dimensions)
   const getFontSizeNumeric = (baseFontSize: number | undefined, isTitle: boolean): number => {
-    if (!imageDimensions) {
+    const dims = getDisplayedImageDimensions();
+    if (!dims || !imageDimensions) {
       return isTitle ? 56 : 32;
     }
     
+    // Calculate font size using the ACTUAL image width (matching backend logic)
+    let calculatedFontSize: number;
     if (baseFontSize) {
-      return baseFontSize;
+      // If custom font size is provided, use it directly (it's already calculated for actual image width)
+      calculatedFontSize = baseFontSize;
+    } else {
+      // Calculate using actual image width (matching backend exactly)
+      if (isTitle) {
+        calculatedFontSize = Math.max(56, Math.min(imageDimensions.width / 10, 120));
+      } else {
+        calculatedFontSize = Math.max(32, Math.min(imageDimensions.width / 16, 64));
+      }
     }
     
-    if (isTitle) {
-      return Math.max(56, Math.min(imageDimensions.width / 10, 120));
-    } else {
-      return Math.max(32, Math.min(imageDimensions.width / 16, 64));
-    }
+    // Scale the font size to match the displayed image size
+    // This ensures the Canvas measurement matches the preview display
+    const scale = dims.displayWidth / imageDimensions.width;
+    return calculatedFontSize * scale;
   };
 
   // Map font family choice to font stack that matches server-side rendering
