@@ -413,9 +413,9 @@ export const applyTextOverlay = async (
                              overlayConfig.title_font_weight === 'light' ? '300' : '400';
       const titleLetterSpacing = overlayConfig.title_letter_spacing === 'wide' ? '0.15em' : 'normal';
       
-      // Use pre-calculated lines from frontend if available, otherwise calculate
+      // Use pre-calculated lines from frontend if available (already transformed), otherwise calculate
       const titleLines = overlayConfig.title_lines && overlayConfig.title_lines.length > 0
-        ? overlayConfig.title_lines.map(line => transformText(line, overlayConfig.title_font_transform))
+        ? overlayConfig.title_lines  // Use lines as-is, they're already transformed by frontend
         : undefined;
       
       titleElement = calculateTextElement(
@@ -454,9 +454,9 @@ export const applyTextOverlay = async (
                                  overlayConfig.subtitle_font_weight === 'light' ? '300' : '400';
       const subtitleLetterSpacing = overlayConfig.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal';
       
-      // Use pre-calculated lines from frontend if available, otherwise calculate
+      // Use pre-calculated lines from frontend if available (already transformed), otherwise calculate
       const subtitleLines = overlayConfig.subtitle_lines && overlayConfig.subtitle_lines.length > 0
-        ? overlayConfig.subtitle_lines.map(line => transformText(line, overlayConfig.subtitle_font_transform))
+        ? overlayConfig.subtitle_lines  // Use lines as-is, they're already transformed by frontend
         : undefined;
       
       subtitleElement = calculateTextElement(
