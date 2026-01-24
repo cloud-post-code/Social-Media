@@ -94,6 +94,26 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     }
     return (displayAsset?.overlayConfig?.[key] as 'uppercase' | 'lowercase' | 'capitalize' | 'none') || 'none';
   };
+
+  // Helper to apply text transform (matching backend behavior)
+  const applyTextTransform = (
+    text: string,
+    transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none'
+  ): string => {
+    if (!text) return '';
+    const cleaned = stripMarkdown(text);
+    
+    if (transform === 'uppercase') {
+      return cleaned.toUpperCase();
+    } else if (transform === 'lowercase') {
+      return cleaned.toLowerCase();
+    } else if (transform === 'capitalize') {
+      return cleaned.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' ');
+    }
+    return cleaned;
+  };
   
   // Store calculated line breaks for preview display
   const [calculatedTitleLines, setCalculatedTitleLines] = useState<string[]>([]);
@@ -274,8 +294,12 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           ? '0.15em' 
           : 'normal';
         
+        // Apply transform before calculating lines to match backend behavior
+        const titleTransform = getEffectiveTransform('title');
+        const titleTextTransformed = applyTextTransform(titleText, titleTransform);
+        
         const titleLines = await calculateTextLinesWithCanvas(
-          titleText,
+          titleTextTransformed,
           titleMaxWidthPx,
           titleFontSize,
           titleFontFamily,
@@ -323,8 +347,12 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           ? '0.15em' 
           : 'normal';
         
+        // Apply transform before calculating lines to match backend behavior
+        const subtitleTransform = getEffectiveTransform('subtitle');
+        const subtitleTextTransformed = applyTextTransform(subtitleText, subtitleTransform);
+        
         const subtitleLines = await calculateTextLinesWithCanvas(
-          subtitleText,
+          subtitleTextTransformed,
           subtitleMaxWidthPx,
           subtitleFontSize,
           subtitleFontFamily,
@@ -1250,8 +1278,12 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           ? '0.15em' 
           : 'normal';
         
+        // Apply transform before calculating lines to match backend behavior
+        const titleTransform = getEffectiveTransform('title');
+        const titleTextTransformed = applyTextTransform(titleText, titleTransform);
+        
         const titleLines = await calculateTextLinesWithCanvas(
-          titleText,
+          titleTextTransformed,
           titleMaxWidthPx,
           titleFontSize,
           titleFontFamily,
@@ -1289,8 +1321,12 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           ? '0.15em' 
           : 'normal';
         
+        // Apply transform before calculating lines to match backend behavior
+        const subtitleTransform = getEffectiveTransform('subtitle');
+        const subtitleTextTransformed = applyTextTransform(subtitleText, subtitleTransform);
+        
         const subtitleLines = await calculateTextLinesWithCanvas(
-          subtitleText,
+          subtitleTextTransformed,
           subtitleMaxWidthPx,
           subtitleFontSize,
           subtitleFontFamily,
