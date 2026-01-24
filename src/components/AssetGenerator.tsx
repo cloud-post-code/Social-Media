@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BrandDNA, GenerationOption, GeneratedAsset } from '../models/types.js';
 import { assetApi } from '../services/assetApi.js';
 import TextToolbar from './TextToolbar.js';
+import { getFontFamilyString, loadGoogleFont, GOOGLE_FONTS, FONT_MAPPING } from '../utils/googleFonts.js';
 
 // Utility function to strip markdown syntax from text
 const stripMarkdown = (text: string): string => {
@@ -38,7 +39,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     title?: string;
     subtitle?: string;
     // Title properties - completely separate
-    title_font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+    title_font_family?: string;
     title_font_weight?: 'light' | 'regular' | 'bold';
     title_font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
     title_letter_spacing?: 'normal' | 'wide';
@@ -55,7 +56,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     title_overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
     title_overlay_background_padding?: number;
     // Subtitle properties - completely separate
-    subtitle_font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+    subtitle_font_family?: string;
     subtitle_font_weight?: 'light' | 'regular' | 'bold';
     subtitle_font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
     subtitle_letter_spacing?: 'normal' | 'wide';
@@ -82,6 +83,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   
   const [isDragging, setIsDragging] = useState(false);
+  const [draggingElement, setDraggingElement] = useState<'title' | 'subtitle' | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null>(null);
@@ -180,9 +182,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           true
         );
         
-        const titleFontFamily = overlayEdit.title_font_family || 
+        const titleFontFamilyRaw = overlayEdit.title_font_family || 
           displayAsset?.overlayConfig?.title_font_family || 
           'sans-serif';
+        const titleFontFamily = FONT_MAPPING[titleFontFamilyRaw] || titleFontFamilyRaw;
+        // Load Google Font if needed
+        if (GOOGLE_FONTS.some(f => f.family === titleFontFamily)) {
+          loadGoogleFont(titleFontFamily).catch(() => {});
+        }
         const titleFontWeight = overlayEdit.title_font_weight === 'bold' 
           ? 'bold' 
           : overlayEdit.title_font_weight === 'light' 
@@ -224,9 +231,14 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           false
         );
         
-        const subtitleFontFamily = overlayEdit.subtitle_font_family || 
+        const subtitleFontFamilyRaw = overlayEdit.subtitle_font_family || 
           displayAsset?.overlayConfig?.subtitle_font_family || 
           'sans-serif';
+        const subtitleFontFamily = FONT_MAPPING[subtitleFontFamilyRaw] || subtitleFontFamilyRaw;
+        // Load Google Font if needed
+        if (GOOGLE_FONTS.some(f => f.family === subtitleFontFamily)) {
+          loadGoogleFont(subtitleFontFamily).catch(() => {});
+        }
         const subtitleFontWeight = overlayEdit.subtitle_font_weight === 'bold' 
           ? 'bold' 
           : overlayEdit.subtitle_font_weight === 'light' 
@@ -448,18 +460,27 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
 
   // Map font family choice to font stack that matches server-side rendering
   // Server uses DejaVu fonts, so we use Arial/Times which have similar metrics
-  const getFontStackForMeasurement = (family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten'): string => {
+  const getFontStackForMeasurement = (family: string): string => {
+    // Map old font names to Google Fonts
+    const mappedFamily = FONT_MAPPING[family] || family;
+    
+    // Check if it's a Google Font
+    const isGoogleFont = GOOGLE_FONTS.some(f => f.family === mappedFamily);
+    if (isGoogleFont) {
+      // Load font if not already loaded
+      loadGoogleFont(mappedFamily).catch(() => {});
+      return getFontFamilyString(mappedFamily);
+    }
+    
+    // Fallback for old system fonts
     switch (family) {
       case 'serif':
-        // Times New Roman has similar metrics to DejaVu Serif
         return 'Times New Roman, Times, serif';
       case 'cursive':
       case 'handwritten':
-        // Use serif fallback for cursive/handwritten
         return 'Times New Roman, Times, serif';
       case 'sans-serif':
       default:
-        // Arial has similar metrics to DejaVu Sans
         return 'Arial, Helvetica, sans-serif';
     }
   };
@@ -953,22 +974,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const x = (actualX / imageDimensions.width) * 100;
             const y = (actualY / imageDimensions.height) * 100;
             
-            // Determine which element is being dragged based on drag start position
-            const titleText = overlayEdit.title !== undefined ? overlayEdit.title : (displayAsset?.overlayConfig?.title || '');
-            const subtitleText = overlayEdit.subtitle !== undefined ? overlayEdit.subtitle : (displayAsset?.overlayConfig?.subtitle || '');
-            const titleY = overlayEdit.title_y_percent !== undefined 
-              ? overlayEdit.title_y_percent 
-              : (displayAsset?.overlayConfig?.title_y_percent || 30);
-            const subtitleY = overlayEdit.subtitle_y_percent !== undefined 
-              ? overlayEdit.subtitle_y_percent 
-              : (displayAsset?.overlayConfig?.subtitle_y_percent || 80);
-            
-            // Determine which element is closer to the drag start position
-            const distanceToTitle = Math.abs((dragStart.y || 0) - titleY);
-            const distanceToSubtitle = Math.abs((dragStart.y || 0) - subtitleY);
-            const isDraggingTitle = titleText && (!subtitleText || distanceToTitle < distanceToSubtitle);
-            
-            if (isDraggingTitle) {
+            // Use the stored draggingElement instead of recalculating
+            if (draggingElement === 'title') {
               setOverlayEdit(prev => ({
                 ...prev,
                 title_x_percent: x,
@@ -978,7 +985,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 title_x_percent: x,
                 title_y_percent: y
               });
-            } else {
+            } else if (draggingElement === 'subtitle') {
               setOverlayEdit(prev => ({
                 ...prev,
                 subtitle_x_percent: x,
@@ -1012,22 +1019,8 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
             const actualY = relativeY * scaleY;
             const x = (actualX / imageDimensions.width) * 100;
             const y = (actualY / imageDimensions.height) * 100;
-            // Determine which element is being dragged based on drag start position
-            const titleText = overlayEdit.title !== undefined ? overlayEdit.title : (displayAsset?.overlayConfig?.title || '');
-            const subtitleText = overlayEdit.subtitle !== undefined ? overlayEdit.subtitle : (displayAsset?.overlayConfig?.subtitle || '');
-            const titleY = overlayEdit.title_y_percent !== undefined 
-              ? overlayEdit.title_y_percent 
-              : (displayAsset?.overlayConfig?.title_y_percent || 30);
-            const subtitleY = overlayEdit.subtitle_y_percent !== undefined 
-              ? overlayEdit.subtitle_y_percent 
-              : (displayAsset?.overlayConfig?.subtitle_y_percent || 80);
-            
-            // Determine which element is closer to the drag start position
-            const distanceToTitle = Math.abs((dragStart.y || 0) - titleY);
-            const distanceToSubtitle = Math.abs((dragStart.y || 0) - subtitleY);
-            const isDraggingTitle = titleText && (!subtitleText || distanceToTitle < distanceToSubtitle);
-            
-            if (isDraggingTitle) {
+            // Use the stored draggingElement instead of recalculating
+            if (draggingElement === 'title') {
               setOverlayEdit(prev => ({
                 ...prev,
                 title_x_percent: x,
@@ -1037,7 +1030,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                 title_x_percent: x,
                 title_y_percent: y
               });
-            } else {
+            } else if (draggingElement === 'subtitle') {
               setOverlayEdit(prev => ({
                 ...prev,
                 subtitle_x_percent: x,
@@ -1055,6 +1048,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     
     const handleMouseUp = () => {
       setIsDragging(false);
+      setDraggingElement(null);
       setDragStart(null);
       setIsResizing(false);
       setResizeHandle(null);
@@ -1069,7 +1063,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, isResizing, dragStart, resizeStart, resizeHandle, currentAsset, imageDimensions, overlayEdit, displayAsset]);
+  }, [isDragging, isResizing, dragStart, resizeStart, resizeHandle, draggingElement, currentAsset, imageDimensions, overlayEdit, displayAsset]);
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1202,9 +1196,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           true
         );
         
-        const titleFontFamily = configToSave.title_font_family || 
+        const titleFontFamilyRaw = configToSave.title_font_family || 
           displayAsset?.overlayConfig?.title_font_family || 
           'sans-serif';
+        const titleFontFamily = FONT_MAPPING[titleFontFamilyRaw] || titleFontFamilyRaw;
         const titleFontWeight = configToSave.title_font_weight === 'bold' 
           ? 'bold' 
           : configToSave.title_font_weight === 'light' 
@@ -1240,9 +1235,10 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
           false
         );
         
-        const subtitleFontFamily = configToSave.subtitle_font_family || 
+        const subtitleFontFamilyRaw = configToSave.subtitle_font_family || 
           displayAsset?.overlayConfig?.subtitle_font_family || 
           'sans-serif';
+        const subtitleFontFamily = FONT_MAPPING[subtitleFontFamilyRaw] || subtitleFontFamilyRaw;
         const subtitleFontWeight = configToSave.subtitle_font_weight === 'bold' 
           ? 'bold' 
           : configToSave.subtitle_font_weight === 'light' 
@@ -1579,7 +1575,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             padding: '0.5rem',
                             color: overlayEdit.title_color_hex || displayAsset.overlayConfig?.title_color_hex || '#FFFFFF',
                             opacity: overlayEdit.title_opacity !== undefined ? overlayEdit.title_opacity : (displayAsset.overlayConfig.title_opacity !== undefined ? displayAsset.overlayConfig.title_opacity : 1),
-                            fontFamily: getFontStackForMeasurement((overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif') as 'sans-serif' | 'serif' | 'cursive' | 'handwritten'),
+                            fontFamily: getFontStackForMeasurement(overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif'),
                             fontWeight: overlayEdit.title_font_weight === 'bold' ? 'bold' : overlayEdit.title_font_weight === 'light' ? '300' : 'normal',
                             fontSize: getFontSize(titleFontSize, true),
                             letterSpacing: overlayEdit.title_letter_spacing === 'wide' ? '0.15em' : 'normal',
@@ -1623,6 +1619,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             }
                             e.preventDefault();
                             setIsDragging(true);
+                            setDraggingElement('title');
                             const imageContainer = e.currentTarget.parentElement;
                             if (imageContainer && imageDimensions) {
                               const imageBounds = getImageDisplayBounds(imageContainer);
@@ -1702,7 +1699,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             padding: '0.5rem',
                             color: overlayEdit.subtitle_color_hex || displayAsset.overlayConfig?.subtitle_color_hex || '#FFFFFF',
                             opacity: overlayEdit.subtitle_opacity !== undefined ? overlayEdit.subtitle_opacity : (displayAsset.overlayConfig.subtitle_opacity !== undefined ? displayAsset.overlayConfig.subtitle_opacity : 0.9),
-                            fontFamily: getFontStackForMeasurement((overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif') as 'sans-serif' | 'serif' | 'cursive' | 'handwritten'),
+                            fontFamily: getFontStackForMeasurement(overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif'),
                             fontWeight: overlayEdit.subtitle_font_weight === 'bold' ? 'bold' : overlayEdit.subtitle_font_weight === 'light' ? '300' : 'normal',
                             fontSize: getFontSize(subtitleFontSize, false),
                             letterSpacing: overlayEdit.subtitle_letter_spacing === 'wide' ? '0.15em' : 'normal',
@@ -1746,6 +1743,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                             }
                             e.preventDefault();
                             setIsDragging(true);
+                            setDraggingElement('subtitle');
                             const imageContainer = e.currentTarget.parentElement;
                             if (imageContainer && imageDimensions) {
                               const imageBounds = getImageDisplayBounds(imageContainer);

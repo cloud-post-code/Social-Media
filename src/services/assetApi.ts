@@ -35,7 +35,7 @@ export const assetApi = {
     title?: string;
     subtitle?: string;
     // Title properties - completely separate
-    title_font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+    title_font_family?: string;
     title_font_weight?: 'light' | 'regular' | 'bold';
     title_font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
     title_letter_spacing?: 'normal' | 'wide';
@@ -53,7 +53,7 @@ export const assetApi = {
     title_overlay_background_padding?: number;
     title_lines?: string[];
     // Subtitle properties - completely separate
-    subtitle_font_family?: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+    subtitle_font_family?: string;
     subtitle_font_weight?: 'light' | 'regular' | 'bold';
     subtitle_font_transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
     subtitle_letter_spacing?: 'normal' | 'wide';

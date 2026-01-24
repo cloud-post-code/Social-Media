@@ -33,7 +33,7 @@ export interface OverlayConfig {
   title: string;
   subtitle: string;
   // Title properties - completely separate
-  title_font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+  title_font_family: string; // Can be 'sans-serif' | 'serif' | 'cursive' | 'handwritten' or any Google Font name
   title_font_weight: 'light' | 'regular' | 'bold';
   title_font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
   title_letter_spacing: 'normal' | 'wide';
@@ -51,7 +51,7 @@ export interface OverlayConfig {
   title_overlay_background_padding?: number;
   title_lines?: string[]; // Pre-calculated line breaks for exact frontend match
   // Subtitle properties - completely separate
-  subtitle_font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+  subtitle_font_family: string; // Can be 'sans-serif' | 'serif' | 'cursive' | 'handwritten' or any Google Font name
   subtitle_font_weight: 'light' | 'regular' | 'bold';
   subtitle_font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
   subtitle_letter_spacing: 'normal' | 'wide';
