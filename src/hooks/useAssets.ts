@@ -15,7 +15,8 @@ export const useAssets = (brandId?: string) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await assetApi.getAll(brandId);
+      // Limit to 20 assets for sidebar performance (we only show 8 anyway)
+      const data = await assetApi.getAll(brandId, 20);
       setAssets(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load assets');

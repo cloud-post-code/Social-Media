@@ -2,8 +2,11 @@ import { api } from './api.js';
 import { GeneratedAsset } from '../models/types.js';
 
 export const assetApi = {
-  getAll: (brandId?: string) => {
-    const query = brandId ? `?brandId=${brandId}` : '';
+  getAll: (brandId?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    if (brandId) params.append('brandId', brandId);
+    if (limit) params.append('limit', limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
     return api.get<GeneratedAsset[]>(`/assets${query}`);
   },
   

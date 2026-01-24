@@ -4,6 +4,7 @@ import * as brandService from '../services/brandService.js';
 import * as geminiService from '../services/geminiService.js';
 import * as imageOverlayService from '../services/imageOverlayService.js';
 import { BrandDNA, OverlayConfig } from '../types/index.js';
+import sharp from 'sharp';
 
 // Utility function to strip markdown syntax from text
 const stripMarkdown = (text: string): string => {
@@ -21,7 +22,8 @@ const stripMarkdown = (text: string): string => {
 export const getAllAssets = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const brandId = req.query.brandId as string | undefined;
-    const assets = await assetService.getAllAssets(brandId);
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+    const assets = await assetService.getAllAssets(brandId, limit);
     res.json(assets);
   } catch (error) {
     next(error);
@@ -547,15 +549,447 @@ export const editAssetImage = async (req: Request, res: Response, next: NextFunc
       return res.status(404).json({ error: { message: 'Asset not found' } });
     }
 
-    const newImageUrl = await geminiService.editImage(asset.image_url, feedback);
+    // CRITICAL: Use base_image_url (clean image without overlay) for analysis and regeneration
+    // Never use image_url (final image with overlay) for regeneration steps
+    const baseImageForAnalysis = asset.base_image_url || asset.image_url;
 
+    // Step 1: Analyze feedback to determine which step to redo
+    const stepAnalysis = await geminiService.analyzeFeedbackForStepSelection(
+      asset.type,
+      asset.strategy,
+      feedback,
+      baseImageForAnalysis
+    );
+
+    console.log(`[Feedback Loop] Step selected: ${stepAnalysis.stepToRedo}, Reasoning: ${stepAnalysis.reasoning}, Confidence: ${stepAnalysis.confidence}`);
+
+    let newBaseImageUrl = asset.base_image_url;
+    let newOverlayConfig = asset.overlay_config;
+    let newStrategy = { ...asset.strategy };
+    let newTitleSubtitle = null;
+
+    // Get brand DNA for regeneration
+    const brand = await brandService.getBrandById(asset.brand_id);
+    if (!brand) {
+      return res.status(404).json({ error: { message: 'Brand not found' } });
+    }
+
+    // Extract image dimensions from base image for regeneration
+    let imageWidth = 1080;
+    let imageHeight = 1080;
+    try {
+      if (baseImageForAnalysis) {
+        const base64Data = baseImageForAnalysis.includes(',') 
+          ? baseImageForAnalysis.split(',')[1] 
+          : baseImageForAnalysis;
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        const metadata = await sharp(imageBuffer).metadata();
+        imageWidth = metadata.width || 1080;
+        imageHeight = metadata.height || 1080;
+      }
+    } catch (error) {
+      console.warn('[Feedback Loop] Failed to extract image dimensions, using defaults');
+    }
+
+    // Cascade regeneration based on step selection
+    switch (stepAnalysis.stepToRedo) {
+      case 'image_prompt': {
+        // Regenerate prompt → regenerate image → regenerate text → regenerate overlay
+        console.log('[Feedback Loop] Regenerating image prompt...');
+        const imagePromptResult = await geminiService.regenerateImagePrompt(
+          brand,
+          asset.user_prompt || '',
+          feedback,
+          undefined // TODO: Get reference image from original generation if available
+        );
+
+        console.log('[Feedback Loop] Regenerating image...');
+        newBaseImageUrl = await geminiService.regenerateImage(
+          imagePromptResult.imagen_prompt_final,
+          feedback,
+          imageWidth,
+          imageHeight,
+          undefined // TODO: Get reference image from original generation if available
+        );
+
+        // Update strategy
+        newStrategy.step_1_image_generation = {
+          step_1_analysis: imagePromptResult.step_1_analysis,
+          reasoning: imagePromptResult.reasoning,
+          includes_person: imagePromptResult.includes_person,
+          composition_notes: imagePromptResult.composition_notes,
+          imagen_prompt_final: imagePromptResult.imagen_prompt_final
+        };
+
+        // Cascade: Regenerate text with new image
+        console.log('[Feedback Loop] Regenerating title/subtitle...');
+        newTitleSubtitle = await geminiService.regenerateTitleSubtitle(
+          brand,
+          asset.user_prompt || '',
+          feedback,
+          newBaseImageUrl // Use NEW base image
+        );
+
+        // Cascade: Regenerate overlay with new image and text
+        console.log('[Feedback Loop] Regenerating overlay design...');
+        const overlayDesign = await geminiService.regenerateOverlayDesign(
+          brand,
+          newTitleSubtitle.title,
+          newTitleSubtitle.subtitle,
+          feedback,
+          newBaseImageUrl // Use NEW base image
+        );
+
+        // Build overlay config
+        const titleYPercent = overlayDesign.position?.includes('top') ? 30 : 
+                             overlayDesign.position?.includes('bottom') ? 20 : 30;
+        const subtitleYPercent = overlayDesign.position?.includes('top') ? 70 : 
+                                overlayDesign.position?.includes('bottom') ? 80 : 80;
+        const xPercent = overlayDesign.position?.includes('left') ? 20 : 
+                        overlayDesign.position?.includes('right') ? 80 : 50;
+
+        newOverlayConfig = {
+          title: stripMarkdown(newTitleSubtitle.title),
+          subtitle: stripMarkdown(newTitleSubtitle.subtitle),
+          title_font_family: overlayDesign.font_family,
+          title_font_weight: overlayDesign.font_weight,
+          title_font_transform: overlayDesign.font_transform,
+          title_letter_spacing: overlayDesign.letter_spacing,
+          title_color_hex: overlayDesign.text_color_hex,
+          title_x_percent: xPercent,
+          title_y_percent: titleYPercent,
+          title_text_anchor: overlayDesign.position?.includes('right') ? 'end' : 
+                            overlayDesign.position?.includes('left') ? 'start' : 'middle',
+          title_max_width_percent: overlayDesign.max_width_percent,
+          title_opacity: overlayDesign.opacity,
+          title_overlay_background_type: overlayDesign.overlay_background_type,
+          title_overlay_background_color: overlayDesign.overlay_background_color,
+          title_overlay_background_opacity: overlayDesign.overlay_background_opacity,
+          title_overlay_background_shape: overlayDesign.overlay_background_shape,
+          title_overlay_background_padding: overlayDesign.overlay_background_padding,
+          subtitle_font_family: overlayDesign.font_family,
+          subtitle_font_weight: overlayDesign.font_weight === 'bold' ? 'regular' : overlayDesign.font_weight,
+          subtitle_font_transform: overlayDesign.font_transform,
+          subtitle_letter_spacing: overlayDesign.letter_spacing,
+          subtitle_color_hex: overlayDesign.text_color_hex,
+          subtitle_x_percent: xPercent,
+          subtitle_y_percent: subtitleYPercent,
+          subtitle_text_anchor: overlayDesign.position?.includes('right') ? 'end' : 
+                              overlayDesign.position?.includes('left') ? 'start' : 'middle',
+          subtitle_max_width_percent: overlayDesign.max_width_percent,
+          subtitle_opacity: overlayDesign.opacity * 0.9,
+          subtitle_overlay_background_type: overlayDesign.overlay_background_type,
+          subtitle_overlay_background_color: overlayDesign.overlay_background_color,
+          subtitle_overlay_background_opacity: overlayDesign.overlay_background_opacity,
+          subtitle_overlay_background_shape: overlayDesign.overlay_background_shape,
+          subtitle_overlay_background_padding: overlayDesign.overlay_background_padding
+        };
+
+        // Update strategy
+        newStrategy.step_2_title_subtitle = {
+          title: newTitleSubtitle.title,
+          subtitle: newTitleSubtitle.subtitle
+        };
+        newStrategy.step_3_overlay_design = {
+          reasoning: overlayDesign.reasoning,
+          overlay_config: newOverlayConfig
+        };
+        break;
+      }
+
+      case 'image_generation': {
+        // Regenerate image → regenerate text → regenerate overlay
+        console.log('[Feedback Loop] Regenerating image...');
+        const currentPrompt = asset.strategy?.step_1_image_generation?.imagen_prompt_final || '';
+        newBaseImageUrl = await geminiService.regenerateImage(
+          currentPrompt,
+          feedback,
+          imageWidth,
+          imageHeight,
+          undefined // TODO: Get reference image from original generation if available
+        );
+
+        // Cascade: Regenerate text with new image
+        console.log('[Feedback Loop] Regenerating title/subtitle...');
+        newTitleSubtitle = await geminiService.regenerateTitleSubtitle(
+          brand,
+          asset.user_prompt || '',
+          feedback,
+          newBaseImageUrl // Use NEW base image
+        );
+
+        // Cascade: Regenerate overlay with new image and text
+        console.log('[Feedback Loop] Regenerating overlay design...');
+        const overlayDesign = await geminiService.regenerateOverlayDesign(
+          brand,
+          newTitleSubtitle.title,
+          newTitleSubtitle.subtitle,
+          feedback,
+          newBaseImageUrl // Use NEW base image
+        );
+
+        // Build overlay config (same as image_prompt case)
+        const titleYPercent = overlayDesign.position?.includes('top') ? 30 : 
+                             overlayDesign.position?.includes('bottom') ? 20 : 30;
+        const subtitleYPercent = overlayDesign.position?.includes('top') ? 70 : 
+                                overlayDesign.position?.includes('bottom') ? 80 : 80;
+        const xPercent = overlayDesign.position?.includes('left') ? 20 : 
+                        overlayDesign.position?.includes('right') ? 80 : 50;
+
+        newOverlayConfig = {
+          title: stripMarkdown(newTitleSubtitle.title),
+          subtitle: stripMarkdown(newTitleSubtitle.subtitle),
+          title_font_family: overlayDesign.font_family,
+          title_font_weight: overlayDesign.font_weight,
+          title_font_transform: overlayDesign.font_transform,
+          title_letter_spacing: overlayDesign.letter_spacing,
+          title_color_hex: overlayDesign.text_color_hex,
+          title_x_percent: xPercent,
+          title_y_percent: titleYPercent,
+          title_text_anchor: overlayDesign.position?.includes('right') ? 'end' : 
+                            overlayDesign.position?.includes('left') ? 'start' : 'middle',
+          title_max_width_percent: overlayDesign.max_width_percent,
+          title_opacity: overlayDesign.opacity,
+          title_overlay_background_type: overlayDesign.overlay_background_type,
+          title_overlay_background_color: overlayDesign.overlay_background_color,
+          title_overlay_background_opacity: overlayDesign.overlay_background_opacity,
+          title_overlay_background_shape: overlayDesign.overlay_background_shape,
+          title_overlay_background_padding: overlayDesign.overlay_background_padding,
+          subtitle_font_family: overlayDesign.font_family,
+          subtitle_font_weight: overlayDesign.font_weight === 'bold' ? 'regular' : overlayDesign.font_weight,
+          subtitle_font_transform: overlayDesign.font_transform,
+          subtitle_letter_spacing: overlayDesign.letter_spacing,
+          subtitle_color_hex: overlayDesign.text_color_hex,
+          subtitle_x_percent: xPercent,
+          subtitle_y_percent: subtitleYPercent,
+          subtitle_text_anchor: overlayDesign.position?.includes('right') ? 'end' : 
+                              overlayDesign.position?.includes('left') ? 'start' : 'middle',
+          subtitle_max_width_percent: overlayDesign.max_width_percent,
+          subtitle_opacity: overlayDesign.opacity * 0.9,
+          subtitle_overlay_background_type: overlayDesign.overlay_background_type,
+          subtitle_overlay_background_color: overlayDesign.overlay_background_color,
+          subtitle_overlay_background_opacity: overlayDesign.overlay_background_opacity,
+          subtitle_overlay_background_shape: overlayDesign.overlay_background_shape,
+          subtitle_overlay_background_padding: overlayDesign.overlay_background_padding
+        };
+
+        // Update strategy
+        newStrategy.step_2_title_subtitle = {
+          title: newTitleSubtitle.title,
+          subtitle: newTitleSubtitle.subtitle
+        };
+        newStrategy.step_3_overlay_design = {
+          reasoning: overlayDesign.reasoning,
+          overlay_config: newOverlayConfig
+        };
+        break;
+      }
+
+      case 'title_subtitle': {
+        // Regenerate text → regenerate overlay (use CURRENT base image)
+        console.log('[Feedback Loop] Regenerating title/subtitle...');
+        newTitleSubtitle = await geminiService.regenerateTitleSubtitle(
+          brand,
+          asset.user_prompt || '',
+          feedback,
+          baseImageForAnalysis // Use CURRENT base image
+        );
+
+        // Cascade: Regenerate overlay with new text
+        console.log('[Feedback Loop] Regenerating overlay design...');
+        const overlayDesign = await geminiService.regenerateOverlayDesign(
+          brand,
+          newTitleSubtitle.title,
+          newTitleSubtitle.subtitle,
+          feedback,
+          baseImageForAnalysis // Use CURRENT base image
+        );
+
+        // Build overlay config
+        const titleYPercent = overlayDesign.position?.includes('top') ? 30 : 
+                             overlayDesign.position?.includes('bottom') ? 20 : 30;
+        const subtitleYPercent = overlayDesign.position?.includes('top') ? 70 : 
+                                overlayDesign.position?.includes('bottom') ? 80 : 80;
+        const xPercent = overlayDesign.position?.includes('left') ? 20 : 
+                        overlayDesign.position?.includes('right') ? 80 : 50;
+
+        newOverlayConfig = {
+          title: stripMarkdown(newTitleSubtitle.title),
+          subtitle: stripMarkdown(newTitleSubtitle.subtitle),
+          title_font_family: overlayDesign.font_family,
+          title_font_weight: overlayDesign.font_weight,
+          title_font_transform: overlayDesign.font_transform,
+          title_letter_spacing: overlayDesign.letter_spacing,
+          title_color_hex: overlayDesign.text_color_hex,
+          title_x_percent: xPercent,
+          title_y_percent: titleYPercent,
+          title_text_anchor: overlayDesign.position?.includes('right') ? 'end' : 
+                            overlayDesign.position?.includes('left') ? 'start' : 'middle',
+          title_max_width_percent: overlayDesign.max_width_percent,
+          title_opacity: overlayDesign.opacity,
+          title_overlay_background_type: overlayDesign.overlay_background_type,
+          title_overlay_background_color: overlayDesign.overlay_background_color,
+          title_overlay_background_opacity: overlayDesign.overlay_background_opacity,
+          title_overlay_background_shape: overlayDesign.overlay_background_shape,
+          title_overlay_background_padding: overlayDesign.overlay_background_padding,
+          subtitle_font_family: overlayDesign.font_family,
+          subtitle_font_weight: overlayDesign.font_weight === 'bold' ? 'regular' : overlayDesign.font_weight,
+          subtitle_font_transform: overlayDesign.font_transform,
+          subtitle_letter_spacing: overlayDesign.letter_spacing,
+          subtitle_color_hex: overlayDesign.text_color_hex,
+          subtitle_x_percent: xPercent,
+          subtitle_y_percent: subtitleYPercent,
+          subtitle_text_anchor: overlayDesign.position?.includes('right') ? 'end' : 
+                              overlayDesign.position?.includes('left') ? 'start' : 'middle',
+          subtitle_max_width_percent: overlayDesign.max_width_percent,
+          subtitle_opacity: overlayDesign.opacity * 0.9,
+          subtitle_overlay_background_type: overlayDesign.overlay_background_type,
+          subtitle_overlay_background_color: overlayDesign.overlay_background_color,
+          subtitle_overlay_background_opacity: overlayDesign.overlay_background_opacity,
+          subtitle_overlay_background_shape: overlayDesign.overlay_background_shape,
+          subtitle_overlay_background_padding: overlayDesign.overlay_background_padding
+        };
+
+        // Update strategy
+        newStrategy.step_2_title_subtitle = {
+          title: newTitleSubtitle.title,
+          subtitle: newTitleSubtitle.subtitle
+        };
+        newStrategy.step_3_overlay_design = {
+          reasoning: overlayDesign.reasoning,
+          overlay_config: newOverlayConfig
+        };
+        break;
+      }
+
+      case 'overlay_design': {
+        // Regenerate overlay only (use CURRENT base image and CURRENT text)
+        console.log('[Feedback Loop] Regenerating overlay design...');
+        const currentTitle = asset.overlay_config?.title || '';
+        const currentSubtitle = asset.overlay_config?.subtitle || '';
+        
+        const overlayDesign = await geminiService.regenerateOverlayDesign(
+          brand,
+          currentTitle,
+          currentSubtitle,
+          feedback,
+          baseImageForAnalysis // Use CURRENT base image
+        );
+
+        // Build overlay config
+        const titleYPercent = overlayDesign.position?.includes('top') ? 30 : 
+                             overlayDesign.position?.includes('bottom') ? 20 : 30;
+        const subtitleYPercent = overlayDesign.position?.includes('top') ? 70 : 
+                                overlayDesign.position?.includes('bottom') ? 80 : 80;
+        const xPercent = overlayDesign.position?.includes('left') ? 20 : 
+                        overlayDesign.position?.includes('right') ? 80 : 50;
+
+        newOverlayConfig = {
+          title: asset.overlay_config?.title || '',
+          subtitle: asset.overlay_config?.subtitle || '',
+          ...asset.overlay_config,
+          title_font_family: overlayDesign.font_family,
+          title_font_weight: overlayDesign.font_weight,
+          title_font_transform: overlayDesign.font_transform,
+          title_letter_spacing: overlayDesign.letter_spacing,
+          title_color_hex: overlayDesign.text_color_hex,
+          title_x_percent: xPercent,
+          title_y_percent: titleYPercent,
+          title_text_anchor: overlayDesign.position?.includes('right') ? 'end' : 
+                            overlayDesign.position?.includes('left') ? 'start' : 'middle',
+          title_max_width_percent: overlayDesign.max_width_percent,
+          title_opacity: overlayDesign.opacity,
+          title_overlay_background_type: overlayDesign.overlay_background_type,
+          title_overlay_background_color: overlayDesign.overlay_background_color,
+          title_overlay_background_opacity: overlayDesign.overlay_background_opacity,
+          title_overlay_background_shape: overlayDesign.overlay_background_shape,
+          title_overlay_background_padding: overlayDesign.overlay_background_padding,
+          subtitle_font_family: overlayDesign.font_family,
+          subtitle_font_weight: overlayDesign.font_weight === 'bold' ? 'regular' : overlayDesign.font_weight,
+          subtitle_font_transform: overlayDesign.font_transform,
+          subtitle_letter_spacing: overlayDesign.letter_spacing,
+          subtitle_color_hex: overlayDesign.text_color_hex,
+          subtitle_x_percent: xPercent,
+          subtitle_y_percent: subtitleYPercent,
+          subtitle_text_anchor: overlayDesign.position?.includes('right') ? 'end' : 
+                              overlayDesign.position?.includes('left') ? 'start' : 'middle',
+          subtitle_max_width_percent: overlayDesign.max_width_percent,
+          subtitle_opacity: overlayDesign.opacity * 0.9,
+          subtitle_overlay_background_type: overlayDesign.overlay_background_type,
+          subtitle_overlay_background_color: overlayDesign.overlay_background_color,
+          subtitle_overlay_background_opacity: overlayDesign.overlay_background_opacity,
+          subtitle_overlay_background_shape: overlayDesign.overlay_background_shape,
+          subtitle_overlay_background_padding: overlayDesign.overlay_background_padding
+        };
+
+        // Update strategy
+        newStrategy.step_3_overlay_design = {
+          reasoning: overlayDesign.reasoning,
+          overlay_config: newOverlayConfig
+        };
+        break;
+      }
+
+      case 'final_image':
+      default: {
+        // Fallback to direct image editing
+        console.log('[Feedback Loop] Falling back to direct image editing...');
+        const imageToEdit = baseImageForAnalysis; // Use base image, not final image
+        const newImageUrl = await geminiService.editImage(imageToEdit, feedback);
+        
+        // If we edited the base image, update it
+        newBaseImageUrl = newImageUrl;
+        
+        // Reapply overlay if we have one
+        if (asset.overlay_config) {
+          const finalImageUrl = await imageOverlayService.applyTextOverlay(
+            newBaseImageUrl,
+            asset.overlay_config
+          );
+          newBaseImageUrl = finalImageUrl; // In this case, base becomes final since we edited it
+        } else {
+          newBaseImageUrl = newImageUrl;
+        }
+        break;
+      }
+    }
+
+    // Apply overlay to create final image
+    let finalImageUrl = newBaseImageUrl || asset.base_image_url || asset.image_url;
+    if (newOverlayConfig && stepAnalysis.stepToRedo !== 'final_image' && newOverlayConfig.title && newOverlayConfig.subtitle) {
+      const baseImageForOverlay = newBaseImageUrl || asset.base_image_url || asset.image_url;
+      if (baseImageForOverlay) {
+        finalImageUrl = await imageOverlayService.applyTextOverlay(
+          baseImageForOverlay, // Always use base image for overlay application
+          newOverlayConfig
+        );
+      }
+    }
+
+    // Track feedback iteration in strategy
+    if (!newStrategy.feedback_iterations) {
+      newStrategy.feedback_iterations = [];
+    }
+    newStrategy.feedback_iterations.push({
+      feedback,
+      step_redone: stepAnalysis.stepToRedo,
+      reasoning: stepAnalysis.reasoning,
+      confidence: stepAnalysis.confidence,
+      timestamp: new Date().toISOString()
+    });
+
+    // Update asset
     const updatedAsset = await assetService.updateAsset(id, {
-      image_url: newImageUrl,
+      image_url: finalImageUrl,
+      base_image_url: newBaseImageUrl, // Update base_image_url if image was regenerated
+      overlay_config: newOverlayConfig,
+      strategy: newStrategy,
       feedback_history: [...(asset.feedback_history || []), feedback]
     });
 
     res.json(updatedAsset);
   } catch (error) {
+    console.error('[Feedback Loop] Error:', error);
     next(error);
   }
 };

@@ -25,16 +25,23 @@ const cleanOverlayConfig = (config: any): OverlayConfig | undefined => {
   };
 };
 
-export const getAllAssets = async (brandId?: string): Promise<GeneratedAsset[]> => {
+export const getAllAssets = async (brandId?: string, limit?: number): Promise<GeneratedAsset[]> => {
   let query = 'SELECT * FROM generated_assets';
   const params: any[] = [];
+  let paramIndex = 1;
   
   if (brandId) {
-    query += ' WHERE brand_id = $1';
+    query += ` WHERE brand_id = $${paramIndex}`;
     params.push(brandId);
+    paramIndex++;
   }
   
   query += ' ORDER BY created_at DESC';
+  
+  // Limit results to improve performance (default to 20 for sidebar, can be overridden)
+  const limitValue = limit || 20;
+  query += ` LIMIT $${paramIndex}`;
+  params.push(limitValue);
   
   const result = await pool.query<AssetRow>(query, params);
   return result.rows.map(rowToAsset);

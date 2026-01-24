@@ -11,13 +11,14 @@ import ErrorMessage from './components/ErrorMessage.js';
 
 const App: React.FC = () => {
   const { brands, loading: brandsLoading, error: brandsError, createBrand, updateBrand, deleteBrand } = useBrands();
-  const { assets, loading: assetsLoading, createAsset, deleteAsset, loadAssets } = useAssets();
   
   // Restore state from localStorage on mount
   const [activeBrandId, setActiveBrandId] = useState<string | null>(() => {
     const saved = localStorage.getItem('brandgenius_activeBrandId');
     return saved || null;
   });
+  
+  const { assets, loading: assetsLoading, createAsset, deleteAsset, loadAssets } = useAssets(activeBrandId || undefined);
   const [view, setView] = useState<'home' | 'dna' | 'studio' | 'create'>(() => {
     const saved = localStorage.getItem('brandgenius_view') as 'home' | 'dna' | 'studio' | 'create' | null;
     return saved || 'home';
@@ -302,20 +303,26 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          {assets.length > 0 && (
-            <section>
-              <div className="flex items-center justify-between mb-6 px-2">
-                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Recent Assets</h2>
-                {activeBrand && (
-                  <button 
-                    onClick={() => { setView('create'); }}
-                    className="bg-indigo-50 text-indigo-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all active:scale-90"
-                    title="New Asset"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-                  </button>
-                )}
+          <section>
+            <div className="flex items-center justify-between mb-6 px-2">
+              <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Recent Assets</h2>
+              {activeBrand && (
+                <button 
+                  onClick={() => { setView('create'); }}
+                  className="bg-indigo-50 text-indigo-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all active:scale-90"
+                  title="New Asset"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                </button>
+              )}
+            </div>
+            {assetsLoading ? (
+              <div className="grid grid-cols-2 gap-3 px-1">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="aspect-square rounded-2xl bg-slate-100 animate-pulse" />
+                ))}
               </div>
+            ) : assets.length > 0 ? (
               <div className="grid grid-cols-2 gap-3 px-1">
                 {assets.slice(0, 8).map(asset => {
                   const imageUrl = asset.imageUrl || asset.image_url;
@@ -324,7 +331,22 @@ const App: React.FC = () => {
                       key={asset.id} 
                       className="aspect-square rounded-2xl overflow-hidden bg-slate-100 border-2 border-white shadow-sm cursor-pointer hover:ring-4 hover:ring-indigo-500/20 transition-all hover:scale-[1.05] relative group"
                     >
-                      {imageUrl && <img src={imageUrl} className="w-full h-full object-cover" />}
+                      {imageUrl ? (
+                        <img 
+                          src={imageUrl} 
+                          className="w-full h-full object-cover" 
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            // Hide broken images
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <div className="w-8 h-8 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
+                        </div>
+                      )}
                       
                       {/* Action buttons overlay */}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -369,8 +391,12 @@ const App: React.FC = () => {
                   );
                 })}
               </div>
-            </section>
-          )}
+            ) : (
+              <div className="p-6 bg-slate-50 rounded-2xl text-center border-2 border-dashed border-slate-200">
+                <p className="text-xs font-bold text-slate-400">No assets yet.</p>
+              </div>
+            )}
+          </section>
         </div>
       </aside>
 

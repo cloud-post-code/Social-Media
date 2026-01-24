@@ -1210,24 +1210,24 @@ export const generateProductTitleSubtitle = async (
 You are a Lead Copywriter for a luxury brand.
 Goal: Write a title and subtitle that fits the *visual mood* of the product image and the Brand DNA.
 
+### CRITICAL: ANALYZE THE IMAGE FIRST
+Before writing anything, you MUST carefully examine the product image provided. Describe what you actually see:
+- What product or item is visible in the image?
+- What are the specific visual characteristics (colors, materials, textures, style)?
+- What is the mood and atmosphere of the image?
+- What details, features, or elements are prominent?
+
+DO NOT make assumptions or use generic descriptions. Base your analysis ONLY on what is actually visible in the image.
+
 ### INPUT DATA
 Brand Voice: ${JSON.stringify(brandVoiceContext)}
 Product Focus: ${productFocus}
 
-### IMAGE ANALYSIS
-You have been provided with the product image that the text will be overlaid on. Analyze the image to understand:
-- The visual mood and atmosphere (e.g., soft/cozy, sleek/modern, rugged/outdoor, elegant/luxury)
-- The product's characteristics visible in the image
-- The overall composition and feeling the image conveys
-- Any visual elements that should influence the tone of your copy
-
-Use this visual analysis to inform your title and subtitle choices. The text should complement and enhance the visual story told by the image.
-
 ### INSTRUCTIONS
 - **Title (max 5 words):** Punchy, attention-grabbing, emotion-driven. This is the hero text. Match the visual mood of the image.
-- **Subtitle (max 15 words):** Supporting detail that expands on the title. Can include benefit or feature. Should complement both the image and the title.
+- **Subtitle (max 15 words):** Supporting detail that expands on the title. MUST be based on what you actually see in the image - describe specific features, materials, or benefits visible in the product. Do NOT use generic or unrelated descriptions.
 - **Less is More:** High-end brands use fewer words.
-- **Visual Connection:** Analyze the image - if the product appears soft/cozy, the words should feel soft. If it appears sleek/hard, the words should be punchy. Match the energy and mood you see in the image.
+- **Visual Connection:** The subtitle MUST reflect what is actually visible in the image. If you see specific materials, colors, or features, mention those. If the product appears soft/cozy, the words should feel soft. If it appears sleek/hard, the words should be punchy. Match the energy and mood you see in the image.
 - **Voice Check:** Ensure the tone matches: ${brandDNA.brand_voice.tone_adjectives.join(', ')}.
 - **Writing Style:** ${brandDNA.brand_voice.writing_style}
 - **Keywords to use:** ${brandDNA.brand_voice.keywords_to_use.join(', ')}
@@ -1237,10 +1237,13 @@ Use this visual analysis to inform your title and subtitle choices. The text sho
 Return ONLY:
 {
   "title": "Punchy title, max 5 words",
-  "subtitle": "Supporting subtitle, max 15 words"
+  "subtitle": "Supporting subtitle, max 15 words - MUST describe what is actually visible in the image"
 }
 
-CRITICAL: Return plain text only. Do NOT use markdown formatting (no **, no *, no _, no backticks). Just plain text strings.
+CRITICAL: 
+- Return plain text only. Do NOT use markdown formatting (no **, no *, no _, no backticks). Just plain text strings.
+- The subtitle MUST be based on what you actually see in the image, not generic product descriptions.
+- Do NOT repeat the same subtitle for different images.
   `;
 
   // Extract base64 data (handle data URI format)
@@ -1248,9 +1251,10 @@ CRITICAL: Return plain text only. Do NOT use markdown formatting (no **, no *, n
     ? productImageBase64.split(',')[1] 
     : productImageBase64;
 
+  // Put text prompt first, then image (better for Gemini API)
   const parts = [
-    { inlineData: { mimeType: "image/png", data: base64Data } },
-    { text: prompt }
+    { text: prompt },
+    { inlineData: { mimeType: "image/png", data: base64Data } }
   ];
 
   const response = await ai.models.generateContent({
@@ -1634,6 +1638,406 @@ export const generateImage = async (prompt: string, width: number = 1080, height
     }
   }
   throw new Error("Failed to generate image");
+};
+
+/**
+ * Analyze user feedback to determine which generation step needs to be redone
+ */
+export const analyzeFeedbackForStepSelection = async (
+  assetType: 'product' | 'non-product' | 'campaign',
+  currentStrategy: any,
+  feedback: string,
+  baseImageBase64?: string
+): Promise<{
+  stepToRedo: 'image_prompt' | 'image_generation' | 'title_subtitle' | 'overlay_design' | 'final_image';
+  reasoning: string;
+  confidence: number;
+}> => {
+  const ai = getAIClient();
+  const model = 'gemini-3-flash-preview';
+
+  const strategyContext = JSON.stringify(currentStrategy || {}, null, 2);
+
+  const prompt = `
+You are an expert at analyzing user feedback for image generation workflows.
+
+### ASSET TYPE
+${assetType === 'product' ? 'Product Asset' : assetType === 'non-product' ? 'Non-Product Asset' : 'Campaign Asset'}
+
+### CURRENT STRATEGY
+${strategyContext}
+
+### USER FEEDBACK
+"${feedback}"
+
+### GENERATION STEPS AVAILABLE
+For ${assetType === 'product' ? 'product' : 'non-product'} assets, the generation process has these steps:
+1. **image_prompt**: Generate the image prompt/strategy
+2. **image_generation**: Generate the actual base image
+3. **title_subtitle**: Generate the marketing text (title and subtitle)
+4. **overlay_design**: Design the typography and styling for text overlay
+5. **final_image**: Direct image editing (fallback for complex edits)
+
+### ANALYSIS TASK
+Analyze the user feedback and determine which step MOST LIKELY needs to be redone.
+
+**Guidelines:**
+- **Image-related feedback** (colors, composition, lighting, background, product appearance) → "image_prompt" or "image_generation"
+  - If feedback is about prompt/strategy → "image_prompt"
+  - If feedback is about the generated image itself → "image_generation"
+- **Text/copy feedback** (title, subtitle, messaging, wording) → "title_subtitle"
+- **Typography/styling feedback** (font, colors, positioning, overlay appearance) → "overlay_design"
+- **Complex/general feedback** that doesn't fit clearly → "final_image" (fallback)
+
+### OUTPUT FORMAT (JSON)
+Return ONLY:
+{
+  "stepToRedo": "image_prompt" or "image_generation" or "title_subtitle" or "overlay_design" or "final_image",
+  "reasoning": "Brief explanation of why this step was selected",
+  "confidence": 0-100
+}
+
+Return ONLY JSON. No markdown, no explanations.
+  `;
+
+  const parts: any[] = [{ text: prompt }];
+  
+  // Include base image if provided for context
+  if (baseImageBase64) {
+    const base64Data = baseImageBase64.includes(',') 
+      ? baseImageBase64.split(',')[1] 
+      : baseImageBase64;
+    parts.push({ inlineData: { mimeType: "image/png", data: base64Data } });
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: { parts },
+      config: { responseMimeType: "application/json" }
+    });
+
+    const result = safeJsonParse(response.text || '{}');
+    
+    return {
+      stepToRedo: result.stepToRedo || 'final_image',
+      reasoning: result.reasoning || 'Unable to determine specific step',
+      confidence: result.confidence || 50
+    };
+  } catch (error) {
+    console.error('[analyzeFeedbackForStepSelection] Error:', error);
+    // Fallback to final_image if analysis fails
+    return {
+      stepToRedo: 'final_image',
+      reasoning: 'Analysis failed, falling back to direct image editing',
+      confidence: 0
+    };
+  }
+};
+
+/**
+ * Regenerate image prompt with feedback incorporated
+ */
+export const regenerateImagePrompt = async (
+  brandDNA: BrandDNA,
+  productFocus: string,
+  feedback: string,
+  referenceImageBase64?: string
+): Promise<{ imagen_prompt_final: string; reasoning: string; includes_person: boolean; composition_notes: string; step_1_analysis?: any }> => {
+  // Call original function but incorporate feedback into productFocus
+  const enhancedProductFocus = `${productFocus}\n\nFEEDBACK FOR REGENERATION: ${feedback}`;
+  return generateProductImagePrompt(brandDNA, enhancedProductFocus, referenceImageBase64);
+};
+
+/**
+ * Regenerate image with feedback incorporated
+ */
+export const regenerateImage = async (
+  prompt: string,
+  feedback: string,
+  width: number = 1080,
+  height: number = 1080,
+  referenceImageBase64?: string
+): Promise<string> => {
+  // Enhance prompt with feedback
+  const enhancedPrompt = `${prompt}\n\nFEEDBACK FOR REGENERATION: ${feedback}`;
+  return generateImage(enhancedPrompt, width, height, referenceImageBase64);
+};
+
+/**
+ * Regenerate title and subtitle with feedback incorporated
+ */
+export const regenerateTitleSubtitle = async (
+  brandDNA: BrandDNA,
+  productFocus: string,
+  feedback: string,
+  baseImageBase64: string
+): Promise<{ title: string; subtitle: string }> => {
+  const ai = getAIClient();
+  const model = 'gemini-3-pro-preview';
+
+  // Only include brand voice information
+  const brandVoiceContext = {
+    tone_adjectives: brandDNA.brand_voice.tone_adjectives,
+    writing_style: brandDNA.brand_voice.writing_style,
+    keywords_to_use: brandDNA.brand_voice.keywords_to_use,
+    taboo_words: brandDNA.brand_voice.taboo_words
+  };
+
+  const prompt = `
+You are a Lead Copywriter for a luxury brand.
+Goal: Write a title and subtitle that fits the *visual mood* of the product image and the Brand DNA.
+
+### CRITICAL: ANALYZE THE IMAGE FIRST
+Before writing anything, you MUST carefully examine the product image provided. Describe what you actually see:
+- What product or item is visible in the image?
+- What are the specific visual characteristics (colors, materials, textures, style)?
+- What is the mood and atmosphere of the image?
+- What details, features, or elements are prominent?
+
+DO NOT make assumptions or use generic descriptions. Base your analysis ONLY on what is actually visible in the image.
+
+### INPUT DATA
+Brand Voice: ${JSON.stringify(brandVoiceContext)}
+Product Focus: ${productFocus}
+
+### FEEDBACK FOR REGENERATION
+The user provided this feedback about the previous title/subtitle:
+"${feedback}"
+
+Please incorporate this feedback into your new title and subtitle generation.
+
+### INSTRUCTIONS
+- **Title (max 5 words):** Punchy, attention-grabbing, emotion-driven. This is the hero text. Match the visual mood of the image.
+- **Subtitle (max 15 words):** Supporting detail that expands on the title. MUST be based on what you actually see in the image - describe specific features, materials, or benefits visible in the product. Do NOT use generic or unrelated descriptions.
+- **Less is More:** High-end brands use fewer words.
+- **Visual Connection:** The subtitle MUST reflect what is actually visible in the image. If you see specific materials, colors, or features, mention those. If the product appears soft/cozy, the words should feel soft. If it appears sleek/hard, the words should be punchy. Match the energy and mood you see in the image.
+- **Voice Check:** Ensure the tone matches: ${brandDNA.brand_voice.tone_adjectives.join(', ')}.
+- **Writing Style:** ${brandDNA.brand_voice.writing_style}
+- **Keywords to use:** ${brandDNA.brand_voice.keywords_to_use.join(', ')}
+- **Taboo words (avoid):** ${brandDNA.brand_voice.taboo_words.join(', ')}
+- **CRITICAL:** Address the feedback provided above.
+
+### OUTPUT FORMAT (JSON)
+Return ONLY:
+{
+  "title": "Punchy title, max 5 words",
+  "subtitle": "Supporting subtitle, max 15 words - MUST describe what is actually visible in the image"
+}
+
+CRITICAL: 
+- Return plain text only. Do NOT use markdown formatting (no **, no *, no _, no backticks). Just plain text strings.
+- The subtitle MUST be based on what you actually see in the image, not generic product descriptions.
+- Do NOT repeat the same subtitle for different images.
+- Address the user's feedback about the previous subtitle.
+  `;
+
+  // Extract base64 data (handle data URI format)
+  const base64Data = baseImageBase64.includes(',') 
+    ? baseImageBase64.split(',')[1] 
+    : baseImageBase64;
+
+  // Put text prompt first, then image (better for Gemini API)
+  const parts = [
+    { text: prompt },
+    { inlineData: { mimeType: "image/png", data: base64Data } }
+  ];
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: { parts },
+    config: { responseMimeType: "application/json" }
+  });
+
+  const result = safeJsonParse(response.text || '{}');
+  
+  // Clean markdown from title and subtitle
+  const cleanMarkdown = (text: string): string => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
+      .replace(/\*(.*?)\*/g, '$1')       // Remove *italic*
+      .replace(/__(.*?)__/g, '$1')       // Remove __bold__
+      .replace(/_(.*?)_/g, '$1')         // Remove _italic_
+      .replace(/~~(.*?)~~/g, '$1')       // Remove ~~strikethrough~~
+      .replace(/`(.*?)`/g, '$1')         // Remove `code`
+      .trim();
+  };
+  
+  return {
+    title: cleanMarkdown(result.title || ''),
+    subtitle: cleanMarkdown(result.subtitle || '')
+  };
+};
+
+/**
+ * Regenerate overlay design with feedback incorporated
+ */
+export const regenerateOverlayDesign = async (
+  brandDNA: BrandDNA,
+  title: string,
+  subtitle: string,
+  feedback: string,
+  baseImageBase64: string
+): Promise<{
+  font_family: 'sans-serif' | 'serif' | 'cursive' | 'handwritten';
+  font_weight: 'light' | 'regular' | 'bold';
+  font_transform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+  letter_spacing: 'normal' | 'wide';
+  text_color_hex: string;
+  position: 'top-center' | 'bottom-left' | 'bottom-right' | 'center-middle' | 'top-left' | 'top-right' | 'center-left' | 'center-right' | 'floating-center';
+  max_width_percent: number;
+  opacity: number;
+  overlay_background_type?: 'gradient' | 'solid' | 'blur' | 'shape' | 'none';
+  overlay_background_color?: string;
+  overlay_background_opacity?: number;
+  overlay_background_shape?: 'rectangle' | 'rounded' | 'pill' | 'circle';
+  overlay_background_padding?: number;
+  reasoning: string;
+}> => {
+  const ai = getAIClient();
+  const model = 'gemini-3-pro-preview';
+
+  const allColors = brandDNA.visual_identity.colors && brandDNA.visual_identity.colors.length > 0
+    ? brandDNA.visual_identity.colors
+    : [brandDNA.visual_identity.primary_color_hex, brandDNA.visual_identity.accent_color_hex].filter(Boolean);
+  
+  const colorsList = allColors.join(', ');
+
+  const prompt = `
+You are a UI/UX Designer specializing in Social Media aesthetics and accessibility.
+Goal: Determine the CSS/Design properties to overlay the title and subtitle onto the image with MAXIMUM READABILITY.
+
+### INPUT DATA
+Brand DNA: ${JSON.stringify(brandDNA)}
+Title: "${title}"
+Subtitle: "${subtitle}"
+
+### FEEDBACK FOR REGENERATION
+The user provided this feedback about the previous overlay design:
+"${feedback}"
+
+Please incorporate this feedback into your new overlay design. Address the specific concerns mentioned in the feedback.
+
+### BRAND COLOR PALETTE
+All brand colors: ${allColors.join(', ')}
+Primary color (most important): ${brandDNA.visual_identity.primary_color_hex}
+Accent color (secondary): ${brandDNA.visual_identity.accent_color_hex}
+
+### CRITICAL READABILITY ANALYSIS
+Before determining placement, you MUST analyze the image:
+
+1. **Contrast Analysis:**
+   - Identify areas with sufficient brightness contrast (light backgrounds need dark text, dark backgrounds need light text)
+   - Look for zones with minimal visual clutter (avoid busy/complex areas)
+   - Find areas with consistent color/brightness that won't interfere with text legibility
+   - **MANDATORY**: If no area has sufficient natural contrast, you MUST add overlay background elements
+
+2. **Readability Zones:**
+   - Top areas: Often work well if image has simpler backgrounds at top
+   - Bottom areas: Common choice, but ensure sufficient contrast
+   - Center areas: Use only if background is uniform and provides good contrast
+   - Avoid: Areas with high detail, busy patterns, or extreme brightness variations
+   - **PRIORITY**: Choose position that maximizes readability, even if it means adding overlay backgrounds
+
+3. **Text Length Consideration:**
+   - Title length: "${title.length}" characters
+   - Subtitle length: "${subtitle.length}" characters
+   - Position must accommodate both text blocks without overlapping important image elements
+   - Ensure there's enough space for clear, readable text placement
+
+4. **Accessibility Standards (MANDATORY):**
+   - **REQUIRED**: Text MUST meet WCAG contrast ratio of at least 4.5:1 for normal text, 3:1 for large text
+   - **REQUIRED**: If natural contrast is insufficient, you MUST add overlay background elements (gradient, solid, blur, or shape)
+   - Test color combinations: If background is light, use dark text; if background is dark, use light text
+   - **DEFAULT TO SAFE**: When in doubt, add a subtle overlay background (opacity 0.4-0.6) to ensure readability
+
+5. **Overlay Background Elements Analysis (ENHANCED):**
+   - **MANDATORY CHECK**: Analyze the image at the chosen text position FIRST
+   - **DEFAULT ASSUMPTION**: Most product images benefit from overlay backgrounds for text readability
+   - **REQUIRED**: If the background is busy, has varying brightness, or lacks sufficient contrast, you MUST add overlay elements
+   - Choose overlay type based on image analysis:
+     - **'gradient'**: Best for images with varying brightness - creates smooth transition
+     - **'solid'**: Best for consistent backgrounds that need contrast boost - most reliable for readability
+     - **'blur'**: Best for very busy/complex backgrounds - creates visual separation
+     - **'shape'**: Best for minimal backgrounds that need subtle enhancement
+     - **'none'**: ONLY use if background is uniform, has excellent contrast, and text is clearly readable without overlay
+   - **Color Selection**: Choose from brand colors [${allColors.join(', ')}] OR white/black based on what provides best contrast
+   - **Opacity Guidelines**: 
+     - 0.4-0.5: Subtle, for backgrounds with decent contrast
+     - 0.6-0.7: Medium, for backgrounds with moderate contrast issues (RECOMMENDED DEFAULT)
+     - 0.8-0.9: Strong, for very busy or low-contrast backgrounds
+   - **Shape**: 'rounded' (recommended default) or 'pill' for softer look, 'rectangle' for bold look
+   - **Padding**: 25-35 pixels around text for comfortable spacing (30px recommended)
+   - **CRITICAL**: Overlay elements MUST improve readability without detracting from the product image
+   - **WHEN IN DOUBT**: Add a subtle overlay background - it's better to have slightly more contrast than risk unreadable text
+
+### INSTRUCTIONS
+- **PRIORITY: READABILITY FIRST** - Choose position and color that maximizes text legibility
+- Design styling that works for both title (larger, bolder) and subtitle (smaller, supporting)
+- Consider spacing between title and subtitle (typically 8-12px)
+- Position should leave room for both text elements AND avoid busy/complex image areas
+- **COLOR SELECTION**: Analyze the image background at the chosen position. Choose the BEST color from ALL available brand colors (${allColors.join(', ')}) OR white/black depending on contrast needs. The chosen color MUST provide excellent contrast against the background at the selected position.
+- **POSITION SELECTION**: Choose position based on readability analysis, not just aesthetics. Prefer positions with simpler backgrounds and better contrast.
+- **CRITICAL**: Address the feedback provided above - incorporate the user's specific concerns into your design decisions.
+
+### OUTPUT FORMAT (JSON)
+Return ONLY:
+{
+  "design_strategy": {
+    "font_family_category": "sans-serif" | "serif" | "handwritten",
+    "font_weight": "light" | "regular" | "bold",
+    "text_transform": "uppercase" | "lowercase" | "capitalize",
+    "letter_spacing": "normal" | "wide",
+    "text_color_hex": "Choose the BEST color from the brand palette [${allColors.join(', ')}] OR white/black for contrast. Select the color that provides MAXIMUM readability against the background at the chosen position.",
+    "suggested_position": "top-center" | "bottom-right" | "center-left" | "floating-center" | "top-left" | "top-right" | "bottom-left" | "bottom-center" | "center-right" | "center-middle",
+    "opacity": 1.0,
+    "max_width_percent": 80,
+    "overlay_background_type": "gradient" | "solid" | "blur" | "shape" | "none",
+    "overlay_background_color": "Hex color from brand palette or derived from image (e.g., #FFFFFF, #000000, or brand color)",
+    "overlay_background_opacity": 0.0-1.0,
+    "overlay_background_shape": "rectangle" | "rounded" | "pill" | "circle",
+    "overlay_background_padding": 20-40
+  },
+  "reasoning": "Explain: (1) Which area of the image you analyzed for readability, (2) Why this position provides optimal contrast and avoids visual clutter, (3) Which brand color you chose and why it provides excellent readability, (4) How this placement accommodates both title and subtitle without overlapping important image elements, (5) Whether overlay elements are needed and why (or why not), (6) If overlay elements are suggested, explain how they improve readability while matching brand style, (7) How you addressed the user's feedback."
+}
+  `;
+
+  const base64Data = baseImageBase64.includes(',') 
+    ? baseImageBase64.split(',')[1] 
+    : baseImageBase64;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: {
+      parts: [
+        { text: prompt },
+        { inlineData: { mimeType: "image/png", data: base64Data } }
+      ]
+    },
+    config: { responseMimeType: "application/json" }
+  });
+
+  const result = safeJsonParse(response.text || '{}');
+  const designStrategy = result.design_strategy || {};
+  
+  const fallbackColor = allColors.length > 0 ? allColors[0] : brandDNA.visual_identity.primary_color_hex;
+  
+  return {
+    font_family: designStrategy.font_family_category || 'sans-serif',
+    font_weight: designStrategy.font_weight || 'bold',
+    font_transform: designStrategy.text_transform || 'none',
+    letter_spacing: designStrategy.letter_spacing || 'normal',
+    text_color_hex: designStrategy.text_color_hex || fallbackColor,
+    position: designStrategy.suggested_position || 'bottom-right',
+    max_width_percent: designStrategy.max_width_percent || 80,
+    opacity: designStrategy.opacity !== undefined ? designStrategy.opacity : 1.0,
+    overlay_background_type: designStrategy.overlay_background_type || 'solid',
+    overlay_background_color: designStrategy.overlay_background_color || '#000000',
+    overlay_background_opacity: designStrategy.overlay_background_opacity !== undefined ? designStrategy.overlay_background_opacity : 0.6,
+    overlay_background_shape: designStrategy.overlay_background_shape || 'rounded',
+    overlay_background_padding: designStrategy.overlay_background_padding !== undefined ? designStrategy.overlay_background_padding : 30,
+    reasoning: result.reasoning || ''
+  };
 };
 
 export const editImage = async (originalImageBase64: string, feedback: string): Promise<string> => {
