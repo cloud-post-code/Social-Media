@@ -4,7 +4,7 @@ import { BrandDNA } from '../models/types.js';
 
 interface BrandDNAPageProps {
   activeBrand: BrandDNA | null;
-  onSave: (dna: BrandDNA) => void;
+  onSave: (dna: BrandDNA) => Promise<BrandDNA>;
   onCancel: () => void;
 }
 

@@ -71,7 +71,20 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
             }
           }
           if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
-            for (const imageUrl of extractedAssets.imageUrls.slice(0, 50)) {
+            // Check how many images we can still upload
+            const currentImageCount = assets.length;
+            const maxImages = 50;
+            const remainingSlots = Math.max(0, maxImages - currentImageCount);
+            
+            if (remainingSlots === 0) {
+              console.warn('Cannot upload extracted images: brand already has 50 images');
+              setExtractedAssets(null);
+              return;
+            }
+            
+            // Only upload as many as we can fit
+            const imagesToUpload = extractedAssets.imageUrls.slice(0, remainingSlots);
+            for (const imageUrl of imagesToUpload) {
               try {
                 await uploadAsset(imageUrl, 'brand_image');
               } catch (err: any) {
@@ -86,12 +99,14 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
           await loadAssets();
         } catch (err) {
           console.error('Failed to save extracted assets:', err);
+          // Don't let this error block - clear extracted assets anyway
+          setExtractedAssets(null);
         }
       };
       saveExtractedAssets();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brandId, extractedAssets]);
+  }, [brandId, extractedAssets, assets.length]);
 
   const handleExtract = async () => {
     if (!urlInput) return;
@@ -338,14 +353,29 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     const file = e.target.files?.[0];
     if (!file || !brandId) return;
     
+    // Check limits before uploading
+    if (assetType === 'brand_image' && assets.length >= 50) {
+      alert('Maximum of 50 brand images allowed. Please delete an image first.');
+      e.target.value = ''; // Reset file input
+      return;
+    }
+    
     const reader = new FileReader();
     reader.onload = async (event) => {
       const base64 = event.target?.result as string;
       try {
         await uploadAsset(base64, assetType);
       } catch (err: any) {
-        alert(err.message || 'Failed to upload image.');
+        const errorMessage = err.message || 'Failed to upload image.';
+        alert(errorMessage);
+        console.error('Upload failed:', err);
+      } finally {
+        e.target.value = ''; // Reset file input after upload attempt
       }
+    };
+    reader.onerror = () => {
+      alert('Failed to read file.');
+      e.target.value = ''; // Reset file input
     };
     reader.readAsDataURL(file);
   };
@@ -425,6 +455,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     const savedBrand = await onSave(finalData);
     
     // If there are extracted assets that weren't saved yet (e.g., from screenshot extraction), save them now
+    // Note: This happens AFTER the brand is saved, so errors here won't block the save
     if (extractedAssets && savedBrand.id) {
       try {
         const { brandAssetApi } = await import('../services/brandAssetApi.js');
@@ -443,7 +474,29 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
         
         // Save brand images if extracted
         if (extractedAssets.imageUrls && extractedAssets.imageUrls.length > 0) {
-          for (const imageUrl of extractedAssets.imageUrls.slice(0, 50)) {
+          // Check current asset count first
+          let currentImageCount = 0;
+          try {
+            const currentAssets = await brandAssetApi.getAssets(savedBrand.id, 'brand_image').catch(() => []);
+            currentImageCount = currentAssets?.length || 0;
+          } catch (err: any) {
+            // If we can't get the count, assume 0 (brand might be new)
+            console.warn('Could not get current asset count, assuming 0:', err);
+            currentImageCount = 0;
+          }
+          
+          const maxImages = 50;
+          const remainingSlots = Math.max(0, maxImages - currentImageCount);
+          
+          if (remainingSlots === 0) {
+            console.warn('Cannot upload extracted images: brand already has 50 images');
+            setExtractedAssets(null);
+            return;
+          }
+          
+          // Only upload as many as we can fit
+          const imagesToUpload = extractedAssets.imageUrls.slice(0, remainingSlots);
+          for (const imageUrl of imagesToUpload) {
             try {
               await brandAssetApi.uploadAsset(savedBrand.id, imageUrl, 'brand_image');
             } catch (err: any) {
@@ -462,6 +515,8 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
         }, 500);
       } catch (err) {
         console.error('Failed to save extracted assets:', err);
+        // Don't let this error prevent the save from completing - clear extracted assets anyway
+        setExtractedAssets(null);
       }
     }
     
@@ -735,6 +790,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                     <img
                       src={logo.image_url}
                       alt="Brand logo"
+                      loading="lazy"
                       className="max-w-xs max-h-24 object-contain"
                       onError={(e) => {
                         const img = e.target as HTMLImageElement;
@@ -794,6 +850,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
                       <img
                         src={asset.image_url}
                         alt={`Brand image ${asset.id}`}
+                        loading="lazy"
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           const img = e.target as HTMLImageElement;
