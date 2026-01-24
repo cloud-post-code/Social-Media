@@ -45,21 +45,21 @@ app.use(errorHandler);
 
 // Run migrations and start server
 async function startServer() {
-  try {
-    console.log('Running database migrations...');
-    await migrate();
-    console.log('Migrations completed, starting server...');
-  } catch (error: any) {
-    console.error('Migration error:', error);
-    console.log('Starting server anyway (migrations may have already run)...');
-  }
-  
+  // Start server FIRST, then run migrations in background
+  // This ensures Railway can see the service is running
   try {
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Server accessible on 0.0.0.0:${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`CORS enabled: All origins allowed`);
+      
+      // Run migrations after server starts (non-blocking)
+      console.log('Starting database migrations in background...');
+      migrate().catch((error: any) => {
+        console.error('Migration error (non-fatal):', error);
+        console.log('Server continues running despite migration error');
+      });
     });
     
     // Handle server errors
