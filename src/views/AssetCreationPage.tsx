@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrandDNA, GeneratedAsset, GenerationOption } from '../models/types.js';
 import { assetApi } from '../services/assetApi.js';
 import { useBrandAssets } from '../hooks/useBrandAssets.js';
+import GenerationProgressBar from '../components/GenerationProgressBar.js';
 
 interface AssetCreationPageProps {
   activeBrand: BrandDNA | null;
@@ -13,6 +14,11 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
   const [option, setOption] = useState<GenerationOption>('product');
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
+  
+  // Progress tracking
+  const [currentPost, setCurrentPost] = useState(0);
+  const [totalPosts, setTotalPosts] = useState(1);
+  const [startTime, setStartTime] = useState<number | null>(null);
   
   const [productFocus, setProductFocus] = useState('');
   const [userPurpose, setUserPurpose] = useState('');
@@ -56,13 +62,22 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
   const handleGenerate = async () => {
     if (!activeBrand) return;
     setLoading(true);
-    setStatusText('Creative Director is mapping the vision...');
+    setStartTime(Date.now());
     
     try {
       let asset: GeneratedAsset;
+      const total = option === 'product' ? 1 : postCount;
+      setTotalPosts(total);
+      setCurrentPost(0);
 
       if (option === 'product') {
+        setStatusText('Creative Director is mapping the vision...');
+        setCurrentPost(0.2); // 20% - starting
+        
         const dimensions = getImageDimensions();
+        setStatusText('Generating product image...');
+        setCurrentPost(0.3); // 30% - generating image
+        
         asset = await assetApi.generateProduct({
           brandId: activeBrand.id,
           productFocus,
@@ -70,13 +85,19 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
           width: dimensions.width,
           height: dimensions.height
         });
-        setStatusText('Capturing high-fidelity visual...');
+        
+        setStatusText('Applying text overlay...');
+        setCurrentPost(0.9); // 90% - applying overlay
+        setStatusText('Finalizing...');
+        setCurrentPost(1); // 100% - complete
       } else {
         // Handle batch generation for non-product posts
         const assetsToCreate: GeneratedAsset[] = [];
         
         for (let i = 0; i < postCount; i++) {
-          setStatusText(`Generating post ${i + 1} of ${postCount}...`);
+          const postNumber = i + 1;
+          setStatusText(`Generating post ${postNumber} of ${postCount}...`);
+          setCurrentPost(i + 0.1); // Start of this post
           
           const asset = await assetApi.generateNonProduct({
             brandId: activeBrand.id,
@@ -100,7 +121,10 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
           };
           
           assetsToCreate.push(frontendAsset);
+          setCurrentPost(postNumber); // Update progress
         }
+        
+        setStatusText('Finalizing...');
         
         // Call onAssetCreated for each generated asset
         for (const asset of assetsToCreate) {
@@ -109,6 +133,8 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         
         setLoading(false);
         setStatusText('');
+        setCurrentPost(0);
+        setStartTime(null);
         return;
       }
 
@@ -132,6 +158,8 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
     } finally {
       setLoading(false);
       setStatusText('');
+      setCurrentPost(0);
+      setStartTime(null);
     }
   };
 
@@ -284,12 +312,24 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                   )}
                 </div>
                 
+                {/* Progress Bar */}
+                {loading && startTime !== null && (
+                  <div key="product-progress" className="p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
+                    <GenerationProgressBar
+                      current={currentPost}
+                      total={totalPosts}
+                      statusText={statusText || 'Generating...'}
+                      startTime={startTime}
+                    />
+                  </div>
+                )}
+                
                 <button 
                   onClick={handleGenerate}
                   disabled={loading || !productFocus}
                   className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
                 >
-                  {loading ? statusText : 'Draft Product Masterpiece'}
+                  {loading ? 'Generating...' : 'Draft Product Masterpiece'}
                 </button>
               </div>
             </div>
@@ -370,12 +410,24 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                 <p className="text-xs text-slate-500 ml-4">Generate multiple variations (up to 10 at a time)</p>
               </div>
               
+              {/* Progress Bar */}
+              {loading && startTime !== null && (
+                <div key="non-product-progress" className="p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
+                  <GenerationProgressBar
+                    current={currentPost}
+                    total={totalPosts}
+                    statusText={statusText || 'Generating...'}
+                    startTime={startTime}
+                  />
+                </div>
+              )}
+              
               <button 
                 onClick={handleGenerate}
                 disabled={loading || !userPurpose}
                 className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
               >
-                {loading ? statusText : `Generate ${postCount} Brand DNA Asset${postCount !== 1 ? 's' : ''}`}
+                {loading ? 'Generating...' : `Generate ${postCount} Brand DNA Asset${postCount !== 1 ? 's' : ''}`}
               </button>
             </div>
           )}
