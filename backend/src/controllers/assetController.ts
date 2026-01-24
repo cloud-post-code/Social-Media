@@ -70,7 +70,8 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
     let baseImageUrl = await geminiService.generateImage(
       imagePromptResult.imagen_prompt_final,
       width || 1080,
-      height || 1080
+      height || 1080,
+      referenceImageBase64 // Pass reference image to Nano Banana
     );
 
     // Step 1.5: Verify product accuracy if reference image provided
@@ -101,7 +102,8 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
         baseImageUrl = await geminiService.generateImage(
           enhancedPrompt,
           width || 1080,
-          height || 1080
+          height || 1080,
+          referenceImageBase64 // Pass reference image to Nano Banana on retry
         );
 
         // Verify again

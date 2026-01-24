@@ -1525,7 +1525,7 @@ export const generateCampaignStrategy = async (brandDNA: BrandDNA, campaignDetai
   return safeJsonParse(response.text || '{}');
 };
 
-export const generateImage = async (prompt: string, width: number = 1080, height: number = 1080): Promise<string> => {
+export const generateImage = async (prompt: string, width: number = 1080, height: number = 1080, referenceImageBase64?: string): Promise<string> => {
   const ai = getAIClient();
   
   // Calculate aspect ratio from dimensions (simplify to common ratios)
@@ -1569,9 +1569,19 @@ export const generateImage = async (prompt: string, width: number = 1080, height
   // Determine image size based on larger dimension
   const imageSize = Math.max(width, height) >= 2048 ? "4K" : "2K";
   
+  // Build parts array - include reference image if provided
+  const parts: any[] = [{ text: prompt }];
+  
+  if (referenceImageBase64) {
+    const base64Data = referenceImageBase64.includes(',') 
+      ? referenceImageBase64.split(',')[1] 
+      : referenceImageBase64;
+    parts.push({ inlineData: { mimeType: "image/png", data: base64Data } });
+  }
+  
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview', // Nano Banana Pro - higher fidelity, up to 4K output
-    contents: { parts: [{ text: prompt }] },
+    contents: { parts },
     config: { 
       imageConfig: { 
         aspectRatio: aspectRatio as any, 
