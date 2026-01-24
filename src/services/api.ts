@@ -2,6 +2,10 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// Log API URL for debugging
+console.log('[API] API_BASE_URL:', API_BASE_URL);
+console.log('[API] VITE_API_URL env var:', import.meta.env.VITE_API_URL || 'not set');
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -55,7 +59,32 @@ async function request<T>(
 
   if (!isJson) {
     const text = await response.text();
-    throw new Error(`Expected JSON but received: ${contentType || 'unknown content type'}. Response: ${text.substring(0, 200)}`);
+    let errorMessage = `Expected JSON but received: ${contentType || 'unknown content type'}`;
+    
+    if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+      errorMessage += '\n\n⚠️ Server returned HTML instead of JSON.';
+      errorMessage += `\nRequest URL: ${url}`;
+      errorMessage += `\nThis usually means:`;
+      errorMessage += '\n1. VITE_API_URL is pointing to the frontend URL instead of backend';
+      errorMessage += '\n2. The backend server is not running';
+      errorMessage += '\n3. The API endpoint doesn\'t exist';
+      errorMessage += `\n\nCurrent VITE_API_URL: ${import.meta.env.VITE_API_URL || 'not set (using default: http://localhost:3001/api)'}`;
+      
+      if (!import.meta.env.VITE_API_URL) {
+        errorMessage += '\n\n❌ VITE_API_URL is not set!';
+        errorMessage += '\nSet it in Railway: Frontend Service → Variables → VITE_API_URL = https://social-media-production-cf45.up.railway.app/api';
+      } else if (import.meta.env.VITE_API_URL.includes('amused-generosity')) {
+        errorMessage += '\n\n❌ VITE_API_URL appears to be pointing to the FRONTEND URL!';
+        errorMessage += '\nIt should point to the BACKEND URL: https://social-media-production-cf45.up.railway.app/api';
+      } else if (!import.meta.env.VITE_API_URL.endsWith('/api')) {
+        errorMessage += '\n\n❌ VITE_API_URL is missing /api suffix!';
+        errorMessage += '\nIt should end with /api: https://social-media-production-cf45.up.railway.app/api';
+      }
+    } else {
+      errorMessage += `. Response: ${text.substring(0, 200)}`;
+    }
+    
+    throw new Error(errorMessage);
   }
 
   return response.json();
