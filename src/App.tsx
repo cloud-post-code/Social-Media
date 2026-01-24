@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrandDNA, GeneratedAsset } from './models/types.js';
 import { useBrands } from './hooks/useBrands.js';
 import { useAssets } from './hooks/useAssets.js';
@@ -30,6 +30,9 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('brandgenius_editingAssetId');
     return saved || null;
   });
+  
+  // Track which editingAssetId we've already navigated for
+  const navigatedForAssetIdRef = useRef<string | null>(null);
 
   const activeBrand = brands.find(b => b.id === activeBrandId) || null;
   const editingAsset = editingAssetId ? assets.find(a => a.id === editingAssetId) : null;
@@ -68,20 +71,28 @@ const App: React.FC = () => {
     }
   }, [brands, activeBrandId]);
 
-  // Restore studio view if editingAssetId is set and assets are loaded
+  // Navigate to studio view when editingAssetId is set or changes
+  // Only navigate once per editingAssetId to allow users to navigate away
   useEffect(() => {
     if (editingAssetId && assets.length > 0 && editingAsset) {
-      // Ensure we're on the studio view when editing an asset
-      if (view !== 'studio') {
+      // Only navigate if this is a new editingAssetId (not already navigated for)
+      const shouldNavigate = navigatedForAssetIdRef.current !== editingAssetId;
+      
+      if (shouldNavigate) {
         setView('studio');
+        navigatedForAssetIdRef.current = editingAssetId;
       }
+      
       // Ensure the brand is active
       const assetBrandId = editingAsset.brand_id || editingAsset.brandId;
       if (assetBrandId && assetBrandId !== activeBrandId) {
         setActiveBrandId(assetBrandId);
       }
+    } else if (!editingAssetId) {
+      // Clear the ref when editingAssetId is cleared
+      navigatedForAssetIdRef.current = null;
     }
-  }, [editingAssetId, assets, editingAsset, view, activeBrandId]);
+  }, [editingAssetId, assets, editingAsset, activeBrandId]);
 
   const handleSaveBrand = async (dna: BrandDNA): Promise<BrandDNA> => {
     try {

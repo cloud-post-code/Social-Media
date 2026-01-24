@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { BrandDNA, ScrapingCodeResponse } from "../types/index.js";
-import { getWebsiteStructure, executeScrapingCode, extractBrandColors } from "./imageScrapingService.js";
+import { getWebsiteStructure, executeScrapingCode, extractBrandColors, scrapeBrandAssetsDirect } from "./imageScrapingService.js";
 import sharp from 'sharp';
 import dotenv from 'dotenv';
 
@@ -777,7 +777,8 @@ export const extractStrategicProfile = async (input: { url?: string; imageBase64
 
 /**
  * Step 5: Extract Brand Images (logo and key images) - Only works with URL
- * Uses AI-generated Puppeteer scraping code for one-time execution
+ * Uses new direct Puppeteer scraping with intelligent heuristics (more reliable)
+ * Falls back to AI-generated code approach if direct scraping fails
  */
 export const extractBrandImages = async (url: string): Promise<{ logoUrl?: string; imageUrls?: string[] }> => {
   if (!url) {
@@ -787,6 +788,33 @@ export const extractBrandImages = async (url: string): Promise<{ logoUrl?: strin
   console.log(`[Gemini Service] extractBrandImages called with URL: ${url}`);
   
   try {
+    // Try new direct scraping method first (more reliable)
+    console.log(`[Gemini Service] Attempting direct scraping method...`);
+    try {
+      const directResult = await scrapeBrandAssetsDirect(url);
+      
+      if (directResult.logo_url || (directResult.image_urls && directResult.image_urls.length > 0)) {
+        console.log(`[Gemini Service] Direct scraping succeeded:`, {
+          hasLogo: !!directResult.logo_url,
+          imageCount: directResult.image_urls?.length || 0
+        });
+        
+        return {
+          logoUrl: directResult.logo_url || undefined,
+          imageUrls: directResult.image_urls && directResult.image_urls.length > 0 
+            ? directResult.image_urls.slice(0, 50) // Limit to max 50 images
+            : undefined
+        };
+      } else {
+        console.log(`[Gemini Service] Direct scraping found no images, trying AI-generated code approach...`);
+      }
+    } catch (directError: any) {
+      console.warn(`[Gemini Service] Direct scraping failed, trying AI-generated code approach:`, directError.message);
+    }
+    
+    // Fallback to AI-generated code approach
+    console.log(`[Gemini Service] Using AI-generated code approach...`);
+    
     // Step 1: Extract website structure using Puppeteer
     console.log(`[Gemini Service] Step 1/4: Extracting website structure...`);
     const domStructure = await getWebsiteStructure(url);

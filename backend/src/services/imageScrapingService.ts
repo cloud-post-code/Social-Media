@@ -125,8 +125,337 @@ export async function getWebsiteStructure(url: string): Promise<string> {
 }
 
 /**
+ * NEW: Direct Puppeteer-based scraping with intelligent heuristics
+ * More reliable than AI-generated code approach
+ */
+export async function scrapeBrandAssetsDirect(
+  url: string
+): Promise<{ logo_url?: string; image_urls?: string[] }> {
+  let browser: Browser | null = null;
+  
+  try {
+    console.log(`[Scraping Service] Starting direct scraping for: ${url}`);
+    
+    // Launch browser
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-web-security'
+      ]
+    });
+    
+    const page = await browser.newPage();
+    page.setDefaultTimeout(30000);
+    await page.setViewport({ width: 1920, height: 1080 });
+    
+    // Navigate to the page
+    await page.goto(url, {
+      waitUntil: 'networkidle2',
+      timeout: 30000
+    });
+    
+    // Wait for content to load, especially lazy-loaded images
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // Scroll down to trigger lazy loading
+    await page.evaluate(() => {
+      // @ts-expect-error - browser globals
+      window.scrollTo(0, document.body.scrollHeight / 2);
+    });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    await page.evaluate(() => {
+      // @ts-expect-error - browser globals
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Extract all images with detailed metadata
+    const imageData = await page.evaluate((baseUrl: string) => {
+      // @ts-expect-error - browser globals
+      const doc = document;
+      // @ts-expect-error - browser globals
+      const win = window;
+      
+      const images: Array<{
+        src: string;
+        alt: string;
+        width: number;
+        height: number;
+        naturalWidth: number;
+        naturalHeight: number;
+        className: string;
+        id: string;
+        parentTag: string;
+        parentClass: string;
+        isInHeader: boolean;
+        isInNav: boolean;
+        isInHero: boolean;
+        isInGallery: boolean;
+        isVisible: boolean;
+        aspectRatio: number;
+        area: number;
+      }> = [];
+      
+      const allImages = doc.querySelectorAll('img');
+      const baseUrlObj = new URL(baseUrl);
+      
+      allImages.forEach((img: any) => {
+        try {
+          // Get image source (handle lazy loading attributes)
+          let src = img.src || img.getAttribute('src') || img.getAttribute('data-src') || 
+                    img.getAttribute('data-lazy-src') || img.getAttribute('data-original') || '';
+          
+          // Skip data URLs and empty sources
+          if (!src || src.startsWith('data:') || src.trim() === '') return;
+          
+          // Convert relative URLs to absolute
+          try {
+            if (src.startsWith('//')) {
+              src = `${baseUrlObj.protocol}${src}`;
+            } else if (src.startsWith('/')) {
+              src = `${baseUrlObj.protocol}//${baseUrlObj.host}${src}`;
+            } else if (!src.startsWith('http')) {
+              src = new URL(src, baseUrl).href;
+            }
+          } catch (e) {
+            // Invalid URL, skip
+            return;
+          }
+          
+          const rect = img.getBoundingClientRect();
+          const naturalWidth = img.naturalWidth || rect.width;
+          const naturalHeight = img.naturalHeight || rect.height;
+          
+          // Skip very small images (likely icons)
+          if (naturalWidth < 50 || naturalHeight < 50) return;
+          
+          // Check if image is in header/nav
+          let isInHeader = false;
+          let isInNav = false;
+          let parent = img.parentElement;
+          let depth = 0;
+          while (parent && depth < 5) {
+            const tagName = parent.tagName?.toLowerCase();
+            const className = parent.className?.toLowerCase() || '';
+            const id = parent.id?.toLowerCase() || '';
+            
+            if (tagName === 'header' || className.includes('header') || id.includes('header')) {
+              isInHeader = true;
+            }
+            if (tagName === 'nav' || className.includes('nav') || id.includes('nav') || 
+                parent.getAttribute('role') === 'navigation') {
+              isInNav = true;
+            }
+            parent = parent.parentElement;
+            depth++;
+          }
+          
+          // Check if in hero section
+          const isInHero = img.closest('[class*="hero"], [class*="banner"], [id*="hero"], [id*="banner"]') !== null;
+          
+          // Check if in gallery/carousel
+          const isInGallery = img.closest('[class*="gallery"], [class*="carousel"], [class*="slider"], [class*="product"]') !== null;
+          
+          // Check visibility
+          const isVisible = rect.width > 0 && rect.height > 0 && 
+                           win.getComputedStyle(img).display !== 'none' &&
+                           win.getComputedStyle(img).visibility !== 'hidden' &&
+                           win.getComputedStyle(img).opacity !== '0';
+          
+          const area = naturalWidth * naturalHeight;
+          const aspectRatio = naturalHeight > 0 ? naturalWidth / naturalHeight : 1;
+          
+          images.push({
+            src,
+            alt: img.alt || '',
+            width: rect.width,
+            height: rect.height,
+            naturalWidth,
+            naturalHeight,
+            className: img.className || '',
+            id: img.id || '',
+            parentTag: img.parentElement?.tagName || '',
+            parentClass: img.parentElement?.className || '',
+            isInHeader,
+            isInNav,
+            isInHero,
+            isInGallery,
+            isVisible,
+            aspectRatio,
+            area
+          });
+        } catch (e) {
+          // Skip images that cause errors
+        }
+      });
+      
+      return images;
+    }, url);
+    
+    console.log(`[Scraping Service] Found ${imageData.length} images`);
+    
+    // Find logo (prioritize images in header/nav, with logo-related keywords)
+    const logoKeywords = ['logo', 'brand', 'logotype'];
+    const logoCandidates = imageData
+      .filter(img => {
+        const altLower = img.alt.toLowerCase();
+        const classNameLower = img.className.toLowerCase();
+        const idLower = img.id.toLowerCase();
+        
+        const hasLogoKeyword = logoKeywords.some(keyword => 
+          altLower.includes(keyword) || classNameLower.includes(keyword) || idLower.includes(keyword)
+        );
+        
+        // Logo is usually in header/nav, square-ish, and not too large
+        return (img.isInHeader || img.isInNav) && 
+               img.isVisible &&
+               img.area > 1000 && // At least 32x32px
+               img.area < 500000 && // Not huge
+               (hasLogoKeyword || (img.aspectRatio > 0.5 && img.aspectRatio < 2.5)); // Roughly square
+      })
+      .sort((a, b) => {
+        // Prioritize: has logo keyword > larger area > better aspect ratio
+        const aHasKeyword = logoKeywords.some(k => 
+          a.alt.toLowerCase().includes(k) || a.className.toLowerCase().includes(k)
+        );
+        const bHasKeyword = logoKeywords.some(k => 
+          b.alt.toLowerCase().includes(k) || b.className.toLowerCase().includes(k)
+        );
+        
+        if (aHasKeyword && !bHasKeyword) return -1;
+        if (!aHasKeyword && bHasKeyword) return 1;
+        
+        // Prefer images closer to square (aspect ratio near 1)
+        const aSquareScore = 1 - Math.abs(1 - a.aspectRatio);
+        const bSquareScore = 1 - Math.abs(1 - b.aspectRatio);
+        
+        if (Math.abs(aSquareScore - bSquareScore) > 0.2) {
+          return bSquareScore - aSquareScore;
+        }
+        
+        return b.area - a.area;
+      });
+    
+    const logo_url = logoCandidates.length > 0 ? logoCandidates[0].src : undefined;
+    
+    if (logo_url) {
+      console.log(`[Scraping Service] Found logo: ${logo_url.substring(0, 80)}...`);
+    }
+    
+    // Find brand images (hero, gallery, product images)
+    // Filter out: icons, logos, very small images, hidden images
+    const brandImageCandidates = imageData
+      .filter(img => {
+        // Skip if it's the logo
+        if (logo_url && img.src === logo_url) return false;
+        
+        // Must be visible and reasonably sized
+        if (!img.isVisible || img.area < 50000) return false; // At least ~224x224px
+        
+        // Skip icons (very small or square small images)
+        if (img.area < 10000 && img.aspectRatio > 0.8 && img.aspectRatio < 1.2) return false;
+        
+        // Skip avatars/profile images (usually small and square)
+        const altLower = img.alt.toLowerCase();
+        const classNameLower = img.className.toLowerCase();
+        if ((altLower.includes('avatar') || altLower.includes('profile') || classNameLower.includes('avatar')) &&
+            img.area < 25000) {
+          return false;
+        }
+        
+        return true;
+      })
+      .sort((a, b) => {
+        // Prioritize: hero images > gallery images > larger images > better positioned
+        let aScore = 0;
+        let bScore = 0;
+        
+        if (a.isInHero) aScore += 100;
+        if (b.isInHero) bScore += 100;
+        
+        if (a.isInGallery) aScore += 50;
+        if (b.isInGallery) bScore += 50;
+        
+        // Prefer landscape images (common for hero/product images)
+        if (a.aspectRatio > 1.2 && a.aspectRatio < 3) aScore += 20;
+        if (b.aspectRatio > 1.2 && b.aspectRatio < 3) bScore += 20;
+        
+        // Prefer larger images
+        aScore += Math.min(a.area / 10000, 30);
+        bScore += Math.min(b.area / 10000, 30);
+        
+        return bScore - aScore;
+      });
+    
+    // Remove duplicates and limit to top 10-15 images
+    const seenUrls = new Set<string>();
+    const uniqueImages: string[] = [];
+    
+    for (const img of brandImageCandidates) {
+      if (seenUrls.has(img.src)) continue;
+      
+      // Check for similar URLs (different sizes/parameters)
+      const baseUrl = img.src.split('?')[0].split('#')[0];
+      const isDuplicate = Array.from(seenUrls).some(seen => {
+        const seenBase = seen.split('?')[0].split('#')[0];
+        return baseUrl === seenBase;
+      });
+      
+      if (!isDuplicate) {
+        seenUrls.add(img.src);
+        uniqueImages.push(img.src);
+        
+        if (uniqueImages.length >= 15) break;
+      }
+    }
+    
+    console.log(`[Scraping Service] Found ${uniqueImages.length} brand images`);
+    
+    // Validate URLs
+    const validatedImages = uniqueImages.filter(imgUrl => {
+      try {
+        const urlObj = new URL(imgUrl);
+        return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+      } catch {
+        return false;
+      }
+    });
+    
+    return {
+      logo_url: logo_url ? (() => {
+        try {
+          const urlObj = new URL(logo_url);
+          return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') ? logo_url : undefined;
+        } catch {
+          return undefined;
+        }
+      })() : undefined,
+      image_urls: validatedImages.length > 0 ? validatedImages : undefined
+    };
+    
+  } catch (error: any) {
+    console.error(`[Scraping Service] Error in direct scraping:`, error.message);
+    console.error(`[Scraping Service] Error stack:`, error.stack);
+    throw new Error(`Failed to scrape brand assets: ${error.message}`);
+  } finally {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError: any) {
+        console.error(`[Scraping Service] Error closing browser:`, closeError.message);
+      }
+    }
+  }
+}
+
+/**
  * Execute Gemini-generated scraping code directly (not in VM to avoid Puppeteer context issues)
  * The code should return an object with logo_url and image_urls
+ * @deprecated Use scrapeBrandAssetsDirect instead for more reliable results
  */
 export async function executeScrapingCode(
   code: string,
