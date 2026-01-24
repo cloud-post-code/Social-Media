@@ -1,10 +1,23 @@
 // Base HTTP client
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Get and normalize API URL
+let API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+// Normalize the URL - ensure it has protocol and /api suffix
+if (API_BASE_URL && !API_BASE_URL.startsWith('http://') && !API_BASE_URL.startsWith('https://')) {
+  // Add https:// if protocol is missing
+  API_BASE_URL = `https://${API_BASE_URL}`;
+}
+
+// Ensure /api suffix is present
+if (API_BASE_URL && !API_BASE_URL.endsWith('/api')) {
+  // Remove trailing slash if present, then add /api
+  API_BASE_URL = API_BASE_URL.replace(/\/$/, '') + '/api';
+}
 
 // Log API URL for debugging
-console.log('[API] API_BASE_URL:', API_BASE_URL);
-console.log('[API] VITE_API_URL env var:', import.meta.env.VITE_API_URL || 'not set');
+console.log('[API] API_BASE_URL (normalized):', API_BASE_URL);
+console.log('[API] VITE_API_URL env var (raw):', import.meta.env.VITE_API_URL || 'not set');
 
 async function request<T>(
   endpoint: string,
