@@ -4,6 +4,7 @@ import { assetApi } from '../services/assetApi.js';
 import TextToolbar from './TextToolbar.js';
 import { getFontFamilyString, loadGoogleFont, GOOGLE_FONTS, FONT_MAPPING } from '../utils/googleFonts.js';
 import { useBrandAssets } from '../hooks/useBrandAssets.js';
+import html2canvas from 'html2canvas';
 
 // Utility function to strip markdown syntax from text
 const stripMarkdown = (text: string): string => {
