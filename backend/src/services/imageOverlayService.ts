@@ -620,3 +620,68 @@ export const updateOverlay = async (
 ): Promise<string> => {
   return applyTextOverlay(baseImageBase64, newOverlayConfig);
 };
+
+/**
+ * Optimize image compression before storing
+ * Converts images to WebP format for better compression
+ */
+export const optimizeImage = async (
+  imageBase64: string,
+  quality: number = 85
+): Promise<string> => {
+  try {
+    const base64Data = imageBase64.includes(',') 
+      ? imageBase64.split(',')[1] 
+      : imageBase64;
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    
+    // Get image metadata
+    const metadata = await sharp(imageBuffer).metadata();
+    const format = metadata.format || 'png';
+    
+    let optimizedBuffer: Buffer;
+    
+    // Convert to WebP for better compression (smaller file size)
+    // WebP is supported by all modern browsers
+    optimizedBuffer = await sharp(imageBuffer)
+      .webp({ quality, effort: 6 })
+      .toBuffer();
+    
+    return bufferToBase64(optimizedBuffer, 'image/webp');
+  } catch (error) {
+    console.warn('[Image Optimization] Failed to optimize, using original:', error);
+    // Return original if optimization fails
+    return imageBase64;
+  }
+};
+
+/**
+ * Generate thumbnail version of image for list views
+ * Creates a smaller, optimized version for faster loading
+ */
+export const generateThumbnail = async (
+  imageBase64: string,
+  width: number = 300,
+  height: number = 300
+): Promise<string> => {
+  try {
+    const base64Data = imageBase64.includes(',') 
+      ? imageBase64.split(',')[1] 
+      : imageBase64;
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    
+    const thumbnailBuffer = await sharp(imageBuffer)
+      .resize(width, height, { 
+        fit: 'cover',
+        withoutEnlargement: true,
+        position: 'center'
+      })
+      .webp({ quality: 75, effort: 6 })
+      .toBuffer();
+    
+    return bufferToBase64(thumbnailBuffer, 'image/webp');
+  } catch (error) {
+    console.warn('[Thumbnail] Failed to generate thumbnail, using original:', error);
+    return imageBase64;
+  }
+};

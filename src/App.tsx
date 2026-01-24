@@ -249,7 +249,7 @@ const App: React.FC = () => {
           </h1>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 space-y-10 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-6 space-y-10 custom-scrollbar min-h-0">
           <section>
             <div className="flex items-center justify-between mb-6 px-2">
               <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Your Libraries</h2>
