@@ -6,7 +6,7 @@ export interface GoogleFont {
   category: 'sans-serif' | 'serif' | 'display' | 'handwriting' | 'monospace';
 }
 
-// Popular Google Fonts - reduced to 4 fonts
+// Popular Google Fonts
 export const GOOGLE_FONTS: GoogleFont[] = [
   // Sans-serif (most popular)
   { family: 'Inter', category: 'sans-serif' },
@@ -17,6 +17,7 @@ export const GOOGLE_FONTS: GoogleFont[] = [
   
   // Handwriting/Cursive
   { family: 'Dancing Script', category: 'handwriting' },
+  { family: 'Kalam', category: 'handwriting' },
 ];
 
 // Map old font names to Google Fonts

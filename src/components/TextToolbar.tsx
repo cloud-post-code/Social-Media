@@ -74,8 +74,21 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
   const fontFamilyRaw = overlayEdit[`${prefix}_font_family` as keyof OverlayConfig] as string || 
     overlayConfig?.[`${prefix}_font_family` as keyof OverlayConfig] as string || 'sans-serif';
   
-  // Map old font names to Google Fonts
+  // Map old font names to Google Fonts for display
   const fontFamily = FONT_MAPPING[fontFamilyRaw] || fontFamilyRaw;
+  
+  // Get display name for the dropdown button - show actual font name
+  const getDisplayName = (fontName: string): string => {
+    // If it's a mapped generic name, show the actual font
+    const mappedFont = FONT_MAPPING[fontName];
+    if (mappedFont) {
+      return mappedFont; // Show actual font name (e.g., "Inter" instead of "sans-serif")
+    }
+    // If it's already an actual font name, show it
+    return fontName;
+  };
+  
+  const displayFontName = getDisplayName(fontFamilyRaw);
   
   const fontWeight = overlayEdit[`${prefix}_font_weight` as keyof OverlayConfig] as string || 
     overlayConfig?.[`${prefix}_font_weight` as keyof OverlayConfig] as string || (elementType === 'title' ? 'bold' : 'regular');
@@ -89,20 +102,26 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
   const textAnchor = overlayEdit[`${prefix}_text_anchor` as keyof OverlayConfig] as 'start' | 'middle' | 'end' || 
     overlayConfig?.[`${prefix}_text_anchor` as keyof OverlayConfig] as 'start' | 'middle' | 'end' || 'middle';
 
-  const handleFontFamilyChange = async (e: React.MouseEvent, value: string) => {
+  const handleFontFamilyChange = async (e: React.MouseEvent, font: FontWithDisplay) => {
     e.preventDefault();
     e.stopPropagation();
     
+    // Use the actual font family name for loading
+    const actualFontFamily = font.family;
+    
     // Load the font if it's a Google Font
-    const isGoogleFont = GOOGLE_FONTS.some(f => f.family === value);
+    const isGoogleFont = GOOGLE_FONTS.some(f => f.family === actualFontFamily);
     if (isGoogleFont) {
       try {
-        await loadGoogleFont(value);
+        await loadGoogleFont(actualFontFamily);
       } catch (err) {
         console.error('Failed to load font:', err);
       }
     }
-    onUpdate({ [`${prefix}_font_family`]: value } as any);
+    
+    // Store the value (generic name if available for backward compatibility, otherwise actual font name)
+    const valueToStore = font.storedValue || actualFontFamily;
+    onUpdate({ [`${prefix}_font_family`]: valueToStore } as any);
     setShowFontDropdown(false);
     setFontSearch('');
   };
@@ -131,20 +150,30 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
     }
   }, [showFontDropdown]);
 
-  // Include system fonts in the list
-  const SYSTEM_FONTS: GoogleFont[] = [
-    { family: 'sans-serif', category: 'sans-serif' },
-    { family: 'serif', category: 'serif' },
-    { family: 'cursive', category: 'handwriting' },
-    { family: 'handwritten', category: 'handwriting' },
-  ];
+  // Show actual font names in dropdown, but allow selection by generic name for backward compatibility
+  type FontWithDisplay = GoogleFont & { displayName?: string; genericName?: string; storedValue?: string };
   
-  const ALL_FONTS = [...SYSTEM_FONTS, ...GOOGLE_FONTS];
+  const ALL_FONTS: FontWithDisplay[] = GOOGLE_FONTS.map(font => {
+    // Find if this font is mapped from a generic name
+    const genericName = Object.keys(FONT_MAPPING).find(key => FONT_MAPPING[key] === font.family);
+    if (genericName) {
+      // Show the actual font name, but store the generic name for backward compatibility
+      return { 
+        ...font, 
+        displayName: font.family, // Show actual font name
+        genericName,
+        storedValue: genericName // Store generic name for compatibility
+      };
+    }
+    return { ...font, displayName: font.family, storedValue: font.family };
+  });
   
   // Filter fonts based on search
-  const filteredFonts = ALL_FONTS.filter(font =>
-    font.family.toLowerCase().includes(fontSearch.toLowerCase())
-  );
+  const filteredFonts = ALL_FONTS.filter(font => {
+    const searchTerm = fontSearch.toLowerCase();
+    return font.family.toLowerCase().includes(searchTerm) || 
+           (font.displayName && font.displayName.toLowerCase().includes(searchTerm));
+  });
 
   const handleFontWeightChange = (value: string) => {
     onUpdate({ [`${prefix}_font_weight`]: value } as any);
@@ -181,7 +210,7 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
           className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-700 cursor-pointer hover:border-indigo-400 transition-colors min-w-[180px] text-left flex items-center justify-between"
           style={{ fontFamily: getFontFamilyString(fontFamily) }}
         >
-          <span>{fontFamily}</span>
+          <span>{displayFontName}</span>
           <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
           </svg>
@@ -198,21 +227,28 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
             />
             <div className="overflow-y-auto max-h-80 custom-scrollbar">
               {filteredFonts.length > 0 ? (
-                filteredFonts.map((font) => (
-                  <button
-                    key={font.family}
-                    type="button"
-                    onClick={(e) => handleFontFamilyChange(e, font.family)}
-                    onMouseDown={(e) => e.preventDefault()} // Prevent dropdown from closing before click
-                    className={`w-full px-3 py-2 text-left hover:bg-indigo-50 transition-colors flex items-center justify-between ${
-                      fontFamily === font.family ? 'bg-indigo-100 font-bold' : ''
-                    }`}
-                    style={{ fontFamily: getFontFamilyString(font.family) }}
-                  >
-                    <span>{font.family}</span>
-                    <span className="text-xs text-slate-500 capitalize">{font.category}</span>
-                  </button>
-                ))
+                filteredFonts.map((font) => {
+                  // Check if this font is selected (by actual name or by stored value)
+                  const isSelected = fontFamily === font.family || 
+                                    (font.storedValue && fontFamily === font.storedValue) ||
+                                    FONT_MAPPING[fontFamily] === font.family ||
+                                    (font.genericName && fontFamily === font.genericName);
+                  return (
+                    <button
+                      key={font.family}
+                      type="button"
+                      onClick={(e) => handleFontFamilyChange(e, font)}
+                      onMouseDown={(e) => e.preventDefault()} // Prevent dropdown from closing before click
+                      className={`w-full px-3 py-2 text-left hover:bg-indigo-50 transition-colors flex items-center justify-between ${
+                        isSelected ? 'bg-indigo-100 font-bold' : ''
+                      }`}
+                      style={{ fontFamily: getFontFamilyString(font.family) }}
+                    >
+                      <span style={{ fontFamily: getFontFamilyString(font.family) }}>{font.displayName || font.family}</span>
+                      <span className="text-xs text-slate-500 capitalize">{font.category}</span>
+                    </button>
+                  );
+                })
               ) : (
                 <div className="px-3 py-2 text-sm text-slate-500">No fonts found</div>
               )}
