@@ -6,25 +6,17 @@ export interface GoogleFont {
   category: 'sans-serif' | 'serif' | 'display' | 'handwriting' | 'monospace';
 }
 
-// Popular Google Fonts - reduced to 10 for faster builds
+// Popular Google Fonts - reduced to 4 fonts
 export const GOOGLE_FONTS: GoogleFont[] = [
   // Sans-serif (most popular)
   { family: 'Inter', category: 'sans-serif' },
   { family: 'Roboto', category: 'sans-serif' },
-  { family: 'Open Sans', category: 'sans-serif' },
-  { family: 'Montserrat', category: 'sans-serif' },
   
   // Serif
   { family: 'Merriweather', category: 'serif' },
-  { family: 'Playfair Display', category: 'serif' },
   
   // Handwriting/Cursive
   { family: 'Dancing Script', category: 'handwriting' },
-  { family: 'Kalam', category: 'handwriting' },
-  
-  // Display
-  { family: 'Oswald', category: 'display' },
-  { family: 'Bangers', category: 'display' },
 ];
 
 // Map old font names to Google Fonts

@@ -1570,7 +1570,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       // Get font family and ensure it's loaded
                       const titleFontFamilyRaw = overlayEdit.title_font_family || displayAsset.overlayConfig.title_font_family || 'sans-serif';
                       const titleFontFamilyMapped = FONT_MAPPING[titleFontFamilyRaw] || titleFontFamilyRaw;
-                      const titleFontFamily = getFontStackForMeasurement(titleFontFamilyRaw);
+                      const titleFontFamily = getFontFamilyString(titleFontFamilyMapped);
                       
                       return (
                         <div
@@ -1699,7 +1699,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                       // Get font family and ensure it's loaded
                       const subtitleFontFamilyRaw = overlayEdit.subtitle_font_family || displayAsset.overlayConfig.subtitle_font_family || 'sans-serif';
                       const subtitleFontFamilyMapped = FONT_MAPPING[subtitleFontFamilyRaw] || subtitleFontFamilyRaw;
-                      const subtitleFontFamily = getFontStackForMeasurement(subtitleFontFamilyRaw);
+                      const subtitleFontFamily = getFontFamilyString(subtitleFontFamilyMapped);
                       
                       return (
                         <div
@@ -1887,16 +1887,6 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
                       Download
-                    </button>
-                    <button
-                      onClick={handleSave}
-                      disabled={!activeBrand?.id || saving || !currentAsset}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Save
                     </button>
                   </div>
                 </div>
