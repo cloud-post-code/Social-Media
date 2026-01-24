@@ -33,7 +33,39 @@ async function request<T>(
     ...options,
   };
 
-  const response = await fetch(url, config);
+  let response: Response;
+  try {
+    response = await fetch(url, config);
+  } catch (error: any) {
+    // Network error or fetch failed
+    let errorMessage = 'Failed to fetch';
+    
+    if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    // Provide helpful guidance
+    errorMessage += '\n\n⚠️ Network request failed. This usually means:';
+    errorMessage += '\n1. The backend server is not running or not accessible';
+    errorMessage += '\n2. VITE_API_URL is incorrect or not set';
+    errorMessage += '\n3. CORS is blocking the request';
+    errorMessage += `\n\nCurrent VITE_API_URL (raw): ${import.meta.env.VITE_API_URL || 'not set (using default: http://localhost:3001/api)'}`;
+    errorMessage += `\nNormalized API_BASE_URL: ${API_BASE_URL}`;
+    errorMessage += `\nRequest URL: ${url}`;
+    
+    if (!import.meta.env.VITE_API_URL) {
+      errorMessage += '\n\n❌ VITE_API_URL is not set!';
+      errorMessage += '\nSet it in Railway: Frontend Service → Variables → VITE_API_URL = https://social-media-production-cf45.up.railway.app/api';
+    } else if (import.meta.env.VITE_API_URL.includes('localhost')) {
+      errorMessage += '\n\n❌ VITE_API_URL is set to localhost, which won\'t work in production!';
+      errorMessage += '\nSet it to your Railway backend URL: https://social-media-production-cf45.up.railway.app/api';
+    } else if (!import.meta.env.VITE_API_URL.includes('social-media-production-cf45')) {
+      errorMessage += '\n\n❌ VITE_API_URL might be pointing to the wrong URL!';
+      errorMessage += '\nIt should be: https://social-media-production-cf45.up.railway.app/api';
+    }
+    
+    throw new Error(errorMessage);
+  }
 
   // Handle 204 No Content responses (common for DELETE requests)
   if (response.status === 204) {
