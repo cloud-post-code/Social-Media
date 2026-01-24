@@ -27,6 +27,11 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
     setFormData(dna);
     if (dna.id) {
       loadAssets();
+    } else {
+      // Reset extraction-related state when creating a new brand
+      setUrlInput('');
+      setExtractedAssets(null);
+      setIsExtracting(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dna]);
@@ -470,7 +475,7 @@ const BrandDNAForm: React.FC<BrandDNAFormProps> = ({ dna, onSave, onCancel }) =>
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-20 animate-in fade-in slide-in-from-top-4 duration-500">
       {/* Extraction Header - Only show when creating a new brand */}
-      {!dna.id && (
+      {!formData.id && (
         <section className="bg-gradient-to-br from-slate-900 to-indigo-950 p-10 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
           <div className="relative z-10">
             <h2 className="text-3xl font-black mb-2">Build from existing brand</h2>
