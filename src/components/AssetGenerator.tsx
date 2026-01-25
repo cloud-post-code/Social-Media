@@ -20,6 +20,38 @@ const stripMarkdown = (text: string): string => {
     .trim();
 };
 
+// ============================================================
+// FONT SIZE PERCENTAGE CONVERSION HELPERS (Canva-style)
+// All font sizes are stored as percentage of image width for resolution independence
+// ============================================================
+
+// Convert pixel font size to percentage of image width
+const fontSizeToPercent = (px: number, imageWidth: number): number => {
+  if (!imageWidth || imageWidth === 0) return 10; // Default 10%
+  return (px / imageWidth) * 100;
+};
+
+// Convert percentage to pixel font size for given width
+const percentToFontSize = (percent: number, targetWidth: number): number => {
+  return (percent / 100) * targetWidth;
+};
+
+// Normalize font size value - handles backward compatibility with legacy pixel values
+// If value > 20, assume it's legacy pixels and convert to percentage
+// Otherwise, treat as percentage
+const normalizeFontSizeToPercent = (value: number | undefined, imageWidth: number, isTitle: boolean): number => {
+  if (value === undefined) {
+    // Default: 10% for title, 6% for subtitle
+    return isTitle ? 10 : 6;
+  }
+  // If value > 20, it's likely legacy pixels - convert to percentage
+  if (value > 20) {
+    return fontSizeToPercent(value, imageWidth);
+  }
+  // Already a percentage
+  return value;
+};
+
 interface AssetGeneratorProps {
   activeBrand: BrandDNA | null;
   onAssetCreated: (asset: GeneratedAsset) => void;
@@ -699,33 +731,23 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
     return Math.min(scaleX, scaleY); // Use smaller to ensure text fits
   };
   
-  // Calculate font size based on actual image dimensions (matching backend logic)
+  // Calculate font size based on percentage of image width (Canva-style)
+  // baseFontSize is stored as percentage of image width for resolution independence
   const getFontSize = (baseFontSize: number | undefined, isTitle: boolean) => {
     const dims = getDisplayedImageDimensions();
     if (!dims || !imageDimensions) {
       return isTitle ? 'clamp(1.5rem, 4vw, 3rem)' : 'clamp(1rem, 2.5vw, 2rem)';
     }
     
-    // Calculate font size using the ACTUAL image width (not displayed width) to match backend
-    // Backend uses: Math.max(56, Math.min(width / 10, 120)) for title
-    // Backend uses: Math.max(32, Math.min(width / 16, 64)) for subtitle
-    let calculatedFontSize: number;
-    if (baseFontSize) {
-      // If custom font size is provided, use it directly (it's already calculated for actual image width)
-      calculatedFontSize = baseFontSize;
-    } else {
-      // Calculate using actual image width (matching backend exactly)
-      if (isTitle) {
-        calculatedFontSize = Math.max(56, Math.min(imageDimensions.width / 10, 120));
-      } else {
-        calculatedFontSize = Math.max(32, Math.min(imageDimensions.width / 16, 64));
-      }
-    }
+    // Normalize font size to percentage (handles legacy pixel values)
+    const fontSizePercent = normalizeFontSizeToPercent(baseFontSize, imageDimensions.width, isTitle);
     
-    // Now scale the font size to match the displayed image size
-    // This ensures the preview matches what will be rendered
+    // Calculate actual font size in pixels at full resolution
+    const actualFontSizePx = percentToFontSize(fontSizePercent, imageDimensions.width);
+    
+    // Scale to display size
     const scale = dims.displayWidth / imageDimensions.width;
-    return `${calculatedFontSize * scale}px`;
+    return `${actualFontSizePx * scale}px`;
   };
   
   // Calculate aspect ratio for the image container
@@ -822,30 +844,50 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   };
 
   // Get numeric font size for calculations (scaled to match displayed/preview dimensions)
+  // baseFontSize is stored as percentage of image width
   const getFontSizeNumeric = (baseFontSize: number | undefined, isTitle: boolean): number => {
     const dims = getDisplayedImageDimensions();
     if (!dims || !imageDimensions) {
       return isTitle ? 56 : 32;
     }
     
-    // Calculate font size using the ACTUAL image width (matching backend logic)
-    let calculatedFontSize: number;
-    if (baseFontSize) {
-      // If custom font size is provided, use it directly (it's already calculated for actual image width)
-      calculatedFontSize = baseFontSize;
-    } else {
-      // Calculate using actual image width (matching backend exactly)
-      if (isTitle) {
-        calculatedFontSize = Math.max(56, Math.min(imageDimensions.width / 10, 120));
-      } else {
-        calculatedFontSize = Math.max(32, Math.min(imageDimensions.width / 16, 64));
-      }
+    // Normalize font size to percentage (handles legacy pixel values)
+    const fontSizePercent = normalizeFontSizeToPercent(baseFontSize, imageDimensions.width, isTitle);
+    
+    // Calculate actual font size in pixels at full resolution
+    const actualFontSizePx = percentToFontSize(fontSizePercent, imageDimensions.width);
+    
+    // Scale to display size for preview calculations
+    const scale = dims.displayWidth / imageDimensions.width;
+    return actualFontSizePx * scale;
+  };
+  
+  // Get the actual font size in pixels at full image resolution (for backend)
+  const getActualFontSizePixels = (baseFontSize: number | undefined, isTitle: boolean): number => {
+    if (!imageDimensions) {
+      return isTitle ? 102 : 64; // Default for 1024px image
     }
     
-    // Scale the font size to match the displayed image size
-    // This ensures the Canvas measurement matches the preview display
+    // Normalize font size to percentage (handles legacy pixel values)
+    const fontSizePercent = normalizeFontSizeToPercent(baseFontSize, imageDimensions.width, isTitle);
+    
+    // Return actual font size in pixels at full resolution
+    return percentToFontSize(fontSizePercent, imageDimensions.width);
+  };
+  
+  // Convert display font size (from slider) to percentage for storage
+  const displayFontSizeToPercent = (displayPx: number): number => {
+    const dims = getDisplayedImageDimensions();
+    if (!dims || !imageDimensions) {
+      return 10; // Default
+    }
+    
+    // Convert display pixels to actual pixels
     const scale = dims.displayWidth / imageDimensions.width;
-    return calculatedFontSize * scale;
+    const actualPx = displayPx / scale;
+    
+    // Convert to percentage
+    return fontSizeToPercent(actualPx, imageDimensions.width);
   };
 
   // Map font family choice to font stack that matches server-side rendering
@@ -1681,18 +1723,19 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         : (displayAsset?.overlayConfig?.subtitle || '');
 
       // Calculate title lines if title exists
-      if (titleText) {
+      // Use ACTUAL image dimensions (not display dimensions) for backend rendering
+      if (titleText && imageDimensions) {
         const titleMaxWidthPercent = configToSave.title_max_width_percent !== undefined
           ? configToSave.title_max_width_percent
           : (displayAsset?.overlayConfig?.title_max_width_percent || 80);
-        const titleMaxWidthPx = getMaxWidthPixelsNumeric(titleMaxWidthPercent);
+        // Calculate max width in ACTUAL image pixels (not display pixels)
+        const titleMaxWidthPx = (imageDimensions.width * titleMaxWidthPercent) / 100;
         
-        const titleFontSize = getFontSizeNumeric(
-          configToSave.title_font_size !== undefined 
-            ? configToSave.title_font_size 
-            : displayAsset?.overlayConfig?.title_font_size,
-          true
-        );
+        // Get font size in ACTUAL image pixels using the percentage-based calculation
+        const storedFontSize = configToSave.title_font_size !== undefined 
+          ? configToSave.title_font_size 
+          : displayAsset?.overlayConfig?.title_font_size;
+        const titleFontSize = getActualFontSizePixels(storedFontSize, true);
         
         const titleFontFamilyRaw = configToSave.title_font_family || 
           displayAsset?.overlayConfig?.title_font_family || 
@@ -1721,21 +1764,25 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         );
         
         overlayConfigToSend.title_lines = titleLines;
+        
+        // Also send the font size as percentage for backend
+        overlayConfigToSend.title_font_size = normalizeFontSizeToPercent(storedFontSize, imageDimensions.width, true);
       }
 
       // Calculate subtitle lines if subtitle exists
-      if (subtitleText) {
+      // Use ACTUAL image dimensions (not display dimensions) for backend rendering
+      if (subtitleText && imageDimensions) {
         const subtitleMaxWidthPercent = configToSave.subtitle_max_width_percent !== undefined
           ? configToSave.subtitle_max_width_percent
           : (displayAsset?.overlayConfig?.subtitle_max_width_percent || 80);
-        const subtitleMaxWidthPx = getMaxWidthPixelsNumeric(subtitleMaxWidthPercent);
+        // Calculate max width in ACTUAL image pixels (not display pixels)
+        const subtitleMaxWidthPx = (imageDimensions.width * subtitleMaxWidthPercent) / 100;
         
-        const subtitleFontSize = getFontSizeNumeric(
-          configToSave.subtitle_font_size !== undefined 
-            ? configToSave.subtitle_font_size 
-            : displayAsset?.overlayConfig?.subtitle_font_size,
-          false
-        );
+        // Get font size in ACTUAL image pixels using the percentage-based calculation
+        const storedSubtitleFontSize = configToSave.subtitle_font_size !== undefined 
+          ? configToSave.subtitle_font_size 
+          : displayAsset?.overlayConfig?.subtitle_font_size;
+        const subtitleFontSize = getActualFontSizePixels(storedSubtitleFontSize, false);
         
         const subtitleFontFamilyRaw = configToSave.subtitle_font_family || 
           displayAsset?.overlayConfig?.subtitle_font_family || 
@@ -1764,6 +1811,9 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         );
         
         overlayConfigToSend.subtitle_lines = subtitleLines;
+        
+        // Also send the font size as percentage for backend
+        overlayConfigToSend.subtitle_font_size = normalizeFontSizeToPercent(storedSubtitleFontSize, imageDimensions.width, false);
       }
 
       const updated = await assetApi.updateOverlay(currentAsset.id, overlayConfigToSend);
@@ -2262,12 +2312,29 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                         overlayConfig={displayAsset.overlayConfig}
                         overlayEdit={overlayEdit}
                         onUpdate={(updates) => {
-                          setOverlayEdit(prev => ({ ...prev, ...updates }));
-                          autoSaveOverlay(updates);
+                          // Convert font sizes from display pixels to percentage for storage
+                          const normalizedUpdates = { ...updates };
+                          
+                          // Check if title_font_size is being updated
+                          if ('title_font_size' in updates && typeof updates.title_font_size === 'number') {
+                            // The value from slider is in display pixels, convert to percentage
+                            normalizedUpdates.title_font_size = displayFontSizeToPercent(updates.title_font_size);
+                          }
+                          
+                          // Check if subtitle_font_size is being updated
+                          if ('subtitle_font_size' in updates && typeof updates.subtitle_font_size === 'number') {
+                            // The value from slider is in display pixels, convert to percentage
+                            normalizedUpdates.subtitle_font_size = displayFontSizeToPercent(updates.subtitle_font_size);
+                          }
+                          
+                          setOverlayEdit(prev => ({ ...prev, ...normalizedUpdates }));
+                          autoSaveOverlay(normalizedUpdates);
                         }}
                         textElementRef={editingTextElement === 'title' ? titleTextRef : subtitleTextRef}
                         activeBrand={activeBrand}
                         onEyedropperClick={setEyedropperActive}
+                        imageDimensions={imageDimensions}
+                        getDisplayedImageDimensions={getDisplayedImageDimensions}
                       />
                     )}
                   </>

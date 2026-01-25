@@ -10,7 +10,36 @@ interface TextToolbarProps {
   textElementRef: React.RefObject<HTMLDivElement>;
   activeBrand: any;
   onEyedropperClick: (type: 'title' | 'subtitle') => void;
+  imageDimensions?: { width: number; height: number } | null;
+  getDisplayedImageDimensions?: () => { displayWidth: number; displayHeight: number; offsetX: number; offsetY: number } | null;
 }
+
+// Local storage key for recent colors
+const RECENT_COLORS_KEY = 'brandgenius_recent_colors';
+
+// Get recent colors from localStorage
+const getRecentColors = (): string[] => {
+  try {
+    const stored = localStorage.getItem(RECENT_COLORS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+// Save a color to recent colors
+const saveRecentColor = (color: string) => {
+  try {
+    const recent = getRecentColors();
+    // Remove if already exists, add to front
+    const filtered = recent.filter(c => c.toLowerCase() !== color.toLowerCase());
+    const updated = [color, ...filtered].slice(0, 8); // Keep last 8
+    localStorage.setItem(RECENT_COLORS_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return [color];
+  }
+};
 
 const TextToolbar: React.FC<TextToolbarProps> = ({
   elementType,
@@ -19,13 +48,18 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
   onUpdate,
   textElementRef,
   activeBrand,
-  onEyedropperClick
+  onEyedropperClick,
+  imageDimensions,
+  getDisplayedImageDimensions
 }) => {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [fontSearch, setFontSearch] = useState('');
   const [showFontDropdown, setShowFontDropdown] = useState(false);
+  const [showColorDropdown, setShowColorDropdown] = useState(false);
+  const [recentColors, setRecentColors] = useState<string[]>(getRecentColors());
   const fontDropdownRef = useRef<HTMLDivElement>(null);
+  const colorDropdownRef = useRef<HTMLDivElement>(null);
 
   // Update toolbar position based on text element position
   useEffect(() => {
@@ -93,14 +127,51 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
   const fontWeight = overlayEdit[`${prefix}_font_weight` as keyof OverlayConfig] as string || 
     overlayConfig?.[`${prefix}_font_weight` as keyof OverlayConfig] as string || (elementType === 'title' ? 'bold' : 'regular');
   
-  const fontSize = overlayEdit[`${prefix}_font_size` as keyof OverlayConfig] as number | undefined || 
+  // Font size is stored as percentage of image width
+  const storedFontSizePercent = overlayEdit[`${prefix}_font_size` as keyof OverlayConfig] as number | undefined || 
     overlayConfig?.[`${prefix}_font_size` as keyof OverlayConfig] as number | undefined;
+  
+  // Convert stored percentage to display pixels for the slider
+  const getDisplayFontSize = (): number => {
+    const dims = getDisplayedImageDimensions?.();
+    if (!dims || !imageDimensions) {
+      return elementType === 'title' ? 56 : 32; // Default
+    }
+    
+    // Normalize: if value > 20, it's legacy pixels; otherwise it's percentage
+    let fontSizePercent: number;
+    if (storedFontSizePercent === undefined) {
+      fontSizePercent = elementType === 'title' ? 10 : 6; // Default percentage
+    } else if (storedFontSizePercent > 20) {
+      // Legacy pixel value - convert to percentage first
+      fontSizePercent = (storedFontSizePercent / imageDimensions.width) * 100;
+    } else {
+      fontSizePercent = storedFontSizePercent;
+    }
+    
+    // Convert percentage to actual pixels at full resolution
+    const actualPx = (fontSizePercent / 100) * imageDimensions.width;
+    
+    // Scale to display pixels
+    const scale = dims.displayWidth / imageDimensions.width;
+    return Math.round(actualPx * scale);
+  };
+  
+  const displayFontSize = getDisplayFontSize();
   
   const colorHex = overlayEdit[`${prefix}_color_hex` as keyof OverlayConfig] as string || 
     overlayConfig?.[`${prefix}_color_hex` as keyof OverlayConfig] as string || '#FFFFFF';
   
   const textAnchor = overlayEdit[`${prefix}_text_anchor` as keyof OverlayConfig] as 'start' | 'middle' | 'end' || 
     overlayConfig?.[`${prefix}_text_anchor` as keyof OverlayConfig] as 'start' | 'middle' | 'end' || 'middle';
+  
+  // Get current text transform value
+  const fontTransform = overlayEdit[`${prefix}_font_transform` as keyof OverlayConfig] as 'uppercase' | 'lowercase' | 'capitalize' | 'none' || 
+    overlayConfig?.[`${prefix}_font_transform` as keyof OverlayConfig] as 'uppercase' | 'lowercase' | 'capitalize' | 'none' || 'none';
+
+  const handleFontTransformChange = (value: 'uppercase' | 'lowercase' | 'capitalize' | 'none') => {
+    onUpdate({ [`${prefix}_font_transform`]: value } as any);
+  };
 
   const handleFontFamilyChange = async (e: React.MouseEvent, font: FontWithDisplay) => {
     e.preventDefault();
@@ -137,22 +208,25 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
     }
   }, [fontFamily]);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (fontDropdownRef.current && !fontDropdownRef.current.contains(event.target as Node)) {
         setShowFontDropdown(false);
         setFontSearch('');
       }
+      if (colorDropdownRef.current && !colorDropdownRef.current.contains(event.target as Node)) {
+        setShowColorDropdown(false);
+      }
     };
-    if (showFontDropdown) {
+    if (showFontDropdown || showColorDropdown) {
       // Use capture phase to catch events before they bubble
       document.addEventListener('mousedown', handleClickOutside, true);
       return () => {
         document.removeEventListener('mousedown', handleClickOutside, true);
       };
     }
-  }, [showFontDropdown]);
+  }, [showFontDropdown, showColorDropdown]);
 
   // Show actual font names in dropdown, but allow selection by generic name for backward compatibility
   type FontWithDisplay = GoogleFont & { displayName?: string; genericName?: string; storedValue?: string };
@@ -187,8 +261,17 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
     onUpdate({ [`${prefix}_font_size`]: value } as any);
   };
 
-  const handleColorChange = (value: string) => {
+  const handleColorChange = (value: string, saveToRecent: boolean = true) => {
     onUpdate({ [`${prefix}_color_hex`]: value } as any);
+    if (saveToRecent && value && value.startsWith('#')) {
+      const updated = saveRecentColor(value);
+      setRecentColors(updated);
+    }
+  };
+  
+  const handleColorSelect = (value: string) => {
+    handleColorChange(value, true);
+    setShowColorDropdown(false);
   };
 
   const handleAlignmentChange = (value: 'start' | 'middle' | 'end') => {
@@ -275,22 +358,22 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
         <option value="bold">Bold</option>
       </select>
 
-      {/* Font Size */}
+      {/* Font Size - displays in display pixels, converts to percentage on change */}
       <div className="flex items-center gap-2">
         <input
           type="range"
           min="12"
           max="200"
-          value={fontSize || (elementType === 'title' ? 56 : 32)}
+          value={displayFontSize}
           onChange={(e) => handleFontSizeChange(parseInt(e.target.value))}
           className="w-24"
         />
         <input
           type="number"
           min="12"
-          max="200"
-          value={fontSize || ''}
-          onChange={(e) => handleFontSizeChange(e.target.value ? parseInt(e.target.value) : undefined as any)}
+          max="500"
+          value={displayFontSize}
+          onChange={(e) => handleFontSizeChange(e.target.value ? parseInt(e.target.value) : displayFontSize)}
           className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-700"
           placeholder="Auto"
         />
@@ -300,46 +383,202 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
       {/* Divider */}
       <div className="w-px h-8 bg-slate-300" />
 
-      {/* Color Picker */}
-      <div className="flex items-center gap-2">
-        {activeBrand && (
-          <>
-            <button
-              onClick={() => handleColorChange(activeBrand.visual_identity.primary_color_hex)}
-              className="w-8 h-8 rounded-lg border-2 border-slate-300 hover:border-indigo-400 transition-all shadow-sm"
-              style={{ backgroundColor: activeBrand.visual_identity.primary_color_hex }}
-              title="Primary Brand Color"
-            />
-            <button
-              onClick={() => handleColorChange(activeBrand.visual_identity.accent_color_hex)}
-              className="w-8 h-8 rounded-lg border-2 border-slate-300 hover:border-indigo-400 transition-all shadow-sm"
-              style={{ backgroundColor: activeBrand.visual_identity.accent_color_hex }}
-              title="Accent Brand Color"
-            />
-            <button
-              onClick={() => onEyedropperClick(elementType)}
-              className="w-8 h-8 rounded-lg border-2 border-slate-300 hover:border-indigo-400 transition-all shadow-sm bg-white flex items-center justify-center"
-              title="Pick color from image"
-            >
-              <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-              </svg>
-            </button>
-          </>
+      {/* Color Picker Dropdown */}
+      <div className="relative flex items-center gap-2" ref={colorDropdownRef}>
+        {/* Current color button - opens dropdown */}
+        <button
+          type="button"
+          onClick={() => setShowColorDropdown(!showColorDropdown)}
+          className="w-10 h-10 rounded-lg border-2 border-slate-300 hover:border-indigo-400 transition-all shadow-sm flex items-center justify-center"
+          style={{ backgroundColor: colorHex }}
+          title="Select Color"
+        >
+          <svg className="w-4 h-4 opacity-50" fill="none" stroke={colorHex === '#FFFFFF' || colorHex === '#ffffff' ? '#000' : '#fff'} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        {/* Color dropdown */}
+        {showColorDropdown && (
+          <div className="absolute top-full left-0 mt-2 bg-white border border-slate-300 rounded-xl shadow-xl z-50 p-4 min-w-[280px]">
+            {/* Brand Colors Section */}
+            {activeBrand && (
+              <>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Brand Colors</div>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {/* Primary Color */}
+                  <button
+                    onClick={() => handleColorSelect(activeBrand.visual_identity.primary_color_hex)}
+                    className={`w-10 h-10 rounded-lg border-2 transition-all shadow-sm flex flex-col items-center justify-center ${
+                      colorHex.toLowerCase() === activeBrand.visual_identity.primary_color_hex.toLowerCase()
+                        ? 'border-indigo-600 ring-2 ring-indigo-200'
+                        : 'border-slate-300 hover:border-indigo-400'
+                    }`}
+                    style={{ backgroundColor: activeBrand.visual_identity.primary_color_hex }}
+                    title="Primary"
+                  />
+                  
+                  {/* Accent Color */}
+                  <button
+                    onClick={() => handleColorSelect(activeBrand.visual_identity.accent_color_hex)}
+                    className={`w-10 h-10 rounded-lg border-2 transition-all shadow-sm ${
+                      colorHex.toLowerCase() === activeBrand.visual_identity.accent_color_hex.toLowerCase()
+                        ? 'border-indigo-600 ring-2 ring-indigo-200'
+                        : 'border-slate-300 hover:border-indigo-400'
+                    }`}
+                    style={{ backgroundColor: activeBrand.visual_identity.accent_color_hex }}
+                    title="Accent"
+                  />
+                  
+                  {/* Additional brand colors */}
+                  {activeBrand.visual_identity.colors?.map((color: string, i: number) => (
+                    <button
+                      key={`brand-color-${i}`}
+                      onClick={() => handleColorSelect(color)}
+                      className={`w-10 h-10 rounded-lg border-2 transition-all shadow-sm ${
+                        colorHex.toLowerCase() === color.toLowerCase()
+                          ? 'border-indigo-600 ring-2 ring-indigo-200'
+                          : 'border-slate-300 hover:border-indigo-400'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      title={`Brand Color ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+            
+            {/* Quick Colors */}
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Quick Colors</div>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {['#FFFFFF', '#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'].map((color) => (
+                <button
+                  key={color}
+                  onClick={() => handleColorSelect(color)}
+                  className={`w-8 h-8 rounded-lg border-2 transition-all ${
+                    colorHex.toLowerCase() === color.toLowerCase()
+                      ? 'border-indigo-600 ring-2 ring-indigo-200'
+                      : 'border-slate-300 hover:border-indigo-400'
+                  }`}
+                  style={{ backgroundColor: color }}
+                  title={color}
+                />
+              ))}
+            </div>
+            
+            {/* Recent Colors */}
+            {recentColors.length > 0 && (
+              <>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Recent</div>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {recentColors.map((color, i) => (
+                    <button
+                      key={`recent-${i}`}
+                      onClick={() => handleColorSelect(color)}
+                      className={`w-8 h-8 rounded-lg border-2 transition-all ${
+                        colorHex.toLowerCase() === color.toLowerCase()
+                          ? 'border-indigo-600 ring-2 ring-indigo-200'
+                          : 'border-slate-300 hover:border-indigo-400'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+            
+            {/* Divider */}
+            <div className="border-t border-slate-200 my-3" />
+            
+            {/* Custom Color & Tools */}
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={colorHex}
+                onChange={(e) => handleColorChange(e.target.value, true)}
+                className="w-10 h-10 rounded-lg border-2 border-slate-300 cursor-pointer hover:border-indigo-400 transition-colors"
+                title="Custom Color"
+              />
+              <input
+                type="text"
+                value={colorHex}
+                onChange={(e) => handleColorChange(e.target.value, false)}
+                onBlur={(e) => {
+                  if (e.target.value && e.target.value.startsWith('#')) {
+                    const updated = saveRecentColor(e.target.value);
+                    setRecentColors(updated);
+                  }
+                }}
+                className="flex-1 px-2 py-2 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-700"
+                placeholder="#FFFFFF"
+              />
+              <button
+                onClick={() => {
+                  onEyedropperClick(elementType);
+                  setShowColorDropdown(false);
+                }}
+                className="w-10 h-10 rounded-lg border-2 border-slate-300 hover:border-indigo-400 transition-all shadow-sm bg-white flex items-center justify-center"
+                title="Pick color from image"
+              >
+                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+              </button>
+            </div>
+          </div>
         )}
-        <input
-          type="color"
-          value={colorHex}
-          onChange={(e) => handleColorChange(e.target.value)}
-          className="w-10 h-10 rounded-lg border-2 border-slate-300 cursor-pointer hover:border-indigo-400 transition-colors"
-        />
-        <input
-          type="text"
-          value={colorHex}
-          onChange={(e) => handleColorChange(e.target.value)}
-          className="w-20 px-2 py-1 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-700"
-          placeholder="#FFFFFF"
-        />
+      </div>
+
+      {/* Divider */}
+      <div className="w-px h-8 bg-slate-300" />
+
+      {/* Text Transform (Capitalization) */}
+      <div className="flex gap-1">
+        <button
+          onClick={() => handleFontTransformChange('none')}
+          className={`px-2 py-1 rounded-lg border-2 text-xs font-bold transition-all ${
+            fontTransform === 'none'
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-white border-slate-300 text-slate-600 hover:border-indigo-400'
+          }`}
+          title="No Transform"
+        >
+          Aa
+        </button>
+        <button
+          onClick={() => handleFontTransformChange('uppercase')}
+          className={`px-2 py-1 rounded-lg border-2 text-xs font-bold transition-all ${
+            fontTransform === 'uppercase'
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-white border-slate-300 text-slate-600 hover:border-indigo-400'
+          }`}
+          title="UPPERCASE"
+        >
+          AA
+        </button>
+        <button
+          onClick={() => handleFontTransformChange('lowercase')}
+          className={`px-2 py-1 rounded-lg border-2 text-xs font-bold transition-all ${
+            fontTransform === 'lowercase'
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-white border-slate-300 text-slate-600 hover:border-indigo-400'
+          }`}
+          title="lowercase"
+        >
+          aa
+        </button>
+        <button
+          onClick={() => handleFontTransformChange('capitalize')}
+          className={`px-2 py-1 rounded-lg border-2 text-xs font-bold transition-all ${
+            fontTransform === 'capitalize'
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-white border-slate-300 text-slate-600 hover:border-indigo-400'
+          }`}
+          title="Title Case"
+        >
+          Ab
+        </button>
       </div>
 
       {/* Divider */}
@@ -357,7 +596,7 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
           title="Align Left"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h8" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h10M4 18h16" />
           </svg>
         </button>
         <button
@@ -370,7 +609,7 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
           title="Align Center"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h8" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M7 12h10M4 18h16" />
           </svg>
         </button>
         <button
@@ -383,7 +622,7 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
           title="Align Right"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M10 12h10M4 18h16" />
           </svg>
         </button>
       </div>

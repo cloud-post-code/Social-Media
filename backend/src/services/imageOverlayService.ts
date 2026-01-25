@@ -68,6 +68,39 @@ const stripMarkdown = (text: string): string => {
     .trim();
 };
 
+// ============================================================
+// FONT SIZE PERCENTAGE CONVERSION (Canva-style)
+// Font sizes are stored as percentage of image width for resolution independence
+// ============================================================
+
+/**
+ * Convert percentage to pixel font size
+ */
+const percentToFontSize = (percent: number, imageWidth: number): number => {
+  return (percent / 100) * imageWidth;
+};
+
+/**
+ * Normalize font size - handles backward compatibility with legacy pixel values
+ * If value > 20, assume it's legacy pixels; otherwise treat as percentage
+ */
+const normalizeFontSize = (value: number | undefined, imageWidth: number, isTitle: boolean): number => {
+  if (value === undefined) {
+    // Default: 10% for title, 6% for subtitle (similar to imageWidth/10 and imageWidth/16)
+    return isTitle ? percentToFontSize(10, imageWidth) : percentToFontSize(6, imageWidth);
+  }
+  
+  // If value > 20, it's likely a percentage value from frontend
+  // If value <= 20, it could be a very small percentage or legacy
+  if (value <= 20) {
+    // Treat as percentage
+    return percentToFontSize(value, imageWidth);
+  }
+  
+  // Value > 20 - this is likely already in pixels (legacy), use as-is
+  return value;
+};
+
 /**
  * Transform text based on transform type
  */
@@ -407,7 +440,8 @@ export const applyTextOverlay = async (
     
     if (title) {
       const titleText = transformText(title, overlayConfig.title_font_transform);
-      const titleFontSize = overlayConfig.title_font_size || Math.max(56, Math.min(width / 10, 120));
+      // Use percentage-based font size with backward compatibility
+      const titleFontSize = normalizeFontSize(overlayConfig.title_font_size, width, true);
       const titleFontFamily = getFontFamily(overlayConfig.title_font_family);
       const titleFontWeight = overlayConfig.title_font_weight === 'bold' ? '700' : 
                              overlayConfig.title_font_weight === 'light' ? '300' : '400';
@@ -448,7 +482,8 @@ export const applyTextOverlay = async (
     
     if (subtitle) {
       const subtitleText = transformText(subtitle, overlayConfig.subtitle_font_transform);
-      const subtitleFontSize = overlayConfig.subtitle_font_size || Math.max(32, Math.min(width / 16, 64));
+      // Use percentage-based font size with backward compatibility
+      const subtitleFontSize = normalizeFontSize(overlayConfig.subtitle_font_size, width, false);
       const subtitleFontFamily = getFontFamily(overlayConfig.subtitle_font_family);
       const subtitleFontWeight = overlayConfig.subtitle_font_weight === 'bold' ? '700' : 
                                  overlayConfig.subtitle_font_weight === 'light' ? '300' : '400';
@@ -515,7 +550,7 @@ export const applyTextOverlay = async (
       titleElement.lines,
       titleElement.x,
       titleElement.y,
-      overlayConfig.title_font_size || Math.max(56, Math.min(width / 10, 120)),
+      normalizeFontSize(overlayConfig.title_font_size, width, true),
       titleElement.lineHeight,
       titleFontWeight,
       overlayConfig.title_opacity,
@@ -533,7 +568,7 @@ export const applyTextOverlay = async (
       subtitleElement.lines,
       subtitleElement.x,
       subtitleElement.y,
-      overlayConfig.subtitle_font_size || Math.max(32, Math.min(width / 16, 64)),
+      normalizeFontSize(overlayConfig.subtitle_font_size, width, false),
       subtitleElement.lineHeight,
       subtitleFontWeight,
       overlayConfig.subtitle_opacity,
