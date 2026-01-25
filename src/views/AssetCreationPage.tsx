@@ -49,16 +49,10 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
       });
       
       Promise.all(readers).then((base64Images) => {
-        // Limit to 2 photos total
-        setProductImages(prev => {
-          const combined = [...prev, ...base64Images];
-          return combined.slice(0, 2);
-        });
+        // Add all uploaded images (no limit)
+        setProductImages(prev => [...prev, ...base64Images]);
         // Initialize empty product focus for each new image
-        setProductFocus(prev => {
-          const combined = [...prev, ...new Array(base64Images.length).fill('')];
-          return combined.slice(0, 2);
-        });
+        setProductFocus(prev => [...prev, ...new Array(base64Images.length).fill('')]);
       });
     }
     // Reset input so same files can be selected again
@@ -320,7 +314,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                     {productImages.map((image, index) => (
                       <div key={index} className="space-y-3">
                         <div className="aspect-square bg-slate-50 border-2 border-slate-200 rounded-2xl relative overflow-hidden group">
-                          <img src={image} className="w-full h-full object-cover" alt={`Product reference ${index + 1}`} />
+                          <img src={image} loading="lazy" className="w-full h-full object-cover" alt={`Product reference ${index + 1}`} />
                           <button
                             onClick={() => removeProductImage(index)}
                             className="absolute top-2 right-2 bg-white/95 p-2 rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
@@ -344,17 +338,15 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                         </div>
                       </div>
                     ))}
-                    {productImages.length < 2 && (
-                      <label className="aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
-                        <div className="bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-xl text-indigo-600 group-hover:scale-110 transition">
-                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-                          </svg>
-                        </div>
-                        <span className="text-xs font-black text-slate-500 mt-3">Add More</span>
-                        <input type="file" className="hidden" accept="image/*" multiple onChange={handleProductImageUpload} />
-                      </label>
-                    )}
+                    <label className="aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
+                      <div className="bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-xl text-indigo-600 group-hover:scale-110 transition">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                        </svg>
+                      </div>
+                      <span className="text-xs font-black text-slate-500 mt-3">Add More</span>
+                      <input type="file" className="hidden" accept="image/*" multiple onChange={handleProductImageUpload} />
+                    </label>
                   </div>
                 ) : (
                   <label className="block aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner max-w-md">
@@ -365,7 +357,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                     </div>
                     <span className="text-sm font-black text-slate-500">Add Product References</span>
                     <p className="text-xs text-slate-400 mt-2 font-medium">PNG, JPG up to 10MB</p>
-                    <p className="text-xs text-slate-400 mt-1 font-medium">Select up to 2 photos</p>
+                    <p className="text-xs text-slate-400 mt-1 font-medium">Select multiple photos</p>
                     <input type="file" className="hidden" accept="image/*" multiple onChange={handleProductImageUpload} />
                   </label>
                 )}
@@ -478,7 +470,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                   {logo && (
                     <div className="flex items-center gap-4">
                       <div className="w-20 h-20 bg-white rounded-xl border-2 border-slate-200 p-2 flex items-center justify-center overflow-hidden">
-                        <img src={logo.image_url} alt="Brand logo" className="max-w-full max-h-full object-contain" />
+                        <img src={logo.image_url} loading="lazy" alt="Brand logo" className="max-w-full max-h-full object-contain" />
                       </div>
                       <div className="flex-1">
                         <label className="flex items-center gap-3 cursor-pointer">
@@ -499,14 +491,14 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                   {brandImages.length > 0 && (
                     <div>
                       <p className="text-xs font-bold text-slate-500 mb-2">Brand Images ({brandImages.length} available)</p>
-                      <div className="grid grid-cols-4 gap-2">
-                        {brandImages.slice(0, 8).map((img) => (
+                      <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto">
+                        {brandImages.map((img) => (
                           <div key={img.id} className="aspect-square bg-white rounded-xl border border-slate-200 overflow-hidden">
-                            <img src={img.image_url} alt="Brand image" className="w-full h-full object-cover" />
+                            <img src={img.image_url} loading="lazy" alt="Brand image" className="w-full h-full object-cover" />
                           </div>
                         ))}
                       </div>
-                      <p className="text-xs text-slate-400 mt-2">Brand images will be used as reference for style and composition</p>
+                      <p className="text-xs text-slate-400 mt-2">All brand images will be used as reference for style and composition</p>
                     </div>
                   )}
                 </div>

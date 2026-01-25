@@ -1210,51 +1210,85 @@ export const generateProductTitleSubtitle = async (
 You are a Lead Copywriter for a luxury brand.
 Goal: Write a title and subtitle that fits the *visual mood* of the product image and the Brand DNA.
 
-### CRITICAL: ANALYZE THE IMAGE FIRST
-Before writing anything, you MUST carefully examine the product image provided. Describe what you actually see:
-- What product or item is visible in the image?
-- What are the specific visual characteristics (colors, materials, textures, style)?
-- What is the mood and atmosphere of the image?
-- What details, features, or elements are prominent?
+### STEP 1: ANALYZE THE IMAGE (REQUIRED FIRST STEP)
+Look at the product image provided. You MUST analyze it before writing any copy. In your analysis, identify:
 
-DO NOT make assumptions or use generic descriptions. Base your analysis ONLY on what is actually visible in the image.
+1. **Product Identification:** What specific product or item is shown? Be precise.
+2. **Visual Characteristics:** 
+   - Colors: What colors dominate? What's the color palette?
+   - Materials: What materials/textures are visible? (e.g., leather, metal, fabric, wood)
+   - Style: What's the aesthetic? (e.g., minimalist, luxurious, rugged, elegant)
+   - Details: What specific features, patterns, or design elements stand out?
+3. **Mood & Atmosphere:** What feeling does the image convey? (e.g., cozy, sleek, powerful, serene)
+4. **Key Visual Elements:** What should the copy highlight based on what's actually visible?
+
+DO NOT make assumptions. Base everything ONLY on what you can actually see in the image.
 
 ### INPUT DATA
 Brand Voice: ${JSON.stringify(brandVoiceContext)}
 Product Focus: ${productFocus}
 
+### STEP 2: GENERATE COPY BASED ON IMAGE ANALYSIS
+Using your image analysis from Step 1, write copy that directly reflects what you see:
+
+**CRITICAL: BOTH TITLE AND SUBTITLE MUST BE BASED ON THE IMAGE**
+
+- **Title (max 5 words):** MUST be derived from what you see in the image. Match the visual mood you identified. If the image feels soft, use soft words. If it feels bold, use bold words. The title should reflect the product, mood, or key visual element visible in the image. Do NOT write a generic title that could apply to any product.
+- **Subtitle (max 8 words):** MUST reference specific visual elements from your analysis. Mention actual colors, materials, or features you see. Do NOT use generic descriptions that could apply to any product.
+
 ### INSTRUCTIONS
-- **Title (max 5 words):** Punchy, attention-grabbing, emotion-driven. This is the hero text. Match the visual mood of the image.
-- **Subtitle (max 15 words):** Supporting detail that expands on the title. MUST be based on what you actually see in the image - describe specific features, materials, or benefits visible in the product. Do NOT use generic or unrelated descriptions.
-- **Less is More:** High-end brands use fewer words.
-- **Visual Connection:** The subtitle MUST reflect what is actually visible in the image. If you see specific materials, colors, or features, mention those. If the product appears soft/cozy, the words should feel soft. If it appears sleek/hard, the words should be punchy. Match the energy and mood you see in the image.
-- **Voice Check:** Ensure the tone matches: ${brandDNA.brand_voice.tone_adjectives.join(', ')}.
-- **Writing Style:** ${brandDNA.brand_voice.writing_style}
-- **Keywords to use:** ${brandDNA.brand_voice.keywords_to_use.join(', ')}
-- **Taboo words (avoid):** ${brandDNA.brand_voice.taboo_words.join(', ')}
+- **Image-First for BOTH:** The image is your primary source for BOTH the title AND subtitle. Both must describe what's actually visible in the image.
+- **Title Requirements:** The title must reflect something visible in the image - the product type, the mood, a key visual element, or the style. Look at the image and write a title that captures what you see.
+- **Subtitle Requirements:** The subtitle MUST reference specific visual details from the image (colors, materials, textures, features, style).
+- **Less is More:** High-end brands use fewer words. Be concise and impactful.
+- **Brand Voice:** Apply the brand voice guidelines, but the visual content takes priority.
+- **No Generic Copy:** If you can't see specific details in the image, don't invent them. Work with what's actually there. Both title and subtitle must be image-specific.
 
 ### OUTPUT FORMAT (JSON)
 Return ONLY:
 {
-  "title": "Punchy title, max 5 words",
-  "subtitle": "Supporting subtitle, max 15 words - MUST describe what is actually visible in the image"
+  "title": "Punchy title, max 5 words - matches the visual mood",
+  "subtitle": "Brief subtitle, max 8 words - MUST describe specific visual elements from the image"
 }
 
 CRITICAL: 
 - Return plain text only. Do NOT use markdown formatting (no **, no *, no _, no backticks). Just plain text strings.
-- The subtitle MUST be based on what you actually see in the image, not generic product descriptions.
-- Do NOT repeat the same subtitle for different images.
+- **BOTH title AND subtitle MUST be based on what you see in the image.** Do not write generic copy.
+- The title MUST reflect something visible in the image (product type, mood, visual element, style).
+- The subtitle MUST reference specific visual details you can see in the image (colors, materials, features).
+- Keep subtitles concise - maximum 8 words. Be impactful, not verbose.
+- Do NOT repeat the same title or subtitle for different images.
+- If the image shows a red leather bag, the title might be "Red Leather Elegance" and subtitle "Premium Italian leather, timeless design".
+- If the image shows a minimalist design, both title and subtitle should reflect that minimalism.
+- Look at the image FIRST, then write copy that describes what you actually see.
   `;
 
-  // Extract base64 data (handle data URI format)
-  const base64Data = productImageBase64.includes(',') 
-    ? productImageBase64.split(',')[1] 
-    : productImageBase64;
+  // Extract base64 data and detect mime type (handle data URI format)
+  let base64Data: string;
+  let mimeType = "image/png"; // default
+  
+  if (productImageBase64.includes(',')) {
+    const parts = productImageBase64.split(',');
+    const mimeMatch = parts[0].match(/data:([^;]+)/);
+    if (mimeMatch) {
+      mimeType = mimeMatch[1];
+    }
+    base64Data = parts[1];
+  } else {
+    base64Data = productImageBase64;
+  }
 
-  // Put text prompt first, then image (better for Gemini API)
+  // Log image info for debugging
+  console.log(`[Text Generation] Image received: ${productImageBase64.length} chars total, ${base64Data.length} chars base64, mimeType: ${mimeType}`);
+  
+  if (!base64Data || base64Data.length < 100) {
+    console.warn('[Text Generation] WARNING: Image data seems too short, might be invalid');
+  }
+
+  // Put image first, then text prompt (helps Gemini focus on image analysis)
   const parts = [
-    { text: prompt },
-    { inlineData: { mimeType: "image/png", data: base64Data } }
+    { inlineData: { mimeType, data: base64Data } },
+    { text: prompt }
   ];
 
   const response = await ai.models.generateContent({
@@ -1788,14 +1822,19 @@ export const regenerateTitleSubtitle = async (
 You are a Lead Copywriter for a luxury brand.
 Goal: Write a title and subtitle that fits the *visual mood* of the product image and the Brand DNA.
 
-### CRITICAL: ANALYZE THE IMAGE FIRST
-Before writing anything, you MUST carefully examine the product image provided. Describe what you actually see:
-- What product or item is visible in the image?
-- What are the specific visual characteristics (colors, materials, textures, style)?
-- What is the mood and atmosphere of the image?
-- What details, features, or elements are prominent?
+### STEP 1: ANALYZE THE IMAGE (REQUIRED FIRST STEP)
+Look at the product image provided. You MUST analyze it before writing any copy. In your analysis, identify:
 
-DO NOT make assumptions or use generic descriptions. Base your analysis ONLY on what is actually visible in the image.
+1. **Product Identification:** What specific product or item is shown? Be precise.
+2. **Visual Characteristics:** 
+   - Colors: What colors dominate? What's the color palette?
+   - Materials: What materials/textures are visible? (e.g., leather, metal, fabric, wood)
+   - Style: What's the aesthetic? (e.g., minimalist, luxurious, rugged, elegant)
+   - Details: What specific features, patterns, or design elements stand out?
+3. **Mood & Atmosphere:** What feeling does the image convey? (e.g., cozy, sleek, powerful, serene)
+4. **Key Visual Elements:** What should the copy highlight based on what's actually visible?
+
+DO NOT make assumptions. Base everything ONLY on what you can actually see in the image.
 
 ### INPUT DATA
 Brand Voice: ${JSON.stringify(brandVoiceContext)}
@@ -1807,40 +1846,69 @@ The user provided this feedback about the previous title/subtitle:
 
 Please incorporate this feedback into your new title and subtitle generation.
 
+### STEP 2: GENERATE COPY BASED ON IMAGE ANALYSIS
+Using your image analysis from Step 1, write copy that directly reflects what you see:
+
+**CRITICAL: BOTH TITLE AND SUBTITLE MUST BE BASED ON THE IMAGE**
+
+- **Title (max 5 words):** MUST be derived from what you see in the image. Match the visual mood you identified. If the image feels soft, use soft words. If it feels bold, use bold words. The title should reflect the product, mood, or key visual element visible in the image. Do NOT write a generic title that could apply to any product.
+- **Subtitle (max 8 words):** MUST reference specific visual elements from your analysis. Mention actual colors, materials, or features you see. Do NOT use generic descriptions that could apply to any product.
+
 ### INSTRUCTIONS
-- **Title (max 5 words):** Punchy, attention-grabbing, emotion-driven. This is the hero text. Match the visual mood of the image.
-- **Subtitle (max 15 words):** Supporting detail that expands on the title. MUST be based on what you actually see in the image - describe specific features, materials, or benefits visible in the product. Do NOT use generic or unrelated descriptions.
-- **Less is More:** High-end brands use fewer words.
-- **Visual Connection:** The subtitle MUST reflect what is actually visible in the image. If you see specific materials, colors, or features, mention those. If the product appears soft/cozy, the words should feel soft. If it appears sleek/hard, the words should be punchy. Match the energy and mood you see in the image.
-- **Voice Check:** Ensure the tone matches: ${brandDNA.brand_voice.tone_adjectives.join(', ')}.
-- **Writing Style:** ${brandDNA.brand_voice.writing_style}
-- **Keywords to use:** ${brandDNA.brand_voice.keywords_to_use.join(', ')}
-- **Taboo words (avoid):** ${brandDNA.brand_voice.taboo_words.join(', ')}
+- **Image-First for BOTH:** The image is your primary source for BOTH the title AND subtitle. Both must describe what's actually visible in the image.
+- **Title Requirements:** The title must reflect something visible in the image - the product type, the mood, a key visual element, or the style. Look at the image and write a title that captures what you see.
+- **Subtitle Requirements:** The subtitle MUST reference specific visual details from the image (colors, materials, textures, features, style).
+- **Less is More:** High-end brands use fewer words. Be concise and impactful.
+- **Brand Voice:** Apply the brand voice guidelines, but the visual content takes priority.
+- **No Generic Copy:** If you can't see specific details in the image, don't invent them. Work with what's actually there. Both title and subtitle must be image-specific.
 - **CRITICAL:** Address the feedback provided above.
 
 ### OUTPUT FORMAT (JSON)
 Return ONLY:
 {
-  "title": "Punchy title, max 5 words",
-  "subtitle": "Supporting subtitle, max 15 words - MUST describe what is actually visible in the image"
+  "title": "Punchy title, max 5 words - matches the visual mood",
+  "subtitle": "Brief subtitle, max 8 words - MUST describe specific visual elements from the image"
 }
 
 CRITICAL: 
 - Return plain text only. Do NOT use markdown formatting (no **, no *, no _, no backticks). Just plain text strings.
-- The subtitle MUST be based on what you actually see in the image, not generic product descriptions.
-- Do NOT repeat the same subtitle for different images.
+- **BOTH title AND subtitle MUST be based on what you see in the image.** Do not write generic copy.
+- The title MUST reflect something visible in the image (product type, mood, visual element, style).
+- The subtitle MUST reference specific visual details you can see in the image (colors, materials, features).
+- Keep subtitles concise - maximum 8 words. Be impactful, not verbose.
+- Do NOT repeat the same title or subtitle for different images.
+- If the image shows a red leather bag, the title might be "Red Leather Elegance" and subtitle "Premium Italian leather, timeless design".
+- If the image shows a minimalist design, both title and subtitle should reflect that minimalism.
+- Look at the image FIRST, then write copy that describes what you actually see.
 - Address the user's feedback about the previous subtitle.
   `;
 
-  // Extract base64 data (handle data URI format)
-  const base64Data = baseImageBase64.includes(',') 
-    ? baseImageBase64.split(',')[1] 
-    : baseImageBase64;
+  // Extract base64 data and detect mime type (handle data URI format)
+  let base64Data: string;
+  let mimeType = "image/png"; // default
+  
+  if (baseImageBase64.includes(',')) {
+    const parts = baseImageBase64.split(',');
+    const mimeMatch = parts[0].match(/data:([^;]+)/);
+    if (mimeMatch) {
+      mimeType = mimeMatch[1];
+    }
+    base64Data = parts[1];
+  } else {
+    base64Data = baseImageBase64;
+  }
 
-  // Put text prompt first, then image (better for Gemini API)
+  // Log image info for debugging
+  console.log(`[Text Regeneration] Image received: ${baseImageBase64.length} chars total, ${base64Data.length} chars base64, mimeType: ${mimeType}`);
+  
+  if (!base64Data || base64Data.length < 100) {
+    console.warn('[Text Regeneration] WARNING: Image data seems too short, might be invalid');
+  }
+
+  // Put image first, then text prompt (helps Gemini focus on image analysis)
   const parts = [
-    { text: prompt },
-    { inlineData: { mimeType: "image/png", data: base64Data } }
+    { inlineData: { mimeType, data: base64Data } },
+    { text: prompt }
   ];
 
   const response = await ai.models.generateContent({
