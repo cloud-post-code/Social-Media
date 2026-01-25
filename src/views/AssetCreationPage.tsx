@@ -106,7 +106,9 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         const dimensions = getImageDimensions();
         let stepCounter = 0;
         
-        // Process each photo sequentially - each goes through full independent process
+        // Process each photo sequentially - collect previous assets for coherence
+        const previousProductAssets: Array<{ productFocus: string; title?: string; subtitle?: string; visualStyle?: string }> = [];
+        
         for (let i = 0; i < imagesToProcess.length; i++) {
           const photoIndex = i + 1;
           
@@ -125,7 +127,8 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             productFocus: productFocus[i] || '',
             referenceImageBase64: imagesToProcess[i] || undefined,
             width: dimensions.width,
-            height: dimensions.height
+            height: dimensions.height,
+            previousAssets: previousProductAssets.length > 0 ? previousProductAssets : undefined
           });
           
           // Step 3: Text and overlay processing complete
@@ -158,6 +161,15 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             timestamp: generatedAsset.created_at ? new Date(generatedAsset.created_at).getTime() : (generatedAsset.timestamp || Date.now())
           };
           
+          // Collect asset info for sequential coherence
+          const strategy = generatedAsset.strategy as any;
+          previousProductAssets.push({
+            productFocus: productFocus[i] || '',
+            title: frontendAsset.overlayConfig?.title,
+            subtitle: frontendAsset.overlayConfig?.subtitle,
+            visualStyle: strategy?.step_1_image_generation?.composition_notes || strategy?.step_1_image_generation?.reasoning || ''
+          });
+          
           // Immediately call onAssetCreated - don't wait for batch to complete
           onAssetCreated(frontendAsset);
         }
@@ -181,6 +193,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         
         let stepCounter = 0;
         const assetsToCreate: GeneratedAsset[] = [];
+        const previousNonProductAssets: Array<{ userPurpose: string; headline?: string; visualStyle?: string }> = [];
         
         for (let i = 0; i < postCount; i++) {
           const postNumber = i + 1;
@@ -200,7 +213,8 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             userPurpose,
             useExactLogo,
             logoUrl: useExactLogo && logo ? logo.image_url : undefined,
-            brandImageUrls: brandImages.length > 0 ? brandImages.map(img => img.image_url) : undefined
+            brandImageUrls: brandImages.length > 0 ? brandImages.map(img => img.image_url) : undefined,
+            previousAssets: previousNonProductAssets.length > 0 ? previousNonProductAssets : undefined
           });
           
           // Step 3: Final output
@@ -220,6 +234,14 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             feedbackHistory: asset.feedback_history,
             timestamp: asset.created_at ? new Date(asset.created_at).getTime() : Date.now()
           };
+          
+          // Collect asset info for sequential coherence
+          const strategy = asset.strategy as any;
+          previousNonProductAssets.push({
+            userPurpose,
+            headline: frontendAsset.overlayConfig?.title,
+            visualStyle: strategy?.step_1_visual_concept?.visual_metaphor_reasoning || ''
+          });
           
           assetsToCreate.push(frontendAsset);
         }

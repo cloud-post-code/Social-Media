@@ -45,7 +45,7 @@ export const getAssetById = async (req: Request, res: Response, next: NextFuncti
 
 export const generateProductAsset = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { brandId, productFocus, referenceImageBase64, width, height } = req.body;
+    const { brandId, productFocus, referenceImageBase64, width, height, previousAssets } = req.body;
 
     if (!brandId || !productFocus) {
       return res.status(400).json({ 
@@ -59,10 +59,12 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
     }
 
     // Step 1: Generate image prompt and create product image
+    // Pass previousAssets context for sequential coherence
     const imagePromptResult = await geminiService.generateProductImagePrompt(
       brand,
       productFocus,
-      referenceImageBase64
+      referenceImageBase64,
+      previousAssets // Array of previous assets with productFocus, title, subtitle, visualStyle
     );
 
     if (!imagePromptResult.imagen_prompt_final) {
@@ -379,7 +381,7 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
 
 export const generateNonProductAsset = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { brandId, userPurpose, useExactLogo, logoUrl, brandImageUrls } = req.body;
+    const { brandId, userPurpose, useExactLogo, logoUrl, brandImageUrls, previousAssets } = req.body;
 
     if (!brandId || !userPurpose) {
       return res.status(400).json({ 
@@ -392,11 +394,13 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
       return res.status(404).json({ error: { message: 'Brand not found' } });
     }
 
+    // Pass previousAssets context for sequential coherence
     const strategy = await geminiService.generateNonProductStrategy(
       brand, 
       userPurpose,
       useExactLogo ? logoUrl : undefined,
-      brandImageUrls
+      brandImageUrls,
+      previousAssets // Array of previous assets with userPurpose, headline, visualStyle
     );
 
     if (!strategy?.step_1_visual_concept?.imagen_prompt_final) {

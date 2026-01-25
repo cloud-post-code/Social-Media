@@ -18,6 +18,7 @@ export const assetApi = {
     referenceImageBase64?: string;
     width?: number;
     height?: number;
+    previousAssets?: Array<{ productFocus: string; title?: string; subtitle?: string; visualStyle?: string }>;
   }) => api.post<GeneratedAsset>('/assets/generate/product', data),
   
   generateNonProduct: (data: {
@@ -26,6 +27,7 @@ export const assetApi = {
     useExactLogo?: boolean;
     logoUrl?: string;
     brandImageUrls?: string[];
+    previousAssets?: Array<{ userPurpose: string; headline?: string; visualStyle?: string }>;
   }) => api.post<GeneratedAsset>('/assets/generate/non-product', data),
   
   generateCampaign: (data: {

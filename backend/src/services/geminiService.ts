@@ -1008,7 +1008,8 @@ async function extractBrandImagesFallback(url: string): Promise<{ logoUrl?: stri
 export const generateProductImagePrompt = async (
   brandDNA: BrandDNA,
   productFocus: string,
-  referenceImageBase64?: string
+  referenceImageBase64?: string,
+  previousAssets?: Array<{ productFocus: string; title?: string; subtitle?: string; visualStyle?: string }>
 ): Promise<{ imagen_prompt_final: string; reasoning: string; includes_person: boolean; composition_notes: string; step_1_analysis?: any }> => {
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
@@ -1020,6 +1021,28 @@ export const generateProductImagePrompt = async (
   
   const colorsList = allColors.join(', ');
 
+  // Build context about previous assets for sequential coherence
+  const previousAssetsContext = previousAssets && previousAssets.length > 0 ? `
+### SEQUENTIAL GENERATION CONTEXT
+You are generating this asset as part of a sequence. Previous assets in this batch have been created with these characteristics:
+
+${previousAssets.map((asset, idx) => `
+**Asset ${idx + 1}:**
+- Product Focus: ${asset.productFocus}
+- Title: ${asset.title || 'N/A'}
+- Subtitle: ${asset.subtitle || 'N/A'}
+- Visual Style Notes: ${asset.visualStyle || 'N/A'}
+`).join('\n')}
+
+**COHERENCE REQUIREMENTS:**
+- Maintain visual consistency with previous assets (similar lighting style, composition approach, color usage)
+- Use similar background styles and environmental settings where appropriate
+- Ensure the overall aesthetic feels cohesive and part of the same campaign/series
+- While each product is unique, the photography style, mood, and visual treatment should feel unified
+- Consider how this asset will look alongside the previous ones - they should feel like a coordinated set
+- Maintain brand consistency while allowing each product to shine individually
+` : '';
+
   const prompt = `
 You are an elite Product Photographer and Art Director.
 Goal: Create a highly technical image generation prompt that captures the *exact* physical reality of the product while placing it in a lifestyle context.
@@ -1028,6 +1051,7 @@ Goal: Create a highly technical image generation prompt that captures the *exact
 Brand DNA: ${JSON.stringify(brandDNA)}
 Product Focus: ${productFocus}
 ${referenceImageBase64 ? '**REFERENCE IMAGE PROVIDED:** A reference image of the actual product has been provided. You MUST analyze it FIRST before creating your prompt.' : ''}
+${previousAssetsContext}
 
 ### BRAND COLOR PALETTE
 All brand colors: ${allColors.join(', ')}
@@ -1487,7 +1511,8 @@ export const generateNonProductStrategy = async (
   brandDNA: BrandDNA, 
   userPurpose: string,
   logoUrl?: string,
-  brandImageUrls?: string[]
+  brandImageUrls?: string[],
+  previousAssets?: Array<{ userPurpose: string; headline?: string; visualStyle?: string }>
 ) => {
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
@@ -1513,6 +1538,28 @@ export const generateNonProductStrategy = async (
     brandAssetsContext += '- The generated image should align with the visual style seen in these brand assets.\n';
   }
 
+  // Build context about previous assets for sequential coherence
+  const previousAssetsContext = previousAssets && previousAssets.length > 0 ? `
+### SEQUENTIAL GENERATION CONTEXT
+You are generating this asset as part of a sequence. Previous assets in this batch have been created with these characteristics:
+
+${previousAssets.map((asset, idx) => `
+**Asset ${idx + 1}:**
+- Purpose: ${asset.userPurpose}
+- Headline: ${asset.headline || 'N/A'}
+- Visual Style Notes: ${asset.visualStyle || 'N/A'}
+`).join('\n')}
+
+**COHERENCE REQUIREMENTS:**
+- Maintain visual consistency with previous assets (similar lighting style, composition approach, color usage)
+- Use similar visual metaphors and aesthetic treatments where appropriate
+- Ensure the overall aesthetic feels cohesive and part of the same campaign/series
+- While each post has a unique purpose, the photography style, mood, and visual treatment should feel unified
+- Consider how this asset will look alongside the previous ones - they should feel like a coordinated set
+- Maintain brand consistency while allowing each post to convey its unique message
+- Vary visual elements enough to keep interest, but maintain enough consistency to feel like a series
+` : '';
+
   const logoInstruction = logoUrl 
     ? ' The logo will be added as an overlay separately, so DO NOT include it in the image generation prompt.'
     : ' NO logos should be included in the generated image.';
@@ -1522,6 +1569,7 @@ export const generateNonProductStrategy = async (
     Brand DNA: ${JSON.stringify(brandDNA)}
     User Purpose: ${userPurpose}
     ${brandAssetsContext}
+    ${previousAssetsContext}
 
     ### BRAND COLOR PALETTE
     All brand colors: ${allColors.join(', ')}
