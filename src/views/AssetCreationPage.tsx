@@ -183,6 +183,85 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         setCurrentStep(0);
         setStartTime(null);
         return;
+      } else if (option === 'background') {
+        // Handle background generation (image only, no text overlay)
+        // Use productImages array - if empty, use empty array (will generate without reference)
+        const imagesToProcess = productImages.length > 0 ? productImages : [null];
+        const totalImages = imagesToProcess.length;
+        
+        // Each image goes through 2 steps: image generation -> verification/save
+        const stepsPerImage = 2;
+        const total = totalImages * stepsPerImage;
+        setTotalSteps(total);
+        setCurrentStep(0);
+        
+        const dimensions = getImageDimensions();
+        let stepCounter = 0;
+        
+        // Process each photo sequentially - collect previous assets for coherence
+        const previousBGAssets: Array<{ productFocus: string; visualStyle?: string }> = [];
+        
+        for (let i = 0; i < imagesToProcess.length; i++) {
+          const photoIndex = i + 1;
+          
+          // Step 1: Starting image generation
+          setStatusText(`Generating background ${photoIndex} of ${totalImages}...`);
+          setCurrentStep(stepCounter);
+          stepCounter++;
+          
+          const generatedAsset = await assetApi.generateBackground({
+            brandId: activeBrand.id,
+            productFocus: productFocus[i] || '',
+            referenceImageBase64: imagesToProcess[i] || undefined,
+            width: dimensions.width,
+            height: dimensions.height,
+            previousAssets: previousBGAssets.length > 0 ? previousBGAssets : undefined
+          });
+          
+          // Step 2: Asset complete
+          setStatusText(`Finalizing background ${photoIndex}...`);
+          setCurrentStep(stepCounter);
+          stepCounter++;
+          
+          // Immediately convert backend format to frontend format
+          const frontendAsset: GeneratedAsset = {
+            ...generatedAsset,
+            id: generatedAsset.id,
+            imageUrl: generatedAsset.image_url || generatedAsset.imageUrl,
+            image_url: generatedAsset.image_url || generatedAsset.imageUrl,
+            brandId: generatedAsset.brand_id || generatedAsset.brandId,
+            brand_id: generatedAsset.brand_id || generatedAsset.brandId,
+            campaignImages: generatedAsset.campaign_images || generatedAsset.campaignImages,
+            campaign_images: generatedAsset.campaign_images || generatedAsset.campaignImages,
+            baseImageUrl: generatedAsset.base_image_url || generatedAsset.baseImageUrl,
+            base_image_url: generatedAsset.base_image_url || generatedAsset.baseImageUrl,
+            userPrompt: generatedAsset.user_prompt || generatedAsset.userPrompt,
+            user_prompt: generatedAsset.user_prompt || generatedAsset.userPrompt,
+            feedbackHistory: generatedAsset.feedback_history || generatedAsset.feedbackHistory,
+            feedback_history: generatedAsset.feedback_history || generatedAsset.feedbackHistory,
+            timestamp: generatedAsset.created_at ? new Date(generatedAsset.created_at).getTime() : (generatedAsset.timestamp || Date.now())
+          };
+          
+          // Collect asset info for sequential coherence
+          const strategy = generatedAsset.strategy as any;
+          previousBGAssets.push({
+            productFocus: productFocus[i] || '',
+            visualStyle: strategy?.step_1_image_generation?.composition_notes || strategy?.step_1_image_generation?.reasoning || ''
+          });
+          
+          // Immediately call onAssetCreated - don't wait for batch to complete
+          onAssetCreated(frontendAsset);
+        }
+        
+        setStatusText('All backgrounds processed!');
+        setCurrentStep(total);
+        
+        // Reset loading state
+        setLoading(false);
+        setStatusText('');
+        setCurrentStep(0);
+        setStartTime(null);
+        return;
       } else {
         // Handle batch generation for non-product posts
         // Each non-product post goes through 3 steps: strategy -> image generation -> final output
@@ -304,7 +383,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         </div>
         
         <div className="flex bg-white/50 backdrop-blur-md p-2 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-200/50">
-          {(['product', 'non-product'] as const).map(opt => (
+          {(['product', 'background', 'non-product'] as const).map(opt => (
             <button 
               key={opt}
               onClick={() => setOption(opt)}
@@ -467,6 +546,163 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                 className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? 'Generating...' : 'Draft Product Masterpiece'}
+              </button>
+            </div>
+          )}
+
+          {option === 'background' && (
+            <div className="space-y-8">
+              {/* Background Mode Description */}
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                <p className="text-sm text-amber-800 font-medium">
+                  <span className="font-black">Background Mode:</span> Generate product images without text overlay. Perfect for creating clean background images for further editing.
+                </p>
+              </div>
+              
+              {/* Reference Hero Images Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Reference Hero Images</label>
+                  {productImages.length > 0 && (
+                    <span className="text-xs font-bold text-slate-500">{productImages.length} photo{productImages.length !== 1 ? 's' : ''} selected</span>
+                  )}
+                </div>
+                {productImages.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {productImages.map((image, index) => (
+                      <div key={index} className="space-y-3">
+                        <div className="aspect-square bg-slate-50 border-2 border-slate-200 rounded-2xl relative overflow-hidden group">
+                          <img src={image} loading="lazy" className="w-full h-full object-cover" alt={`Product reference ${index + 1}`} />
+                          <button
+                            onClick={() => removeProductImage(index)}
+                            className="absolute top-2 right-2 bg-white/95 p-2 rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
+                          >
+                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                          <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded">
+                            {index + 1}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Describe the scene</label>
+                          <textarea 
+                            value={productFocus[index] || ''}
+                            onChange={e => updateProductFocus(index, e.target.value)}
+                            placeholder="Describe the product context, setting, or mood for the background..."
+                            className="w-full h-32 p-4 bg-slate-50 border-2 border-slate-100 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-50/50 focus:border-indigo-500 transition-all text-sm font-medium leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    <label className="aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner">
+                      <div className="bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-xl text-indigo-600 group-hover:scale-110 transition">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                        </svg>
+                      </div>
+                      <span className="text-xs font-black text-slate-500 mt-3">Add More</span>
+                      <input type="file" className="hidden" accept="image/*" multiple onChange={handleProductImageUpload} />
+                    </label>
+                  </div>
+                ) : (
+                  <label className="block aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-400 transition-all cursor-pointer shadow-inner max-w-md">
+                    <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl text-indigo-600 group-hover:scale-110 transition">
+                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-black text-slate-500">Add Product References</span>
+                    <p className="text-xs text-slate-400 mt-2 font-medium">PNG, JPG up to 10MB</p>
+                    <p className="text-xs text-slate-400 mt-1 font-medium">Select multiple photos</p>
+                    <input type="file" className="hidden" accept="image/*" multiple onChange={handleProductImageUpload} />
+                  </label>
+                )}
+              </div>
+              
+              {/* Image Size Selector */}
+              <div className="space-y-3">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">Image Size</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      onClick={() => setImageSizePreset('story')}
+                      className={`p-4 rounded-2xl border-2 transition-all font-bold text-sm ${
+                        imageSizePreset === 'story' 
+                          ? 'bg-indigo-600 text-white border-indigo-600' 
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      Story<br/><span className="text-xs opacity-80">1080×1920</span>
+                    </button>
+                    <button
+                      onClick={() => setImageSizePreset('square')}
+                      className={`p-4 rounded-2xl border-2 transition-all font-bold text-sm ${
+                        imageSizePreset === 'square' 
+                          ? 'bg-indigo-600 text-white border-indigo-600' 
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      Square<br/><span className="text-xs opacity-80">1080×1080</span>
+                    </button>
+                    <button
+                      onClick={() => setImageSizePreset('custom')}
+                      className={`p-4 rounded-2xl border-2 transition-all font-bold text-sm ${
+                        imageSizePreset === 'custom' 
+                          ? 'bg-indigo-600 text-white border-indigo-600' 
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      Custom
+                    </button>
+                  </div>
+                  {imageSizePreset === 'custom' && (
+                    <div className="flex gap-3 items-center">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Width</label>
+                        <input
+                          type="number"
+                          min="100"
+                          max="4096"
+                          value={customWidth}
+                          onChange={e => setCustomWidth(parseInt(e.target.value) || 1080)}
+                          className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl text-slate-800 font-bold"
+                        />
+                      </div>
+                      <span className="text-2xl font-black text-slate-400 mt-6">×</span>
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Height</label>
+                        <input
+                          type="number"
+                          min="100"
+                          max="4096"
+                          value={customHeight}
+                          onChange={e => setCustomHeight(parseInt(e.target.value) || 1080)}
+                          className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl text-slate-800 font-bold"
+                        />
+                      </div>
+                    </div>
+                  )}
+              </div>
+              
+              {/* Progress Bar */}
+              {loading && startTime !== null && (
+                <div key="background-progress" className="p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
+                  <GenerationProgressBar
+                    current={currentStep}
+                    total={totalSteps}
+                    statusText={statusText || 'Generating...'}
+                    startTime={startTime}
+                  />
+                </div>
+              )}
+              
+              <button 
+                onClick={handleGenerate}
+                disabled={loading || productImages.length === 0 || productFocus.some(focus => !focus || focus.trim() === '')}
+                className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
+              >
+                {loading ? 'Generating...' : 'Generate Background Image'}
               </button>
             </div>
           )}

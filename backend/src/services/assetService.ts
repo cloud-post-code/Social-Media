@@ -139,7 +139,7 @@ function rowToAsset(row: AssetRow): GeneratedAsset {
   return {
     id: row.id,
     brand_id: row.brand_id,
-    type: row.type as 'product' | 'campaign' | 'non-product',
+    type: row.type as 'product' | 'campaign' | 'non-product' | 'background',
     image_url: row.image_url,
     campaign_images: row.campaign_images || undefined,
     strategy: cleanStrategy,

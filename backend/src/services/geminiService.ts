@@ -1726,7 +1726,7 @@ export const generateImage = async (prompt: string, width: number = 1080, height
  * Analyze user feedback to determine which generation step needs to be redone
  */
 export const analyzeFeedbackForStepSelection = async (
-  assetType: 'product' | 'non-product' | 'campaign',
+  assetType: 'product' | 'non-product' | 'campaign' | 'background',
   currentStrategy: any,
   feedback: string,
   baseImageBase64?: string

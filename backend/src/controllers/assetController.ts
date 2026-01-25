@@ -259,6 +259,143 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
 };
 
 /**
+ * Generate a product background image (no text overlay)
+ * This is a simplified flow that only executes Step 1 and Step 1.5
+ */
+export const generateProductBGAsset = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { brandId, productFocus, referenceImageBase64, width, height, previousAssets } = req.body;
+
+    if (!brandId || !productFocus) {
+      return res.status(400).json({ 
+        error: { message: 'brandId and productFocus are required' } 
+      });
+    }
+
+    const brand = await brandService.getBrandById(brandId);
+    if (!brand) {
+      return res.status(404).json({ error: { message: 'Brand not found' } });
+    }
+
+    // Step 1: Generate image prompt and create product image
+    // Pass previousAssets context for sequential coherence
+    const imagePromptResult = await geminiService.generateProductImagePrompt(
+      brand,
+      productFocus,
+      referenceImageBase64,
+      previousAssets // Array of previous assets with productFocus, visualStyle
+    );
+
+    if (!imagePromptResult.imagen_prompt_final) {
+      throw new Error('Image prompt generation failed');
+    }
+
+    let baseImageUrl = await geminiService.generateImage(
+      imagePromptResult.imagen_prompt_final,
+      width || 1080,
+      height || 1080,
+      referenceImageBase64 // Pass reference image to Nano Banana
+    );
+
+    // Step 1.5: Verify product accuracy if reference image provided
+    let verificationResult = null;
+    if (referenceImageBase64) {
+      const expectedAttributes = imagePromptResult.step_1_analysis?.reference_verification;
+      verificationResult = await geminiService.verifyProductImageMatch(
+        baseImageUrl,
+        referenceImageBase64,
+        productFocus,
+        expectedAttributes ? {
+          texture: expectedAttributes.extracted_texture,
+          colors: expectedAttributes.extracted_colors,
+          details: expectedAttributes.extracted_details,
+          finish: expectedAttributes.extracted_finish
+        } : undefined
+      );
+
+      // If match score is below 85, regenerate with enhanced prompt
+      if (verificationResult.matchScore < 85 && verificationResult.recommendations.length > 0) {
+        console.log(`[ProductBG Verification] Match score ${verificationResult.matchScore} below threshold. Regenerating with improvements...`);
+        console.log(`[ProductBG Verification] Discrepancies: ${verificationResult.discrepancies.join('; ')}`);
+        console.log(`[ProductBG Verification] Recommendations: ${verificationResult.recommendations.join('; ')}`);
+
+        // Enhance the prompt with specific recommendations
+        const enhancedPrompt = `${imagePromptResult.imagen_prompt_final}\n\nCRITICAL CORRECTIONS NEEDED:\n${verificationResult.recommendations.map((rec, i) => `${i + 1}. ${rec}`).join('\n')}\n\nYou MUST address ALL these corrections. The product must match the reference exactly.`;
+
+        baseImageUrl = await geminiService.generateImage(
+          enhancedPrompt,
+          width || 1080,
+          height || 1080,
+          referenceImageBase64 // Pass reference image to Nano Banana on retry
+        );
+
+        // Verify again
+        verificationResult = await geminiService.verifyProductImageMatch(
+          baseImageUrl,
+          referenceImageBase64,
+          productFocus,
+          expectedAttributes ? {
+            texture: expectedAttributes.extracted_texture,
+            colors: expectedAttributes.extracted_colors,
+            details: expectedAttributes.extracted_details,
+            finish: expectedAttributes.extracted_finish
+          } : undefined
+        );
+
+        console.log(`[ProductBG Verification] After regeneration - Match score: ${verificationResult.matchScore}`);
+      }
+
+      if (verificationResult.matchScore < 70) {
+        console.warn(`[ProductBG Verification] WARNING: Match score ${verificationResult.matchScore} is still low. Product may not match reference accurately.`);
+      }
+    }
+
+    // Optimize image before storing
+    try {
+      baseImageUrl = await imageOverlayService.optimizeImage(baseImageUrl);
+    } catch (error) {
+      console.warn('[AssetController] Failed to optimize image, using original:', error);
+    }
+
+    // Store strategy information (no Step 2 or Step 3)
+    const strategy = {
+      step_1_image_generation: {
+        step_1_analysis: imagePromptResult.step_1_analysis,
+        reasoning: imagePromptResult.reasoning,
+        includes_person: imagePromptResult.includes_person,
+        composition_notes: imagePromptResult.composition_notes,
+        imagen_prompt_final: imagePromptResult.imagen_prompt_final
+      },
+      step_1_5_verification: verificationResult ? {
+        matches: verificationResult.matches,
+        matchScore: verificationResult.matchScore,
+        discrepancies: verificationResult.discrepancies,
+        recommendations: verificationResult.recommendations,
+        confidence: verificationResult.confidence
+      } : null
+    };
+
+    // Generate unique ID: timestamp + random component to prevent collisions
+    const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Save with no overlay - image_url equals base_image_url
+    const asset = await assetService.createAsset({
+      id: uniqueId,
+      brand_id: brandId,
+      type: 'background',
+      image_url: baseImageUrl,
+      base_image_url: baseImageUrl,
+      strategy,
+      user_prompt: productFocus
+    });
+
+    res.status(201).json(asset);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Update product overlay (colors, text, typography)
  */
 export const updateProductOverlay = async (req: Request, res: Response, next: NextFunction) => {

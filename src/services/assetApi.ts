@@ -30,6 +30,15 @@ export const assetApi = {
     previousAssets?: Array<{ userPurpose: string; headline?: string; visualStyle?: string }>;
   }) => api.post<GeneratedAsset>('/assets/generate/non-product', data),
   
+  generateBackground: (data: {
+    brandId: string;
+    productFocus: string;
+    referenceImageBase64?: string;
+    width?: number;
+    height?: number;
+    previousAssets?: Array<{ productFocus: string; visualStyle?: string }>;
+  }) => api.post<GeneratedAsset>('/assets/generate/background', data),
+  
   generateCampaign: (data: {
     brandId: string;
     campaignDetails: string;

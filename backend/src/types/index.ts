@@ -73,7 +73,7 @@ export interface OverlayConfig {
 export interface GeneratedAsset {
   id: string;
   brand_id: string;
-  type: 'product' | 'campaign' | 'non-product';
+  type: 'product' | 'campaign' | 'non-product' | 'background';
   image_url: string;
   campaign_images?: string[];
   strategy: any;
