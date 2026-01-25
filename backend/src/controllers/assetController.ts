@@ -570,20 +570,56 @@ export const editAssetImage = async (req: Request, res: Response, next: NextFunc
     const { id } = req.params;
     const { feedback } = req.body;
 
+    if (!id) {
+      return res.status(400).json({ 
+        error: { message: 'Asset ID is required' } 
+      });
+    }
+
     if (!feedback) {
       return res.status(400).json({ 
         error: { message: 'feedback is required' } 
       });
     }
 
+    console.log(`[Feedback Loop] Processing feedback for asset ID: ${id}`);
+    
     const asset = await assetService.getAssetById(id);
     if (!asset) {
+      console.error(`[Feedback Loop] Asset not found: ${id}`);
       return res.status(404).json({ error: { message: 'Asset not found' } });
     }
+    
+    // Verify we're working with the correct asset
+    if (asset.id !== id) {
+      console.error(`[Feedback Loop] Asset ID mismatch! Requested: ${id}, Found: ${asset.id}`);
+      return res.status(400).json({ 
+        error: { message: 'Asset ID mismatch' } 
+      });
+    }
+    
+    console.log(`[Feedback Loop] Confirmed working with asset: ${asset.id}, type: ${asset.type}`);
 
     // CRITICAL: Use base_image_url (clean image without overlay) for analysis and regeneration
     // Never use image_url (final image with overlay) for regeneration steps
     const baseImageForAnalysis = asset.base_image_url || asset.image_url;
+    
+    // Validate that we have a valid image
+    if (!baseImageForAnalysis) {
+      console.error('[Feedback Loop] ERROR: No base image found for asset:', asset.id);
+      return res.status(400).json({ 
+        error: { message: 'Asset does not have a base image available for regeneration' } 
+      });
+    }
+    
+    // Log image info for debugging
+    const imageLength = baseImageForAnalysis.length;
+    const isDataUri = baseImageForAnalysis.startsWith('data:image');
+    console.log(`[Feedback Loop] Base image for analysis: ${imageLength} chars, isDataUri: ${isDataUri}, starts with: ${baseImageForAnalysis.substring(0, 50)}`);
+    
+    if (imageLength < 100) {
+      console.warn('[Feedback Loop] WARNING: Image data seems too short, might be invalid');
+    }
 
     // Step 1: Analyze feedback to determine which step to redo
     const stepAnalysis = await geminiService.analyzeFeedbackForStepSelection(
@@ -654,7 +690,12 @@ export const editAssetImage = async (req: Request, res: Response, next: NextFunc
         };
 
         // Cascade: Regenerate text with new image
-        console.log('[Feedback Loop] Regenerating title/subtitle...');
+        console.log('[Feedback Loop] Regenerating title/subtitle with NEW image (image_prompt case)...');
+        console.log(`[Feedback Loop] Image length: ${newBaseImageUrl?.length || 0} chars`);
+        if (!newBaseImageUrl) {
+          console.error('[Feedback Loop] ERROR: newBaseImageUrl is missing for text regeneration!');
+          throw new Error('Cannot regenerate text: base image is missing');
+        }
         newTitleSubtitle = await geminiService.regenerateTitleSubtitle(
           brand,
           asset.user_prompt || '',
@@ -742,7 +783,12 @@ export const editAssetImage = async (req: Request, res: Response, next: NextFunc
         );
 
         // Cascade: Regenerate text with new image
-        console.log('[Feedback Loop] Regenerating title/subtitle...');
+        console.log('[Feedback Loop] Regenerating title/subtitle with NEW image (image_generation case)...');
+        console.log(`[Feedback Loop] Image length: ${newBaseImageUrl?.length || 0} chars`);
+        if (!newBaseImageUrl) {
+          console.error('[Feedback Loop] ERROR: newBaseImageUrl is missing for text regeneration!');
+          throw new Error('Cannot regenerate text: base image is missing');
+        }
         newTitleSubtitle = await geminiService.regenerateTitleSubtitle(
           brand,
           asset.user_prompt || '',
@@ -819,7 +865,12 @@ export const editAssetImage = async (req: Request, res: Response, next: NextFunc
 
       case 'title_subtitle': {
         // Regenerate text → regenerate overlay (use CURRENT base image)
-        console.log('[Feedback Loop] Regenerating title/subtitle...');
+        console.log('[Feedback Loop] Regenerating title/subtitle with CURRENT base image...');
+        console.log(`[Feedback Loop] Image length: ${baseImageForAnalysis?.length || 0} chars`);
+        if (!baseImageForAnalysis) {
+          console.error('[Feedback Loop] ERROR: baseImageForAnalysis is missing for text regeneration!');
+          throw new Error('Cannot regenerate text: base image is missing');
+        }
         newTitleSubtitle = await geminiService.regenerateTitleSubtitle(
           brand,
           asset.user_prompt || '',

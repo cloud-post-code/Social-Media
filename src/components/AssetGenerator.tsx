@@ -5,6 +5,7 @@ import TextToolbar from './TextToolbar.js';
 import { getFontFamilyString, loadGoogleFont, GOOGLE_FONTS, FONT_MAPPING } from '../utils/googleFonts.js';
 import { useBrandAssets } from '../hooks/useBrandAssets.js';
 import html2canvas from 'html2canvas';
+import GenerationProgressBar from './GenerationProgressBar.js';
 
 // Utility function to strip markdown syntax from text
 const stripMarkdown = (text: string): string => {
@@ -31,6 +32,12 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
   const [currentAsset, setCurrentAsset] = useState<GeneratedAsset | null>(null);
   const [feedback, setFeedback] = useState('');
   const [editingTextElement, setEditingTextElement] = useState<'title' | 'subtitle' | null>(null);
+  
+  // Progress tracking for feedback loop
+  const [currentStep, setCurrentStep] = useState(0);
+  const [totalSteps, setTotalSteps] = useState(4);
+  const [statusText, setStatusText] = useState('');
+  const [startTime, setStartTime] = useState<number | null>(null);
   
   // Helper function to get localStorage key for overlay edit state
   const getOverlayEditKey = (assetId: string | undefined) => {
@@ -313,6 +320,19 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         feedbackHistory: initialAsset.feedback_history || initialAsset.feedbackHistory,
         timestamp: initialAsset.created_at ? new Date(initialAsset.created_at).getTime() : initialAsset.timestamp || Date.now()
       };
+      
+      // Clear feedback when switching to a different asset
+      const previousAssetId = currentAsset?.id;
+      if (previousAssetId && previousAssetId !== frontendAsset.id) {
+        console.log(`[AssetGenerator] Switching assets: ${previousAssetId} -> ${frontendAsset.id}, clearing feedback and resetting state`);
+        setFeedback('');
+        setLoading(false);
+        setCurrentStep(0);
+        setTotalSteps(0);
+        setStatusText('');
+        setStartTime(null);
+      }
+      
       setCurrentAsset(frontendAsset);
       
       // Restore overlayEdit from localStorage if available
@@ -1438,9 +1458,171 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
 
   const handleRegenerate = async () => {
     if (!currentAsset || !feedback) return;
+    
+    // Validate we have a valid asset ID
+    if (!currentAsset.id) {
+      console.error('[AssetGenerator] Cannot regenerate: currentAsset has no ID');
+      alert('Error: Asset ID is missing. Please refresh and try again.');
+      return;
+    }
+    
+    // Store the asset ID at the start to ensure we're working with the correct asset
+    const assetIdToProcess = currentAsset.id;
+    console.log(`[AssetGenerator] Starting feedback loop for asset: ${assetIdToProcess}`);
+    
     setLoading(true);
+    setStartTime(Date.now());
+    setCurrentStep(0);
+    
+    // Step definitions based on backend feedback loop
+    // These will be dynamically adjusted based on what step is selected
+    let progressSteps: Array<{ step: number; status: string }> = [];
+    let totalSteps = 0;
+    
     try {
-      const updated = await assetApi.editImage(currentAsset.id, feedback);
+      // Step 1: Analyzing feedback
+      setCurrentStep(1);
+      setStatusText('Analyzing feedback...');
+      setTotalSteps(5); // Default, will be adjusted
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      // Step 2: Processing (this happens during the API call)
+      setCurrentStep(2);
+      setStatusText('Processing your feedback...');
+      
+      // Verify asset hasn't changed before making API call
+      if (currentAsset.id !== assetIdToProcess) {
+        console.warn(`[AssetGenerator] Asset changed during feedback processing. Original: ${assetIdToProcess}, Current: ${currentAsset.id}`);
+        alert('Asset changed. Please try again.');
+        setLoading(false);
+        return;
+      }
+      
+      // Start the API call with the stored asset ID
+      const updated = await assetApi.editImage(assetIdToProcess, feedback);
+      
+      // Verify the response is for the correct asset
+      if (updated.id !== assetIdToProcess) {
+        console.error(`[AssetGenerator] Asset ID mismatch in response. Expected: ${assetIdToProcess}, Got: ${updated.id}`);
+        alert('Error: Received response for different asset. Please refresh and try again.');
+        setLoading(false);
+        return;
+      }
+      
+      // Determine steps based on what was actually done
+      const lastFeedbackIteration = updated.strategy?.feedback_iterations?.[updated.strategy.feedback_iterations.length - 1];
+      const stepRedone = lastFeedbackIteration?.step_redone || 'final_image';
+      
+      // Map backend steps to frontend progress steps and show completion
+      switch (stepRedone) {
+        case 'image_prompt':
+          progressSteps = [
+            { step: 1, status: 'Analyzing feedback...' },
+            { step: 2, status: 'Regenerating image prompt...' },
+            { step: 3, status: 'Generating new image...' },
+            { step: 4, status: 'Creating title & subtitle...' },
+            { step: 5, status: 'Designing overlay...' },
+            { step: 6, status: 'Finalizing...' }
+          ];
+          totalSteps = 6;
+          setTotalSteps(totalSteps);
+          setCurrentStep(3);
+          setStatusText(progressSteps[2].status);
+          await new Promise(resolve => setTimeout(resolve, 250));
+          setCurrentStep(4);
+          setStatusText(progressSteps[3].status);
+          await new Promise(resolve => setTimeout(resolve, 250));
+          setCurrentStep(5);
+          setStatusText(progressSteps[4].status);
+          await new Promise(resolve => setTimeout(resolve, 250));
+          setCurrentStep(6);
+          setStatusText(progressSteps[5].status);
+          break;
+          
+        case 'image_generation':
+          progressSteps = [
+            { step: 1, status: 'Analyzing feedback...' },
+            { step: 2, status: 'Regenerating image...' },
+            { step: 3, status: 'Creating title & subtitle...' },
+            { step: 4, status: 'Designing overlay...' },
+            { step: 5, status: 'Finalizing...' }
+          ];
+          totalSteps = 5;
+          setTotalSteps(totalSteps);
+          setCurrentStep(3);
+          setStatusText(progressSteps[2].status);
+          await new Promise(resolve => setTimeout(resolve, 250));
+          setCurrentStep(4);
+          setStatusText(progressSteps[3].status);
+          await new Promise(resolve => setTimeout(resolve, 250));
+          setCurrentStep(5);
+          setStatusText(progressSteps[4].status);
+          break;
+          
+        case 'title_subtitle':
+          progressSteps = [
+            { step: 1, status: 'Analyzing feedback...' },
+            { step: 2, status: 'Regenerating title & subtitle...' },
+            { step: 3, status: 'Designing overlay...' },
+            { step: 4, status: 'Finalizing...' }
+          ];
+          totalSteps = 4;
+          setTotalSteps(totalSteps);
+          setCurrentStep(3);
+          setStatusText(progressSteps[2].status);
+          await new Promise(resolve => setTimeout(resolve, 250));
+          setCurrentStep(4);
+          setStatusText(progressSteps[3].status);
+          break;
+          
+        case 'overlay_design':
+          progressSteps = [
+            { step: 1, status: 'Analyzing feedback...' },
+            { step: 2, status: 'Redesigning overlay...' },
+            { step: 3, status: 'Finalizing...' }
+          ];
+          totalSteps = 3;
+          setTotalSteps(totalSteps);
+          setCurrentStep(3);
+          setStatusText(progressSteps[2].status);
+          break;
+          
+        case 'final_image':
+        default:
+          progressSteps = [
+            { step: 1, status: 'Analyzing feedback...' },
+            { step: 2, status: 'Editing image...' },
+            { step: 3, status: 'Finalizing...' }
+          ];
+          totalSteps = 3;
+          setTotalSteps(totalSteps);
+          setCurrentStep(3);
+          setStatusText(progressSteps[2].status);
+          break;
+      }
+      
+      // Verify the updated asset matches the one we were processing
+      if (updated.id !== assetIdToProcess) {
+        console.error(`[AssetGenerator] Asset ID mismatch after update. Expected: ${assetIdToProcess}, Got: ${updated.id}`);
+        alert('Error: Received update for different asset. Please refresh the page.');
+        setLoading(false);
+        return;
+      }
+      
+      // Verify currentAsset hasn't changed (user might have switched assets)
+      if (currentAsset?.id !== assetIdToProcess) {
+        console.warn(`[AssetGenerator] Asset changed during processing. Original: ${assetIdToProcess}, Current: ${currentAsset?.id}`);
+        alert('Asset changed during processing. The update was applied to the original asset.');
+        // Still update currentAsset if it matches, otherwise leave it
+        if (currentAsset?.id === updated.id) {
+          // User switched to the asset we just updated, so update it
+        } else {
+          // User switched to a different asset, don't update currentAsset
+          setLoading(false);
+          return;
+        }
+      }
+      
       const frontendAsset: GeneratedAsset = {
         ...updated,
         imageUrl: updated.image_url,
@@ -1452,14 +1634,27 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
         feedbackHistory: updated.feedback_history,
         timestamp: updated.created_at ? new Date(updated.created_at).getTime() : Date.now()
       };
-      setCurrentAsset(frontendAsset);
+      
+      // Only update if we're still viewing the same asset
+      if (currentAsset?.id === assetIdToProcess || !currentAsset) {
+        setCurrentAsset(frontendAsset);
+      } else {
+        console.log(`[AssetGenerator] Not updating currentAsset - user switched to different asset (${currentAsset.id})`);
+      }
+      
       // Clear overlayEdit to show regenerated values instead of stale edits
       setOverlayEdit({});
       setFeedback('');
+      
+      // Small delay to show completion
+      await new Promise(resolve => setTimeout(resolve, 300));
     } catch (err) {
       alert('Revision failed.');
     } finally {
       setLoading(false);
+      setCurrentStep(0);
+      setStatusText('');
+      setStartTime(null);
     }
   };
 
@@ -2162,6 +2357,18 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                   ))}
                 </div>
 
+                {/* Progress Bar */}
+                {loading && startTime !== null && (
+                  <div className="mb-6 p-6 bg-white/5 rounded-2xl border border-white/10">
+                    <GenerationProgressBar
+                      current={currentStep}
+                      total={totalSteps}
+                      statusText={statusText || 'Processing feedback...'}
+                      startTime={startTime}
+                    />
+                  </div>
+                )}
+
                 <div className="flex gap-4">
                   <input 
                     value={feedback}
@@ -2169,6 +2376,7 @@ const AssetGenerator: React.FC<AssetGeneratorProps> = ({ activeBrand, onAssetCre
                     placeholder="e.g. 'Make it darker', 'Move the focus'..."
                     className="flex-1 bg-white/10 border-2 border-white/20 rounded-[1.5rem] px-8 py-5 outline-none focus:bg-white/20 focus:border-indigo-400 transition-all font-bold placeholder:text-white/30"
                     onKeyDown={e => e.key === 'Enter' && handleRegenerate()}
+                    disabled={loading}
                   />
                   <button 
                     onClick={handleRegenerate}
