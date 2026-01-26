@@ -688,7 +688,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
               
               <button 
                 onClick={handleGenerate}
-                disabled={loading || productImages.length === 0 || productFocus.some(focus => !focus || focus.trim() === '')}
+                disabled={loading}
                 className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-slate-300 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? 'Generating...' : 'Generate Background Image'}

@@ -266,9 +266,9 @@ export const generateProductBGAsset = async (req: Request, res: Response, next: 
   try {
     const { brandId, productFocus, referenceImageBase64, width, height, previousAssets } = req.body;
 
-    if (!brandId || !productFocus) {
+    if (!brandId) {
       return res.status(400).json({ 
-        error: { message: 'brandId and productFocus are required' } 
+        error: { message: 'brandId is required' } 
       });
     }
 
