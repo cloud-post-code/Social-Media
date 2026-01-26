@@ -279,11 +279,13 @@ export const generateProductBGAsset = async (req: Request, res: Response, next: 
 
     // Step 1: Generate image prompt and create product image
     // Pass previousAssets context for sequential coherence
+    // isBackgroundOnly=true to generate full-frame product images without text overlay space
     const imagePromptResult = await geminiService.generateProductImagePrompt(
       brand,
       productFocus,
       referenceImageBase64,
-      previousAssets // Array of previous assets with productFocus, visualStyle
+      previousAssets, // Array of previous assets with productFocus, visualStyle
+      true // isBackgroundOnly - no text overlay space needed
     );
 
     if (!imagePromptResult.imagen_prompt_final) {

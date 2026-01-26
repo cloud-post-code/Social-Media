@@ -1009,7 +1009,8 @@ export const generateProductImagePrompt = async (
   brandDNA: BrandDNA,
   productFocus: string,
   referenceImageBase64?: string,
-  previousAssets?: Array<{ productFocus: string; title?: string; subtitle?: string; visualStyle?: string }>
+  previousAssets?: Array<{ productFocus: string; title?: string; subtitle?: string; visualStyle?: string }>,
+  isBackgroundOnly?: boolean
 ): Promise<{ imagen_prompt_final: string; reasoning: string; includes_person: boolean; composition_notes: string; step_1_analysis?: any }> => {
   const ai = getAIClient();
   const model = 'gemini-3-pro-preview';
@@ -1102,7 +1103,23 @@ You must prevent "product hallucination." Before writing the final prompt, you m
 2. **Weight/Drape:** Does it hang heavily (like wool) or float light (like silk)? ${referenceImageBase64 ? 'Base this on what you see in the reference.' : ''}
 3. **Imperfections:** Real products have grain and weave. Mentioning these creates realism. ${referenceImageBase64 ? 'Preserve the exact level of wear/distress visible in the reference.' : ''}
 
-### CRITICAL INSTRUCTION: TEXT OVERLAY SPACE PLANNING
+${isBackgroundOnly ? `### COMPOSITION INSTRUCTION: PRODUCT-FOCUSED IMAGE
+This is a background/product-only image with NO text overlays. Focus entirely on creating a beautiful, fully-composed product photograph:
+
+1. **Full-Frame Product Presentation:**
+   - The product should fill the frame prominently - no need to leave empty space for text
+   - Use the entire image area for impactful product presentation
+   - The product and its environment should be the complete story
+
+2. **Visual Richness:**
+   - Create a rich, detailed background that complements the product
+   - Use the full composition without reserving "dead space"
+   - Props, textures, and environmental elements can fill the entire frame
+
+3. **Hero Product Focus:**
+   - Keep the product as the hero with strong visual presence
+   - Use depth of field or lighting to make the product stand out
+   - The composition should feel complete and polished without any empty areas` : `### CRITICAL INSTRUCTION: TEXT OVERLAY SPACE PLANNING
 This image will have marketing text overlays (title and subtitle) added later. You MUST plan the composition to accommodate text:
 
 1. **Negative Space Strategy:**
@@ -1122,7 +1139,7 @@ This image will have marketing text overlays (title and subtitle) added later. Y
 
 4. **Composition Notes:**
    - Mention in composition_logic where you're creating negative space for text
-   - Describe the background characteristics in text overlay zones (e.g., "soft gradient background at top", "clean minimal background at bottom")
+   - Describe the background characteristics in text overlay zones (e.g., "soft gradient background at top", "clean minimal background at bottom")`}
 
 ### OUTPUT FORMAT (JSON)
 Return ONLY a JSON object with this structure:
@@ -1131,7 +1148,7 @@ ${referenceImageBase64 ? `
   "step_1_analysis": {
     "texture_lock": "EXACT material surface from reference image (e.g., distressed painted metal with chipped yellow paint, smooth matte ceramic). Must match what you see.",
     "lighting_strategy": "How light hits the texture (e.g., Raking side light to accentuate the weave). Consider how lighting affects the visible textures in the reference.",
-    "composition_logic": "Where the subject is placed to leave Negative Space for text overlay later. Specifically describe which areas (top/bottom/sides) have simpler backgrounds suitable for text placement, and how the composition creates visual separation between product and text overlay zones.",
+    "composition_logic": "${isBackgroundOnly ? 'How the product fills the frame prominently with a rich, detailed background. Describe how the full composition showcases the product without empty spaces.' : 'Where the subject is placed to leave Negative Space for text overlay later. Specifically describe which areas (top/bottom/sides) have simpler backgrounds suitable for text placement, and how the composition creates visual separation between product and text overlay zones.'}",
     "reference_verification": {
       "extracted_texture": "What texture is visible in the reference image (be specific)",
       "extracted_colors": ["List exact colors visible on each part of the product"],
@@ -1144,19 +1161,19 @@ ${referenceImageBase64 ? `
   "includes_person": boolean,
   "composition_notes": "Notes about composition and placement",
   "hallucination_check": "Explicit statement: I am preserving [list specific attributes from reference_verification] from the reference image and NOT inventing [list things you cannot see]. The generated product will match the reference in: [colors, textures, details, finish].",
-  "imagen_prompt_final": "A prompt following this strict structure: [CRITICAL: CUSTOMER ACCURACY REQUIREMENT - The product in this image MUST match the reference product EXACTLY. Customers will receive the actual product shown in the reference, so any differences will cause disappointment and returns. This is a legal and ethical requirement for accurate product representation.] + [REFERENCE ANCHOR: Match the EXACT material texture, colors, and structural details from the reference image. Preserve: [list specific details from step_1_analysis.reference_verification]. DO NOT invent features not visible in reference. DO NOT change any product attributes.] + [SUBJECT DEFINITION: detailed description of ${productFocus} EXACTLY matching the reference image. Include: exact colors per part (match hex values if possible), exact texture (match surface finish precisely), exact structural details (same cutouts, patterns, decorative elements in same positions), exact finish condition (same level of wear/distress/aging). The product shape, proportions, and all visible features must be IDENTICAL to the reference.] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero. Background and setting can vary, but the PRODUCT itself must be unchanged.] + [COMPOSITION: Create negative space areas (top/bottom/sides) with simpler backgrounds suitable for text overlays - use depth of field or lighting to separate product from background zones] + [LIGHTING: Specific lighting to highlight material quality and create contrast in background areas. Lighting should reveal the product accurately, not alter its appearance.] + [TECH SPECS: 8k, macro details, commercial photography, depth of field] + [NEGATIVE PROMPT: DO NOT add features not in reference image, DO NOT change material texture from reference, DO NOT invent colors/patterns not visible, DO NOT add decorative elements that do not exist, DO NOT modify structure, DO NOT change finish condition, DO NOT alter product proportions, DO NOT change product shape, DO NOT add or remove details, NO text, NO watermark, NO branding, NO logos]. Clean image only. Ensure background areas where text will be placed have simpler, less busy compositions. REMEMBER: The product must be photographically accurate - customers will compare what they receive to this image."
+  "imagen_prompt_final": "A prompt following this strict structure: [CRITICAL: CUSTOMER ACCURACY REQUIREMENT - The product in this image MUST match the reference product EXACTLY. Customers will receive the actual product shown in the reference, so any differences will cause disappointment and returns. This is a legal and ethical requirement for accurate product representation.] + [REFERENCE ANCHOR: Match the EXACT material texture, colors, and structural details from the reference image. Preserve: [list specific details from step_1_analysis.reference_verification]. DO NOT invent features not visible in reference. DO NOT change any product attributes.] + [SUBJECT DEFINITION: detailed description of \${productFocus} EXACTLY matching the reference image. Include: exact colors per part (match hex values if possible), exact texture (match surface finish precisely), exact structural details (same cutouts, patterns, decorative elements in same positions), exact finish condition (same level of wear/distress/aging). The product shape, proportions, and all visible features must be IDENTICAL to the reference.] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero. Background and setting can vary, but the PRODUCT itself must be unchanged.] + ${isBackgroundOnly ? '[COMPOSITION: Create a full-frame, visually rich composition with the product as the hero. Use the entire image area - no need for empty space. The product and its environment should tell the complete story with detailed backgrounds and props filling the frame.]' : '[COMPOSITION: Create negative space areas (top/bottom/sides) with simpler backgrounds suitable for text overlays - use depth of field or lighting to separate product from background zones]'} + [LIGHTING: Specific lighting to highlight material quality${isBackgroundOnly ? '' : ' and create contrast in background areas'}. Lighting should reveal the product accurately, not alter its appearance.] + [TECH SPECS: 8k, macro details, commercial photography, depth of field] + [NEGATIVE PROMPT: DO NOT add features not in reference image, DO NOT change material texture from reference, DO NOT invent colors/patterns not visible, DO NOT add decorative elements that do not exist, DO NOT modify structure, DO NOT change finish condition, DO NOT alter product proportions, DO NOT change product shape, DO NOT add or remove details, NO text, NO watermark, NO branding, NO logos]. Clean image only.${isBackgroundOnly ? '' : ' Ensure background areas where text will be placed have simpler, less busy compositions.'} REMEMBER: The product must be photographically accurate - customers will compare what they receive to this image."
 }
 ` : `
 {
   "step_1_analysis": {
     "texture_lock": "A few words describing the specific material surface (e.g., coarse woven linen, ribbed wool knit).",
     "lighting_strategy": "How light hits the texture (e.g., Raking side light to accentuate the weave).",
-    "composition_logic": "Where the subject is placed to leave Negative Space for text overlay later. Specifically describe which areas (top/bottom/sides) have simpler backgrounds suitable for text placement, and how the composition creates visual separation between product and text overlay zones."
+    "composition_logic": "${isBackgroundOnly ? 'How the product fills the frame prominently with a rich, detailed background. Describe how the full composition showcases the product without empty spaces.' : 'Where the subject is placed to leave Negative Space for text overlay later. Specifically describe which areas (top/bottom/sides) have simpler backgrounds suitable for text placement, and how the composition creates visual separation between product and text overlay zones.'}"
   },
   "reasoning": "Brief explanation of the visual strategy",
   "includes_person": boolean,
   "composition_notes": "Notes about composition and placement",
-  "imagen_prompt_final": "A prompt following this strict structure: [SUBJECT DEFINITION: detailed description of ${productFocus} focusing on texture, weave, and material weight] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + [COMPOSITION: Create negative space areas (top/bottom/sides) with simpler backgrounds suitable for text overlays - use depth of field or lighting to separate product from background zones] + [LIGHTING: Specific lighting to highlight material quality and create contrast in background areas] + [TECH SPECS: 8k, macro details, commercial photography, depth of field] + [NEGATIVE PROMPT: NO text, NO watermark, NO branding, NO logos]. Clean image only. Ensure background areas where text will be placed have simpler, less busy compositions."
+  "imagen_prompt_final": "A prompt following this strict structure: [SUBJECT DEFINITION: detailed description of \${productFocus} focusing on texture, weave, and material weight] + [CONTEXT: The model/lifestyle setting, ensuring the product is the hero] + ${isBackgroundOnly ? '[COMPOSITION: Create a full-frame, visually rich composition with the product as the hero. Use the entire image area - no need for empty space. The product and its environment should tell the complete story with detailed backgrounds and props filling the frame.]' : '[COMPOSITION: Create negative space areas (top/bottom/sides) with simpler backgrounds suitable for text overlays - use depth of field or lighting to separate product from background zones]'} + [LIGHTING: Specific lighting to highlight material quality${isBackgroundOnly ? '' : ' and create contrast in background areas'}] + [TECH SPECS: 8k, macro details, commercial photography, depth of field] + [NEGATIVE PROMPT: NO text, NO watermark, NO branding, NO logos]. Clean image only.${isBackgroundOnly ? '' : ' Ensure background areas where text will be placed have simpler, less busy compositions.'}"
 }
 `}
   `;
