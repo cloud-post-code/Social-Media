@@ -375,21 +375,13 @@ export const generateProductBGAsset = async (req: Request, res: Response, next: 
       } : null
     };
 
-    // Generate unique ID: timestamp + random component to prevent collisions
-    const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Save with no overlay - image_url equals base_image_url
-    const asset = await assetService.createAsset({
-      id: uniqueId,
-      brand_id: brandId,
-      type: 'background',
+    // Return image directly without saving to database
+    // Background images are meant for download only, not stored as assets
+    res.status(200).json({
       image_url: baseImageUrl,
-      base_image_url: baseImageUrl,
       strategy,
-      user_prompt: productFocus
+      productFocus
     });
-
-    res.status(201).json(asset);
   } catch (error) {
     next(error);
   }

@@ -37,7 +37,7 @@ export const assetApi = {
     width?: number;
     height?: number;
     previousAssets?: Array<{ productFocus: string; visualStyle?: string }>;
-  }) => api.post<GeneratedAsset>('/assets/generate/background', data),
+  }) => api.post<{ image_url: string; strategy: any; productFocus: string }>('/assets/generate/background', data),
   
   generateCampaign: (data: {
     brandId: string;

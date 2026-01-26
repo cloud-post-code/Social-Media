@@ -185,11 +185,11 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
         return;
       } else if (option === 'background') {
         // Handle background generation (image only, no text overlay)
-        // Use productImages array - if empty, use empty array (will generate without reference)
+        // Background images are auto-downloaded, not saved as assets
         const imagesToProcess = productImages.length > 0 ? productImages : [null];
         const totalImages = imagesToProcess.length;
         
-        // Each image goes through 2 steps: image generation -> verification/save
+        // Each image goes through 2 steps: image generation -> download
         const stepsPerImage = 2;
         const total = totalImages * stepsPerImage;
         setTotalSteps(total);
@@ -209,7 +209,7 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
           setCurrentStep(stepCounter);
           stepCounter++;
           
-          const generatedAsset = await assetApi.generateBackground({
+          const result = await assetApi.generateBackground({
             brandId: activeBrand.id,
             productFocus: productFocus[i] || '',
             referenceImageBase64: imagesToProcess[i] || undefined,
@@ -218,42 +218,31 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             previousAssets: previousBGAssets.length > 0 ? previousBGAssets : undefined
           });
           
-          // Step 2: Asset complete
-          setStatusText(`Finalizing background ${photoIndex}...`);
+          // Step 2: Download the image
+          setStatusText(`Downloading background ${photoIndex}...`);
           setCurrentStep(stepCounter);
           stepCounter++;
           
-          // Immediately convert backend format to frontend format
-          const frontendAsset: GeneratedAsset = {
-            ...generatedAsset,
-            id: generatedAsset.id,
-            imageUrl: generatedAsset.image_url || generatedAsset.imageUrl,
-            image_url: generatedAsset.image_url || generatedAsset.imageUrl,
-            brandId: generatedAsset.brand_id || generatedAsset.brandId,
-            brand_id: generatedAsset.brand_id || generatedAsset.brandId,
-            campaignImages: generatedAsset.campaign_images || generatedAsset.campaignImages,
-            campaign_images: generatedAsset.campaign_images || generatedAsset.campaignImages,
-            baseImageUrl: generatedAsset.base_image_url || generatedAsset.baseImageUrl,
-            base_image_url: generatedAsset.base_image_url || generatedAsset.baseImageUrl,
-            userPrompt: generatedAsset.user_prompt || generatedAsset.userPrompt,
-            user_prompt: generatedAsset.user_prompt || generatedAsset.userPrompt,
-            feedbackHistory: generatedAsset.feedback_history || generatedAsset.feedbackHistory,
-            feedback_history: generatedAsset.feedback_history || generatedAsset.feedbackHistory,
-            timestamp: generatedAsset.created_at ? new Date(generatedAsset.created_at).getTime() : (generatedAsset.timestamp || Date.now())
-          };
+          // Auto-download the generated image
+          const imageUrl = result.image_url;
+          if (imageUrl) {
+            const link = document.createElement('a');
+            link.href = imageUrl;
+            link.download = `background-${Date.now()}-${photoIndex}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }
           
           // Collect asset info for sequential coherence
-          const strategy = generatedAsset.strategy as any;
+          const strategy = result.strategy as any;
           previousBGAssets.push({
             productFocus: productFocus[i] || '',
             visualStyle: strategy?.step_1_image_generation?.composition_notes || strategy?.step_1_image_generation?.reasoning || ''
           });
-          
-          // Immediately call onAssetCreated - don't wait for batch to complete
-          onAssetCreated(frontendAsset);
         }
         
-        setStatusText('All backgrounds processed!');
+        setStatusText('All backgrounds downloaded!');
         setCurrentStep(total);
         
         // Reset loading state
