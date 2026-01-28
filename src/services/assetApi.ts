@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { GeneratedAsset } from '../models/types.js';
+import { GeneratedAsset, ImageModel } from '../models/types.js';
 
 export const assetApi = {
   getAll: (brandId?: string, limit?: number) => {
@@ -19,6 +19,7 @@ export const assetApi = {
     width?: number;
     height?: number;
     previousAssets?: Array<{ productFocus: string; title?: string; subtitle?: string; visualStyle?: string }>;
+    imageModel?: ImageModel;
   }) => api.post<GeneratedAsset>('/assets/generate/product', data),
   
   generateNonProduct: (data: {
@@ -28,6 +29,7 @@ export const assetApi = {
     logoUrl?: string;
     brandImageUrls?: string[];
     previousAssets?: Array<{ userPurpose: string; headline?: string; visualStyle?: string }>;
+    imageModel?: ImageModel;
   }) => api.post<GeneratedAsset>('/assets/generate/non-product', data),
   
   generateBackground: (data: {
@@ -37,12 +39,14 @@ export const assetApi = {
     width?: number;
     height?: number;
     previousAssets?: Array<{ productFocus: string; visualStyle?: string }>;
+    imageModel?: ImageModel;
   }) => api.post<{ image_url: string; strategy: any; productFocus: string }>('/assets/generate/background', data),
   
   generateCampaign: (data: {
     brandId: string;
     campaignDetails: string;
     postCount: number;
+    imageModel?: ImageModel;
   }) => api.post<GeneratedAsset>('/assets/generate/campaign', data),
   
   editImage: (id: string, feedback: string) =>

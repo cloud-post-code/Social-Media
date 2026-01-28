@@ -11,6 +11,7 @@
     "migrate": "tsx src/migrations/migrate.ts"
   },
   "dependencies": {
+    "@fal-ai/client": "^1.2.0",
     "@google/genai": "^1.37.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

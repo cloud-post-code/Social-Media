@@ -1,5 +1,20 @@
 // Frontend type definitions (camelCase, may include snake_case from API)
 
+// Image generation model types
+export type ImageModel = 'flux-2-dev' | 'seedream-4.5' | 'recraft-v3';
+
+export interface ImageModelInfo {
+  id: ImageModel;
+  name: string;
+  description: string;
+}
+
+export const IMAGE_MODELS: ImageModelInfo[] = [
+  { id: 'flux-2-dev', name: 'FLUX.2 [dev]', description: 'High-quality, fast generation with excellent text rendering' },
+  { id: 'seedream-4.5', name: 'Seedream 4.5', description: 'ByteDance model, excellent detail preservation' },
+  { id: 'recraft-v3', name: 'Recraft v3', description: 'Top-ranked, excellent for brand-consistent imagery' },
+];
+
 export interface BrandDNA {
   id: string;
   name: string;

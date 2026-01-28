@@ -281,22 +281,27 @@ export const extractBrandDNA = async (input: { url?: string; imageBase64?: strin
     voiceInfo = {};
   }
 
-  // Step 4: Extract Strategic Profile
+  // Step 4: Extract Strategic Profile (business-type agnostic)
   const strategicPrompt = `
     You are an expert Marketing Strategist and Brand Analyst.
     Analyze the ${source} to extract strategic positioning information.
     ${urlContext}
     
+    IMPORTANT: This could be ANY type of business - a product company, service provider, agency, studio, 
+    consultancy, non-profit, creative firm, or any other organization. Do NOT assume it sells products.
+    Analyze what the business ACTUALLY does based on the website content.
+    
     Focus specifically on:
-    - Target audience (specific demographic and psychographic description)
-    - Core value proposition (main benefit or promise the brand makes)
-    - Product category (industry niche or category)
+    - Target audience (specific demographic and psychographic description - who are their clients/customers?)
+    - Core value proposition (main benefit or promise the brand makes - what unique value do they deliver?)
+    - Industry category (the industry, niche, or sector they operate in - e.g., "Architecture & Design", 
+      "Technology Consulting", "Fashion Retail", "Healthcare Services", "Creative Agency", etc.)
     
     Return ONLY a JSON object with this exact structure:
     {
-      "target_audience": "Specific audience description",
-      "core_value_prop": "Main benefit promised",
-      "product_category": "Industry niche"
+      "target_audience": "Specific audience description based on actual website content",
+      "core_value_prop": "Main benefit or value they deliver to clients/customers",
+      "product_category": "Industry or sector (NOT assuming it's a product - could be services, consulting, etc.)"
     }
     
     Return ONLY JSON. No markdown, no explanations.
@@ -709,6 +714,7 @@ export const extractBrandVoice = async (input: { url?: string; imageBase64?: str
 
 /**
  * Step 4: Extract Strategic Profile (target audience, value prop, category)
+ * Updated to be business-type agnostic (works for service companies, agencies, studios, etc.)
  */
 export const extractStrategicProfile = async (input: { url?: string; imageBase64?: string }): Promise<{
   target_audience: string;
@@ -726,16 +732,21 @@ export const extractStrategicProfile = async (input: { url?: string; imageBase64
     Analyze the ${source} to extract strategic positioning information.
     ${urlContext}
     
+    IMPORTANT: This could be ANY type of business - a product company, service provider, agency, studio, 
+    consultancy, non-profit, creative firm, or any other organization. Do NOT assume it sells products.
+    Analyze what the business ACTUALLY does based on the website content.
+    
     Focus specifically on:
-    - Target audience (specific demographic and psychographic description)
-    - Core value proposition (main benefit or promise the brand makes)
-    - Product category (industry niche or category)
+    - Target audience (specific demographic and psychographic description - who are their clients/customers?)
+    - Core value proposition (main benefit or promise the brand makes - what unique value do they deliver?)
+    - Industry category (the industry, niche, or sector they operate in - e.g., "Architecture & Design", 
+      "Technology Consulting", "Fashion Retail", "Healthcare Services", "Creative Agency", etc.)
     
     Return ONLY a JSON object with this exact structure:
     {
-      "target_audience": "Specific audience description",
-      "core_value_prop": "Main benefit promised",
-      "product_category": "Industry niche"
+      "target_audience": "Specific audience description based on actual website content",
+      "core_value_prop": "Main benefit or value they deliver to clients/customers",
+      "product_category": "Industry or sector (NOT assuming it's a product - could be services, consulting, etc.)"
     }
     
     Return ONLY JSON. No markdown, no explanations.
@@ -839,11 +850,16 @@ export const extractBrandImages = async (url: string): Promise<{ logoUrl?: strin
       1. Analyze the DOM structure to understand where images are located
       2. Write executable JavaScript code that uses Puppeteer to:
          - Identify the logo image (typically in header/navbar - look for images in navigation elements)
-         - Extract 3-10 key brand images (hero images, product images, lifestyle images, etc.)
+         - Extract 3-10 key brand images that represent the organization visually:
+           - Hero/banner images, featured imagery, portfolio/project images
+           - Team photos, office/workspace images, case study images
+           - Service illustrations, work samples, or any representative visuals
            - Prioritize high-quality, representative images
            - Avoid duplicates or very similar images
-           - Focus on images that represent the brand visually
-           - Look for images in the main content area, hero sections, and product galleries
+           - Look for images in hero sections, galleries, portfolio areas, about sections
+      
+      NOTE: This could be any type of organization (agency, studio, consultancy, retailer, etc.)
+      Focus on images that best represent the brand visually, regardless of business type.
       
       IMPORTANT CODE REQUIREMENTS:
       - The code will run in a Node.js VM with a Puppeteer Page object already available as 'page'
@@ -953,13 +969,20 @@ async function extractBrandImagesFallback(url: string): Promise<{ logoUrl?: stri
     Analyze the website at ${url} to extract brand images.
     ${urlContext}
     
+    NOTE: This could be any type of organization - a product company, service provider, agency, 
+    architecture studio, consultancy, non-profit, or any other business. Adapt your image extraction 
+    based on what the website actually contains.
+    
     Your task:
     1. Identify the logo image URL (the main brand logo, typically in header/navbar)
-    2. Extract 3-10 key brand images (hero images, product images, lifestyle images, etc.)
+    2. Extract 3-10 key brand images that represent the organization visually:
+       - Hero/banner images, featured imagery
+       - Portfolio/project images, case studies, work samples
+       - Team photos, office/workspace images
+       - Service illustrations or representative visuals
        - Prioritize high-quality, representative images
        - Avoid duplicates or very similar images
-       - Focus on images that represent the brand visually
-       - Look for images in the main content area, hero sections, and product galleries
+       - Look for images in hero sections, galleries, portfolio areas, about sections
     
     Return ONLY a JSON object with this exact structure:
     {

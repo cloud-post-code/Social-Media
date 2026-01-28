@@ -2,9 +2,37 @@ import { Request, Response, NextFunction } from 'express';
 import * as assetService from '../services/assetService.js';
 import * as brandService from '../services/brandService.js';
 import * as geminiService from '../services/geminiService.js';
+import * as imageGenerationService from '../services/imageGenerationService.js';
 import * as imageOverlayService from '../services/imageOverlayService.js';
-import { BrandDNA, OverlayConfig } from '../types/index.js';
+import { BrandDNA, OverlayConfig, ImageModel } from '../types/index.js';
 import sharp from 'sharp';
+
+/**
+ * Helper function to generate image using either fal.ai models or Gemini
+ * If imageModel is provided, uses fal.ai; otherwise falls back to Gemini
+ */
+const generateImageWithModel = async (
+  prompt: string,
+  width: number = 1080,
+  height: number = 1080,
+  referenceImageBase64?: string,
+  imageModel?: ImageModel
+): Promise<string> => {
+  if (imageModel && imageGenerationService.isValidModel(imageModel)) {
+    console.log(`[AssetController] Using fal.ai model: ${imageModel}`);
+    return imageGenerationService.generateImage(
+      imageModel,
+      prompt,
+      width,
+      height,
+      referenceImageBase64
+    );
+  }
+  
+  // Default to Gemini for backward compatibility
+  console.log('[AssetController] Using default Gemini model');
+  return geminiService.generateImage(prompt, width, height, referenceImageBase64);
+};
 
 // Utility function to strip markdown syntax from text
 const stripMarkdown = (text: string): string => {
@@ -45,7 +73,7 @@ export const getAssetById = async (req: Request, res: Response, next: NextFuncti
 
 export const generateProductAsset = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { brandId, productFocus, referenceImageBase64, width, height, previousAssets } = req.body;
+    const { brandId, productFocus, referenceImageBase64, width, height, previousAssets, imageModel } = req.body;
 
     if (!brandId || !productFocus) {
       return res.status(400).json({ 
@@ -71,11 +99,12 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
       throw new Error('Image prompt generation failed');
     }
 
-    let baseImageUrl = await geminiService.generateImage(
+    let baseImageUrl = await generateImageWithModel(
       imagePromptResult.imagen_prompt_final,
       width || 1080,
       height || 1080,
-      referenceImageBase64 // Pass reference image to Nano Banana
+      referenceImageBase64,
+      imageModel as ImageModel
     );
 
     // Step 1.5: Verify product accuracy if reference image provided
@@ -103,11 +132,12 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
         // Enhance the prompt with specific recommendations
         const enhancedPrompt = `${imagePromptResult.imagen_prompt_final}\n\nCRITICAL CORRECTIONS NEEDED:\n${verificationResult.recommendations.map((rec, i) => `${i + 1}. ${rec}`).join('\n')}\n\nYou MUST address ALL these corrections. The product must match the reference exactly.`;
 
-        baseImageUrl = await geminiService.generateImage(
+        baseImageUrl = await generateImageWithModel(
           enhancedPrompt,
           width || 1080,
           height || 1080,
-          referenceImageBase64 // Pass reference image to Nano Banana on retry
+          referenceImageBase64,
+          imageModel as ImageModel
         );
 
         // Verify again
@@ -264,7 +294,7 @@ export const generateProductAsset = async (req: Request, res: Response, next: Ne
  */
 export const generateProductBGAsset = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { brandId, productFocus, referenceImageBase64, width, height, previousAssets } = req.body;
+    const { brandId, productFocus, referenceImageBase64, width, height, previousAssets, imageModel } = req.body;
 
     if (!brandId) {
       return res.status(400).json({ 
@@ -292,11 +322,12 @@ export const generateProductBGAsset = async (req: Request, res: Response, next: 
       throw new Error('Image prompt generation failed');
     }
 
-    let baseImageUrl = await geminiService.generateImage(
+    let baseImageUrl = await generateImageWithModel(
       imagePromptResult.imagen_prompt_final,
       width || 1080,
       height || 1080,
-      referenceImageBase64 // Pass reference image to Nano Banana
+      referenceImageBase64,
+      imageModel as ImageModel
     );
 
     // Step 1.5: Verify product accuracy if reference image provided
@@ -324,11 +355,12 @@ export const generateProductBGAsset = async (req: Request, res: Response, next: 
         // Enhance the prompt with specific recommendations
         const enhancedPrompt = `${imagePromptResult.imagen_prompt_final}\n\nCRITICAL CORRECTIONS NEEDED:\n${verificationResult.recommendations.map((rec, i) => `${i + 1}. ${rec}`).join('\n')}\n\nYou MUST address ALL these corrections. The product must match the reference exactly.`;
 
-        baseImageUrl = await geminiService.generateImage(
+        baseImageUrl = await generateImageWithModel(
           enhancedPrompt,
           width || 1080,
           height || 1080,
-          referenceImageBase64 // Pass reference image to Nano Banana on retry
+          referenceImageBase64,
+          imageModel as ImageModel
         );
 
         // Verify again
@@ -512,7 +544,7 @@ export const updateProductOverlay = async (req: Request, res: Response, next: Ne
 
 export const generateNonProductAsset = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { brandId, userPurpose, useExactLogo, logoUrl, brandImageUrls, previousAssets } = req.body;
+    const { brandId, userPurpose, useExactLogo, logoUrl, brandImageUrls, previousAssets, imageModel } = req.body;
 
     if (!brandId || !userPurpose) {
       return res.status(400).json({ 
@@ -538,8 +570,12 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
       throw new Error('Strategy generation failed to provide a prompt');
     }
 
-    let baseImageUrl = await geminiService.generateImage(
-      strategy.step_1_visual_concept.imagen_prompt_final
+    let baseImageUrl = await generateImageWithModel(
+      strategy.step_1_visual_concept.imagen_prompt_final,
+      1080, // Default width for non-product
+      1080, // Default height for non-product
+      undefined, // No reference image for non-product
+      imageModel as ImageModel
     );
 
     // Convert strategy message into overlay_config (similar to product posts)
@@ -647,7 +683,7 @@ export const generateNonProductAsset = async (req: Request, res: Response, next:
 
 export const generateCampaignAsset = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { brandId, campaignDetails, postCount } = req.body;
+    const { brandId, campaignDetails, postCount, imageModel } = req.body;
 
     if (!brandId || !campaignDetails || !postCount) {
       return res.status(400).json({ 
@@ -668,7 +704,7 @@ export const generateCampaignAsset = async (req: Request, res: Response, next: N
 
     let campaignImages = await Promise.all(
       (campaignStrategy.posts || []).map((p: any) => 
-        geminiService.generateImage(p.visual_prompt)
+        generateImageWithModel(p.visual_prompt, 1080, 1080, undefined, imageModel as ImageModel)
       )
     );
 

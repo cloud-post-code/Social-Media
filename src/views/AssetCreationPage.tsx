@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { BrandDNA, GeneratedAsset, GenerationOption } from '../models/types.js';
+import { BrandDNA, GeneratedAsset, GenerationOption, ImageModel } from '../models/types.js';
 import { assetApi } from '../services/assetApi.js';
 import { useBrandAssets } from '../hooks/useBrandAssets.js';
 import GenerationProgressBar from '../components/GenerationProgressBar.js';
+import ModelSelector from '../components/ModelSelector.js';
 
 interface AssetCreationPageProps {
   activeBrand: BrandDNA | null;
@@ -35,6 +36,9 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
   const [imageSizePreset, setImageSizePreset] = useState<'story' | 'square' | 'custom'>('square');
   const [customWidth, setCustomWidth] = useState<number>(1080);
   const [customHeight, setCustomHeight] = useState<number>(1080);
+  
+  // Image model selection
+  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel | undefined>(undefined);
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -128,7 +132,8 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             referenceImageBase64: imagesToProcess[i] || undefined,
             width: dimensions.width,
             height: dimensions.height,
-            previousAssets: previousProductAssets.length > 0 ? previousProductAssets : undefined
+            previousAssets: previousProductAssets.length > 0 ? previousProductAssets : undefined,
+            imageModel: selectedImageModel
           });
           
           // Step 3: Text and overlay processing complete
@@ -215,7 +220,8 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             referenceImageBase64: imagesToProcess[i] || undefined,
             width: dimensions.width,
             height: dimensions.height,
-            previousAssets: previousBGAssets.length > 0 ? previousBGAssets : undefined
+            previousAssets: previousBGAssets.length > 0 ? previousBGAssets : undefined,
+            imageModel: selectedImageModel
           });
           
           // Step 2: Download the image
@@ -282,7 +288,8 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
             useExactLogo,
             logoUrl: useExactLogo && logo ? logo.image_url : undefined,
             brandImageUrls: brandImages.length > 0 ? brandImages.map(img => img.image_url) : undefined,
-            previousAssets: previousNonProductAssets.length > 0 ? previousNonProductAssets : undefined
+            previousAssets: previousNonProductAssets.length > 0 ? previousNonProductAssets : undefined,
+            imageModel: selectedImageModel
           });
           
           // Step 3: Final output
@@ -517,6 +524,16 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                   )}
               </div>
               
+              {/* Image Model Selector */}
+              <div className="space-y-3">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">AI Model</label>
+                <ModelSelector
+                  selectedModel={selectedImageModel}
+                  onModelChange={setSelectedImageModel}
+                  disabled={loading}
+                />
+              </div>
+              
               {/* Progress Bar */}
               {loading && startTime !== null && (
                 <div key="product-progress" className="p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
@@ -674,6 +691,16 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                   )}
               </div>
               
+              {/* Image Model Selector */}
+              <div className="space-y-3">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">AI Model</label>
+                <ModelSelector
+                  selectedModel={selectedImageModel}
+                  onModelChange={setSelectedImageModel}
+                  disabled={loading}
+                />
+              </div>
+              
               {/* Progress Bar */}
               {loading && startTime !== null && (
                 <div key="background-progress" className="p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
@@ -769,6 +796,16 @@ const AssetCreationPage: React.FC<AssetCreationPageProps> = ({ activeBrand, onAs
                   </div>
                 </div>
                 <p className="text-xs text-slate-500 ml-4">Generate multiple variations (up to 10 at a time)</p>
+              </div>
+              
+              {/* Image Model Selector */}
+              <div className="space-y-3">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-4">AI Model</label>
+                <ModelSelector
+                  selectedModel={selectedImageModel}
+                  onModelChange={setSelectedImageModel}
+                  disabled={loading}
+                />
               </div>
               
               {/* Progress Bar */}
